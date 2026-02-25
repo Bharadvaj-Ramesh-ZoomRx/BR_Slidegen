@@ -1,0 +1,25 @@
+# ── Sensitive / proprietary source files ──────────────────────────────────────
+# Do NOT commit survey data, client templates, or output decks.
+# Place these files locally before running scripts.
+Lung SFEA SB.xlsx
+Rybrevant - Associate Asks.docx
+Rybrevant - Market, Client context and Business Hypotheses.xlsx
+JJ PET RYBREVANT+LAZCLUZE Q4'25 Report.pptx
+
+# ── Generated output files (large binaries) ────────────────────────────────────
+Rybrevant_Analysis_Deck*.pptx
+Slide1_MR_ME_Final*.pptx
+
+# ── Intermediate data (auto-generated, binary) ─────────────────────────────────
+*.pkl
+
+# ── Python cache ───────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Office temp files ──────────────────────────────────────────────────────────
+~$*
+
+# ── Misc artifacts ─────────────────────────────────────────────────────────────
+nul
