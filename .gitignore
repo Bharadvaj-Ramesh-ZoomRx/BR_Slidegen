@@ -26,7 +26,8 @@ output_deck.pptx
 archive/pptx.zip
 
 # ── Claude Code auto-memory (session-specific) ──────────────────────────────
-.claude/
+.claude/*
+!.claude/skills/
 
 # ── OS files ─────────────────────────────────────────────────────────────────
 Thumbs.db
