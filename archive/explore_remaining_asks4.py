@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-XLSX = os.path.join(ROOT, "J_and_J_project", "data", "Lung SFEA SB.xlsx")
+XLSX = os.path.join(ROOT, "projects/jnj_rybrevant", "data", "Lung SFEA SB.xlsx")
 
 pd.set_option("display.max_columns", 35)
 pd.set_option("display.width", 250)

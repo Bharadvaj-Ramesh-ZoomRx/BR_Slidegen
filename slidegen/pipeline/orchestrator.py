@@ -3,7 +3,7 @@ orchestrator.py — Ties config + data + renderers into a complete deck.
 
 Usage:
     from slidegen.pipeline import generate_deck
-    generate_deck("projects/jnj_rybrevant.yaml")
+    generate_deck("projects/jnj_rybrevant/config.yaml")
 """
 
 from __future__ import annotations

@@ -17,8 +17,7 @@ EDIT_LOG_PATH = os.path.join(SLIDEGEN_DIR, "edit_log.json")
 # ── Client template (override per-project in CLAUDE.md or env var) ───────────
 TEMPLATE_PATH = os.environ.get(
     "SLIDEGEN_TEMPLATE",
-    os.path.join(PROJECT_ROOT, "J_and_J_project", "templates",
-                 "JJ PET RYBREVANT+LAZCLUZE Q4'25 Report 1.pptx"),
+    os.path.join(PROJECT_ROOT, "projects", "jnj_rybrevant", "templates", "template.pptx"),
 )
 
 # ── Slide dimensions (widescreen 13.333" x 7.5") ────────────────────────────

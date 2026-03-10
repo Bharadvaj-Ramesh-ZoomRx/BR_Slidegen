@@ -9,9 +9,9 @@ project:
   period_prior: "Q3'25"
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-data_source_path: "J_and_J_project/data/Lung SFEA SB.xlsx"
-template_path: "J_and_J_project/templates/JJ PET RYBREVANT+LAZCLUZE Q4'25 Report 1.pptx"
-output_path: "J_and_J_project/output/Rybrevant_Asks_Deck.pptx"
+data_source_path: "data/source_data.xlsx"
+template_path: "templates/template.pptx"
+output_path: "output/deck.pptx"
 
 # ── Brands ───────────────────────────────────────────────────────────────────
 brands:

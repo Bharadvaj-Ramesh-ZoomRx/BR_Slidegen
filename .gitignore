@@ -1,18 +1,14 @@
-# ── Sensitive / proprietary source files ──────────────────────────────────────
-# Do NOT commit survey data, client templates, or output decks.
-# Place these files locally before running scripts.
-Lung SFEA SB.xlsx
-Rybrevant - Associate Asks.docx
-Rybrevant - Market, Client context and Business Hypotheses.xlsx
-JJ PET RYBREVANT+LAZCLUZE Q4'25 Report.pptx
+# ── Project data files (data, templates, output, reference per project) ──────
+# All proprietary content lives under projects/<name>/ subdirectories.
+projects/*/data/
+projects/*/templates/
+projects/*/output/
+projects/*/reference/
 
 # ── Generated output files ───────────────────────────────────────────────────
 output/
 slidegen/output/
 slidegen/slide_registry.json
-
-# ── Client context files (data, templates, output) ──────────────────────────
-J_and_J_project/
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/

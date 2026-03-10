@@ -1,8 +1,8 @@
 """
 generate_asks.py
 ────────────────
-Generates the Rybrevant ask-response deck from Lung SFEA SB.xlsx.
-Each slide answers a specific ask from rybrevant-ask.md.
+Generates the Rybrevant ask-response deck from source_data.xlsx.
+Each slide answers a specific ask from projects/jnj_rybrevant/reference/asks.md.
 
 Usage:
     python src/generate_asks.py
@@ -37,10 +37,9 @@ from slidegen.pptx_utils import (
 )
 
 # ── Paths ──
-XLSX = os.path.join(ROOT, "J_and_J_project", "data", "Lung SFEA SB.xlsx")
-TMPL = os.path.join(ROOT, "J_and_J_project", "templates",
-                    "JJ PET RYBREVANT+LAZCLUZE Q4'25 Report 1.pptx")
-OUT  = os.path.join(ROOT, "J_and_J_project", "output", "Rybrevant_Asks_Deck_v2.pptx")
+XLSX = os.path.join(ROOT, "projects", "jnj_rybrevant", "data", "source_data.xlsx")
+TMPL = os.path.join(ROOT, "projects", "jnj_rybrevant", "templates", "template.pptx")
+OUT  = os.path.join(ROOT, "projects", "jnj_rybrevant", "output", "deck_legacy.pptx")
 
 # ── Extra brand colours ──
 C_TAG_Q3     = RGBColor(0xAD, 0x88, 0xC8)   # light purple for Q3

@@ -132,7 +132,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     with open(yaml_path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(yaml_path)))
+    project_dir = os.path.dirname(os.path.abspath(yaml_path))
 
     # Brands
     brands = {}
@@ -192,15 +192,15 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     # Resolve paths relative to project root
     data_path = raw.get("data_source_path", "")
     if data_path and not os.path.isabs(data_path):
-        data_path = os.path.join(project_root, data_path)
+        data_path = os.path.join(project_dir, data_path)
 
     tmpl_path = raw.get("template_path", "")
     if tmpl_path and not os.path.isabs(tmpl_path):
-        tmpl_path = os.path.join(project_root, tmpl_path)
+        tmpl_path = os.path.join(project_dir, tmpl_path)
 
     out_path = raw.get("output_path", "")
     if out_path and not os.path.isabs(out_path):
-        out_path = os.path.join(project_root, out_path)
+        out_path = os.path.join(project_dir, out_path)
 
     return ProjectConfig(
         name=raw["project"]["name"],
