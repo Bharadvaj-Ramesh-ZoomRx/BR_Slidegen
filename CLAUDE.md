@@ -15,19 +15,41 @@ Pharma consulting report generator for **Rybrevant (RYB) + Lazcluze** vs **Tagri
 │   ├── generate_slide1.py  # Step 2b: pkl + template → polished Slide 1
 │   └── validate_data.py    # Step 3: cross-check pkl against raw Excel
 ├── scripts/                # Ad-hoc exploration & discovery
-│   ├── discover_data.py    # Explores Excel sheets, outputs column_mapping.csv
-│   ├── explore.py          # Quick data inspection
-│   └── explore2.py         # Quick data inspection
-├── archive/                # Superseded v1 scripts
+│   └── discover_data.py    # Explores Excel sheets, outputs column_mapping.csv
+├── archive/                # Superseded scripts & old artifacts
 │   ├── extract_data_v1.py
-│   └── generate_pptx_v1.py
+│   ├── generate_pptx_v1.py
+│   ├── explore.py          # One-off data inspection scripts
+│   ├── explore2.py
+│   └── pptx.zip            # Backup of pptx skill package
 ├── output/                 # Generated artifacts (gitignored)
 │   ├── slide_data_v2.pkl
 │   ├── Rybrevant_Analysis_Deck_v2.pptx
 │   ├── Slide1_MR_ME_Final_v5.pptx
 │   └── validation_report_v2.txt
-├── docs/
-│   └── session_trace_2026-02-24.md
+├── docs/                   # Design docs & session history
+│   ├── session_trace_2026-02-24.md
+│   ├── SlideGen PRD — Detailed Reference.md
+│   └── SlideGen — Architecture Exploration.md
+├── J_and_J_project/        # Client context files (gitignored)
+│   ├── data/               # Source Excel files
+│   ├── reference/          # Client briefs & asks
+│   ├── templates/          # Template decks
+│   └── output/             # Generated deliverables
+├── slidegen/               # SlideGen system — create + live-edit slides
+│   ├── __init__.py         # Package exports: SlideBuilder, LiveEditor, reconcile
+│   ├── __main__.py         # CLI: python -m slidegen <create|edit|reconcile>
+│   ├── config.py           # Centralized paths and settings
+│   ├── pptx_utils.py       # Utility library (50+ functions, lxml/COM/registry)
+│   ├── create.py           # SlideBuilder class — python-pptx creation + registry
+│   ├── edit.py             # LiveEditor class — win32com live editing + edit log
+│   ├── reconcile.py        # Registry reconciliation from live PowerPoint state
+│   ├── slide_registry.json # Shape state (created at runtime, gitignored)
+│   └── output/             # Generated slides (gitignored)
+├── .claude/skills/         # Claude Code skills (auto-discovered)
+│   ├── pptx/               # PPTX read/create/edit skill
+│   ├── jj-slide-style/     # J&J brand styling skill
+│   └── pptx-utils/         # python-pptx helper utilities
 ├── column_mapping.csv
 └── .gitignore
 ```
@@ -37,15 +59,18 @@ All scripts resolve paths relative to the project root via `os.path.dirname(os.p
 ## Running
 
 ```bash
-# Full pipeline (extract → generate → validate)
-python src/extract_data.py
-python src/generate_pptx.py
-python src/validate_data.py
+# ── R3M Report Pipeline (existing POC) ──
+python src/extract_data.py      # Excel → output/slide_data_v2.pkl
+python src/generate_pptx.py     # pkl → full 15-slide deck
+python src/validate_data.py     # cross-check pkl against raw Excel
+python src/generate_slide1.py   # pkl + template → polished Slide 1
 
-# Single polished slide (requires template PPTX in project root)
-python src/generate_slide1.py
+# ── SlideGen System ──
+python -m slidegen create                   # Demo slide creation
+python -m slidegen edit <filename.pptx>     # Interactive live editor
+python -m slidegen reconcile <filename.pptx> # Sync registry from PowerPoint
 
-# Data discovery
+# ── Data discovery ──
 python scripts/discover_data.py
 ```
 
@@ -70,4 +95,31 @@ All scripts read `Lung SFEA SB.xlsx` (placed in project root, gitignored) with `
 - `pandas`, `openpyxl` (Excel reading)
 - `python-pptx` (PowerPoint generation)
 - `matplotlib`, `numpy` (chart rendering in `generate_pptx.py`)
-- `lxml` (XML manipulation for native PPT charts in `generate_slide1.py`)
+- `lxml` (XML manipulation for native PPT charts)
+- `pywin32` (win32com — live PowerPoint editing via COM)
+
+## SlideGen API
+
+```python
+# Create a slide
+from slidegen.create import SlideBuilder
+builder = SlideBuilder(template="path/to/template.pptx")
+slide = builder.add_blank_slide()
+builder.add_clustered_bar(slide, categories, series_data, ...)
+builder.add_delta_column(slide, deltas, ...)
+builder.add_textbox(slide, text, ...)
+builder.save("output.pptx")  # also writes slide_registry.json
+
+# Edit live (file must be open in PowerPoint)
+from slidegen.edit import LiveEditor
+with LiveEditor("output.pptx") as editor:
+    editor.set_text("zrx_001", "New text", color="red")
+    editor.move("zrx_002", left=5.0, top=2.0)
+    editor.set_fill("zrx_003", "#00B050")
+    editor.undo_last()
+
+# Reconcile before editing (absorbs manual edits from PowerPoint)
+from slidegen.reconcile import reconcile
+report = reconcile("output.pptx")
+# report: {found, missing, unregistered, duplicates, changes, ok}
+```

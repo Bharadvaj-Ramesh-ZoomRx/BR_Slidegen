@@ -8,14 +8,35 @@ JJ PET RYBREVANT+LAZCLUZE Q4'25 Report.pptx
 
 # ── Generated output files ───────────────────────────────────────────────────
 output/
+slidegen/output/
+slidegen/slide_registry.json
+
+# ── Client context files (data, templates, output) ──────────────────────────
+J_and_J_project/
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
 # ── Office temp files ────────────────────────────────────────────────────────
 ~$*
 
-# ── Misc artifacts ───────────────────────────────────────────────────────────
+# ── Temp / test artifacts ────────────────────────────────────────────────────
+test_*.pptx
+output_deck.pptx
+*.tmp
+archive/pptx.zip
+
+# ── Claude Code auto-memory (session-specific) ──────────────────────────────
+.claude/
+
+# ── OS files ─────────────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
 nul
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
