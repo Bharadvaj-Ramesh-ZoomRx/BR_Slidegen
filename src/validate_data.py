@@ -1,5 +1,5 @@
 """
-validate_data_v2.py  –  Verifies every data point used in Rybrevant_Analysis_Deck_v2.pptx
+validate_data.py  –  Verifies every data point used in Rybrevant_Analysis_Deck_v2.pptx
 against the raw source in Lung SFEA SB.xlsx.
 
 Output: validation_report_v2.txt (and console)
@@ -24,14 +24,14 @@ import pickle
 import math
 import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XLSX = os.path.join(BASE_DIR, "Lung SFEA SB.xlsx")
 
 ryb = pd.read_excel(XLSX, sheet_name="RYB",               header=None)
 tag = pd.read_excel(XLSX, sheet_name="TAG",               header=None)
 aa  = pd.read_excel(XLSX, sheet_name="Additonal Analysis", header=None)
 
-with open(os.path.join(BASE_DIR, "slide_data_v2.pkl"), "rb") as f:
+with open(os.path.join(BASE_DIR, "output", "slide_data_v2.pkl"), "rb") as f:
     D = pickle.load(f)
 
 
@@ -406,7 +406,7 @@ for (slide, lbl, src, status) in results:
 report_text = "".join(lines)
 
 # Save report
-report_path = os.path.join(BASE_DIR, "validation_report_v2.txt")
+report_path = os.path.join(BASE_DIR, "output", "validation_report_v2.txt")
 with open(report_path, "w", encoding="utf-8") as f:
     f.write(report_text)
 

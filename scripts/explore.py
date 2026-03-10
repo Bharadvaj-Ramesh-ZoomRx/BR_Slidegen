@@ -1,6 +1,7 @@
-import pandas as pd, sys, io
+import pandas as pd, sys, io, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-XLSX = 'Lung SFEA SB.xlsx'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+XLSX = os.path.join(BASE_DIR, 'Lung SFEA SB.xlsx')
 tag = pd.read_excel(XLSX, sheet_name='TAG', header=None)
 ryb = pd.read_excel(XLSX, sheet_name='RYB', header=None)
 aa  = pd.read_excel(XLSX, sheet_name='Additonal Analysis', header=None)

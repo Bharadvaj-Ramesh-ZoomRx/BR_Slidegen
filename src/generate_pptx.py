@@ -1,5 +1,5 @@
 """
-generate_pptx_v2.py  –  Builds Rybrevant_Analysis_Deck_v2.pptx
+generate_pptx.py  –  Builds Rybrevant_Analysis_Deck_v2.pptx
 Reads slide_data_v2.pkl and produces a deck styled to match the
 JJ PET RYBREVANT+LAZCLUZE Q4'25 Report template.
 
@@ -37,8 +37,8 @@ import pptx.oxml.ns as nsmap
 from lxml import etree
 
 # ─── Load data ────────────────────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(BASE_DIR, "slide_data_v2.pkl"), "rb") as f:
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(BASE_DIR, "output", "slide_data_v2.pkl"), "rb") as f:
     D = pickle.load(f)
 
 # ─── Brand colors ─────────────────────────────────────────────────────────────
@@ -1018,7 +1018,7 @@ slide_footer(s, f"Source: AA rows 44–47, 105–110 | PA: Closing_Rates, High_I
 # ──────────────────────────────────────────────────────────────────────────────
 # Save
 # ──────────────────────────────────────────────────────────────────────────────
-out_path = os.path.join(BASE_DIR, "Rybrevant_Analysis_Deck_v2.pptx")
+out_path = os.path.join(BASE_DIR, "output", "Rybrevant_Analysis_Deck_v2.pptx")
 prs.save(out_path)
 print(f"Saved: {out_path}")
 print(f"Slides: {len(prs.slides)}")

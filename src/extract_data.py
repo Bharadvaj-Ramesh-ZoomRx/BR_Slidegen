@@ -1,6 +1,6 @@
 """
-extract_data_v2.py  –  v2 data extraction for all updated Associate Asks slides.
-Reads Lung SFEA SB.xlsx and saves structured data to slide_data_v2.pkl.
+extract_data.py  –  Data extraction for all updated Associate Asks slides.
+Reads Lung SFEA SB.xlsx and saves structured data to output/slide_data_v2.pkl.
 
 Key survey IDs in Lung SFEA SB.xlsx:
   RYB IM sheet  : col7=Q3_Total,  col17=Q4_Total
@@ -13,7 +13,7 @@ import pickle
 import math
 import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XLSX = os.path.join(BASE_DIR, "Lung SFEA SB.xlsx")
 
 ryb = pd.read_excel(XLSX, sheet_name="RYB",               header=None)
@@ -496,7 +496,8 @@ all_data = {
     "meta":                 meta,
 }
 
-out_pkl = os.path.join(BASE_DIR, "slide_data_v2.pkl")
+out_pkl = os.path.join(BASE_DIR, "output", "slide_data_v2.pkl")
+os.makedirs(os.path.dirname(out_pkl), exist_ok=True)
 with open(out_pkl, "wb") as f:
     pickle.dump(all_data, f)
 

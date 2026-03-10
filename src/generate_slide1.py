@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-generate_slide1_final.py
-────────────────────────
+generate_slide1.py
+───────────────────
 Single perfected client-delivery slide  –  Associate Ask #1
 RYB+LAZ Message Recall & Effectiveness
 
@@ -26,10 +26,10 @@ from pptx.chart.data import ChartData
 from pptx.oxml.ns import qn
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE     = r"C:\Users\VinothRajapandian\Documents\Claude Apps\Rybrevant - Experiment"
+BASE     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE = os.path.join(BASE, "JJ PET RYBREVANT+LAZCLUZE Q4'25 Report.pptx")
-PKL      = os.path.join(BASE, "slide_data_v2.pkl")
-OUT      = os.path.join(BASE, "Slide1_MR_ME_Final_v5.pptx")
+PKL      = os.path.join(BASE, "output", "slide_data_v2.pkl")
+OUT      = os.path.join(BASE, "output", "Slide1_MR_ME_Final_v5.pptx")
 
 # ── Brand colours ─────────────────────────────────────────────────────────────
 C_RYB_Q4  = RGBColor(0xF7, 0x58, 0x24)   # deep orange  – Q4 bars
