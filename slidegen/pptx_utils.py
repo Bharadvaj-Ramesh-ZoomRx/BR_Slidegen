@@ -556,7 +556,8 @@ def add_delta_col(slide, deltas, left, top, width, height, header,
     return tbl
 
 
-def slide_header(slide, headline, module_label="Personal Promotion Module"):
+def slide_header(slide, headline, module_label="Personal Promotion Module",
+                 font=None):
     """Add the standard ZoomRx slide header:
       - thin red accent line at very top
       - module label (top-right, small grey)
@@ -564,34 +565,37 @@ def slide_header(slide, headline, module_label="Personal Promotion Module"):
       - red module badge (top-right rectangle)
       - separator line below header
     """
+    f_display = font or FONT_DISPLAY
+    f_text = font or FONT_TEXT
+
     # Red accent line
     solidrect(slide, 0, 0.15, SLIDE_W_IN, 0.02, C_RED)
 
     # Module label
     textbox(slide, module_label,
             5.5, 0.01, 7.70, 0.22,
-            fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=FONT_TEXT)
+            fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_text)
 
     # Headline
     textbox(slide, headline,
             0.20, 0.20, 10.55, 1.05,
-            fsize=12, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=FONT_DISPLAY)
+            fsize=12, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=f_display)
 
     # Module badge
     solidrect(slide, 10.90, 0.20, 2.25, 0.95, C_RED)
     textbox(slide, "PERSONAL\nPROMOTION\nMODULE",
             10.90, 0.20, 2.25, 0.95,
-            fsize=8, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=FONT_DISPLAY)
+            fsize=8, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_display)
 
     # Separator line
     horiz_line(slide, 0.0, 1.32, SLIDE_W_IN, color=C_RED, width_pt=1.0)
 
 
-def slide_footer(slide, footer_text):
+def slide_footer(slide, footer_text, font=None):
     """Add standard footer text at bottom of slide."""
     textbox(slide, footer_text,
             0.15, 7.20, 13.0, 0.28,
-            fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=FONT_TEXT)
+            fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
 
 
 def manual_legend(slide, q4_n, q3_n,
@@ -682,7 +686,7 @@ def callout_box(slide, left, top, width, height, text=None,
     return shape
 
 
-def section_header_bar(slide, label, top=1.40, icon_path=None):
+def section_header_bar(slide, label, top=1.40, icon_path=None, font=None):
     """Add the gray icon+label strip used as a chart/question title on every data slide.
 
     Creates a light-gray rectangle spanning most of the slide width, with an
@@ -693,6 +697,7 @@ def section_header_bar(slide, label, top=1.40, icon_path=None):
         label: text label shown in the bar (uppercased automatically)
         top: y position in inches (default 1.40, just below slide_header)
         icon_path: path to a small PNG icon; None skips the icon
+        font: optional font name override
     Returns: the background rect shape
     """
     bar_l = 0.15
@@ -711,7 +716,7 @@ def section_header_bar(slide, label, top=1.40, icon_path=None):
 
     textbox(slide, label.upper(),
             text_l, top + 0.03, bar_w - 0.35, bar_h - 0.06,
-            fsize=9, bold=True, color=C_GREY, font=FONT_TEXT)
+            fsize=9, bold=True, color=C_GREY, font=font or FONT_TEXT)
     return bg
 
 
@@ -1170,3 +1175,253 @@ def registry_diff_slide(slide_idx, com_slide, path=None):
                     diffs.append({"name": name, "field": field,
                                   "registry_val": r_val, "live_val": l_val})
     return diffs
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. HIGH-LEVEL CHART BUILDERS
+#    Reusable chart + table patterns used by the pipeline slide renderers.
+# ══════════════════════════════════════════════════════════════════════════════
+
+from pptx.chart.data import CategoryChartData
+
+
+def enable_data_labels(series, color, fsize=8, num_fmt='0"%"', pos="outEnd",
+                       font_name=None):
+    """Enable and style data labels on a chart series.
+
+    Args:
+        pos: 'outEnd' for regular bars, 'ctr' for stacked bars.
+        font_name: override font (default uses FONT_TEXT).
+    """
+    plot = series._element.getparent()
+    plot_dLbls = plot.find(qn("c:dLbls"))
+    if plot_dLbls is None:
+        plot_dLbls = etree.SubElement(plot, qn("c:dLbls"))
+    _get_or_add(plot_dLbls, "c:showVal").set("val", "1")
+    _get_or_add(plot_dLbls, "c:showCatName").set("val", "0")
+    _get_or_add(plot_dLbls, "c:showSerName").set("val", "0")
+    _get_or_add(plot_dLbls, "c:showPercent").set("val", "0")
+
+    dLbls = _get_or_add(series._element, "c:dLbls")
+    _get_or_add(dLbls, "c:showVal").set("val", "1")
+    _get_or_add(dLbls, "c:showCatName").set("val", "0")
+    _get_or_add(dLbls, "c:showSerName").set("val", "0")
+    _get_or_add(dLbls, "c:showPercent").set("val", "0")
+    numFmt = _get_or_add(dLbls, "c:numFmt")
+    numFmt.set("formatCode", num_fmt)
+    numFmt.set("sourceLinked", "0")
+    dLblPos = _get_or_add(dLbls, "c:dLblPos")
+    dLblPos.set("val", pos)
+    set_data_label_color(series, color)
+
+    # Font
+    txPr = _get_or_add(dLbls, "c:txPr")
+    _get_or_add(txPr, "a:bodyPr")
+    _get_or_add(txPr, "a:lstStyle")
+    p = _get_or_add(txPr, "a:p")
+    pPr = _get_or_add(p, "a:pPr")
+    defRPr = _get_or_add(pPr, "a:defRPr")
+    defRPr.set("sz", str(int(fsize * 100)))
+    defRPr.set("b", "1")
+    sf = _get_or_add(defRPr, "a:solidFill")
+    clr = _get_or_add(sf, "a:srgbClr")
+    clr.set("val", str(color))
+    latin = _get_or_add(defRPr, "a:latin")
+    latin.set("typeface", font_name or FONT_TEXT)
+
+
+def delete_data_label(series, point_idx):
+    """Hide the data label for a specific point (e.g. hide small segments in stacked bars)."""
+    dLbls = series._element.find(qn("c:dLbls"))
+    if dLbls is not None:
+        dLbl = etree.SubElement(dLbls, qn("c:dLbl"))
+        idx_el = etree.SubElement(dLbl, qn("c:idx"))
+        idx_el.set("val", str(point_idx))
+        delete_el = etree.SubElement(dLbl, qn("c:delete"))
+        delete_el.set("val", "1")
+
+
+def add_single_bar_chart(slide, categories, values, left, top, width, height,
+                         fill_color, cat_font_size=7, gap=80, font_name=None):
+    """Add a horizontal bar chart with one series + data labels.
+
+    Returns (chart_frame, chart).
+    """
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+    chart_data.add_series("Values", values)
+
+    cf = slide.shapes.add_chart(
+        XL_CHART_TYPE.BAR_CLUSTERED,
+        Inches(left), Inches(top), Inches(width), Inches(height),
+        chart_data)
+    ch = cf.chart
+    ch.has_legend = False
+
+    s = ch.series[0]
+    set_series_color(s, fill_color)
+    set_series_no_border(s)
+    enable_data_labels(s, fill_color, font_name=font_name)
+
+    hide_axis(ch, "val")
+    ch.category_axis.has_major_gridlines = False
+    ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
+    ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
+    invert_cat_axis(ch)
+    set_plot_area_gap(ch, gap)
+
+    return cf, ch
+
+
+def add_clustered_bar_chart(slide, categories, series_list, left, top, width, height,
+                            colors=None, legend=True, gap=100, overlap=0,
+                            cat_font_size=7, label_fsize=7, font_name=None):
+    """Add a clustered horizontal bar chart with multiple series.
+
+    series_list: [("Series Name", [vals...]), ...]
+    colors: list of RGBColor, one per series.
+    Returns (chart_frame, chart).
+    """
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+    for name, vals in series_list:
+        chart_data.add_series(name, vals)
+
+    cf = slide.shapes.add_chart(
+        XL_CHART_TYPE.BAR_CLUSTERED,
+        Inches(left), Inches(top), Inches(width), Inches(height),
+        chart_data)
+    ch = cf.chart
+
+    if colors is None:
+        colors = [C_RYB_Q4, C_TAG]
+
+    for idx, series in enumerate(ch.series):
+        c = colors[idx] if idx < len(colors) else C_LTGREY
+        set_series_color(series, c)
+        set_series_no_border(series)
+        enable_data_labels(series, c, fsize=label_fsize, font_name=font_name)
+
+    set_plot_area_gap(ch, gap)
+    set_overlap(ch, overlap)
+    hide_axis(ch, "val")
+    ch.category_axis.has_major_gridlines = False
+    ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
+    ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
+    invert_cat_axis(ch)
+
+    if legend:
+        ch.has_legend = True
+        ch.legend.position = XL_LEGEND_POSITION.BOTTOM
+        ch.legend.include_in_layout = False
+        ch.legend.font.size = Pt(8)
+        ch.legend.font.name = font_name or FONT_TEXT
+    else:
+        ch.has_legend = False
+
+    return cf, ch
+
+
+def add_delta_table(slide, deltas, left, top, width, row_height,
+                    header_text="QoQ \u0394", font_name=None):
+    """Add a single-column delta table with green/red conditional coloring.
+
+    Args:
+        deltas: list of float/None values
+        row_height: height of each data row in inches
+    Returns the table shape.
+    """
+    n = len(deltas)
+    total_h = 0.28 + n * row_height
+
+    tbl_shape = slide.shapes.add_table(
+        n + 1, 1,
+        Inches(left), Inches(top), Inches(width), Inches(total_h))
+    tbl = tbl_shape.table
+
+    # Header
+    tbl.rows[0].height = Inches(0.28)
+    hc = tbl.cell(0, 0)
+    hc.fill.solid()
+    hc.fill.fore_color.rgb = C_HDRGREY
+    p = hc.text_frame.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    run = p.add_run()
+    run.text = header_text
+    run.font.size = Pt(7)
+    run.font.bold = True
+    run.font.color.rgb = C_WHITE
+    run.font.name = font_name or FONT_TEXT
+
+    # Data rows
+    for i, d in enumerate(deltas):
+        tbl.rows[i + 1].height = Inches(row_height)
+        cell = tbl.cell(i + 1, 0)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = C_LBGREY if i % 2 == 0 else C_WHITE
+
+        if d is None:
+            text, fcolor = "N/A", C_FTGREY
+        elif d > 0:
+            text, fcolor = f"+{d:.1f}", C_GREEN
+        elif d < 0:
+            text, fcolor = f"{d:.1f}", RGBColor(0xFF, 0x00, 0x00)
+        else:
+            text, fcolor = "0.0", C_GREY
+
+        tf = cell.text_frame
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        run = tf.paragraphs[0].add_run()
+        run.text = text
+        run.font.size = Pt(8)
+        run.font.bold = True
+        run.font.color.rgb = fcolor
+        run.font.name = font_name or FONT_TEXT
+
+    tbl.columns[0].width = Inches(width)
+    return tbl_shape
+
+
+def add_value_table(slide, values, left, top, width, row_height,
+                    header_text="Total %", value_color=None, font_name=None):
+    """Add a single-column table showing plain values (not delta-colored).
+
+    Useful for total percentages in stacked bar charts.
+    """
+    n = len(values)
+    total_h = 0.28 + n * row_height
+
+    tbl_shape = slide.shapes.add_table(
+        n + 1, 1,
+        Inches(left), Inches(top), Inches(width), Inches(total_h))
+    tbl = tbl_shape.table
+
+    tbl.rows[0].height = Inches(0.28)
+    hc = tbl.cell(0, 0)
+    hc.fill.solid()
+    hc.fill.fore_color.rgb = C_HDRGREY
+    p = hc.text_frame.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    run = p.add_run()
+    run.text = header_text
+    run.font.size = Pt(7)
+    run.font.bold = True
+    run.font.color.rgb = C_WHITE
+    run.font.name = font_name or FONT_TEXT
+
+    for i, v in enumerate(values):
+        tbl.rows[i + 1].height = Inches(row_height)
+        cell = tbl.cell(i + 1, 0)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = C_LBGREY if i % 2 == 0 else C_WHITE
+        tf = cell.text_frame
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        run = tf.paragraphs[0].add_run()
+        run.text = f"{v:.0f}%" if v is not None else "N/A"
+        run.font.size = Pt(8)
+        run.font.bold = True
+        run.font.color.rgb = value_color or C_GREY
+        run.font.name = font_name or FONT_TEXT
+
+    tbl.columns[0].width = Inches(width)
+    return tbl_shape

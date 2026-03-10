@@ -1,0 +1,423 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# J&J Rybrevant PET Q4'25 — Project Configuration
+# ══════════════════════════════════════════════════════════════════════════════
+
+project:
+  name: "J&J Rybrevant PET"
+  client: "Johnson & Johnson"
+  period_current: "Q4'25"
+  period_prior: "Q3'25"
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+data_source_path: "J_and_J_project/data/Lung SFEA SB.xlsx"
+template_path: "J_and_J_project/templates/JJ PET RYBREVANT+LAZCLUZE Q4'25 Report 1.pptx"
+output_path: "J_and_J_project/output/Rybrevant_Asks_Deck.pptx"
+
+# ── Brands ───────────────────────────────────────────────────────────────────
+brands:
+  primary:
+    name: "RYB+LAZ"
+    full_name: "Rybrevant + Lazcluze"
+    color_current: "#F75824"
+    color_prior: "#FFC199"
+  competitor:
+    name: "Tagrisso"
+    full_name: "AZ Tagrisso"
+    color_current: "#7030A0"
+    color_prior: "#AD88C8"
+
+# ── Fonts ────────────────────────────────────────────────────────────────────
+fonts:
+  display: "Johnson Display"
+  body: "Johnson Text"
+
+# ── Excel Sheet Layout ──────────────────────────────────────────────────────
+sheets:
+  primary:
+    name: "RYB"
+    q_prior_col: 7      # col H = Q3 Total
+    q_current_col: 17   # col R = Q4 Total
+  competitor:
+    name: "TAG"
+    q_prior_col: 7      # col H = Q3 Total
+    q_current_col: 13   # col N = Q4 Total
+  analysis:
+    name: "Additonal Analysis"   # note: misspelled in source
+    q_prior_col: 2
+    q_current_col: 3
+
+# ── Sample Sizes ─────────────────────────────────────────────────────────────
+sample_sizes:
+  primary:   { prior: 103, current: 100 }
+  competitor: { prior: 73, current: 73 }
+
+# ── Label Shortcuts ──────────────────────────────────────────────────────────
+# Keyword-based label shortening for long survey text
+label_shortcuts:
+  - keywords: ["overall quality of sales call"]
+    short: "Overall call quality"
+  - keywords: ["knowledgeable", "competitor"]
+    short: "Knowledge: competitors"
+  - keywords: ["knowledgeable", "exon 20"]
+    short: "Knowledge: EGFR Exon 20"
+  - keywords: ["knowledgeable", "product"]
+    short: "Knowledge: product (RYB)"
+  - keywords: ["knowledgeable", "egfr"]
+    short: "Knowledge: EGFR mNSCLC"
+  - keywords: ["knowledgeable"]
+    short: "Knowledge: product"
+  - keywords: ["organized"]
+    short: "Organized presentation"
+  - keywords: ["compelling reason to prescribe"]
+    short: "Compelling reason to Rx"
+  - keywords: ["compelling reason to use broader"]
+    short: "Compelling: mol. testing"
+  - keywords: ["credible support"]
+    short: "Credible product claims"
+  - keywords: ["prepared", "conversation"]
+    short: "Prepared for conversation"
+  - keywords: ["prepared"]
+    short: "Prepared presentation"
+  - keywords: ["engaging", "discussing"]
+    short: "Engaging discussion"
+  - keywords: ["meaningful questions"]
+    short: "Meaningful questions"
+  - keywords: ["valuable use of my time"]
+    short: "Valuable use of time"
+  - keywords: ["address my questions"]
+    short: "Addressed Rx questions"
+  - keywords: ["delivering a clear message"]
+    short: "Clear product message"
+  - keywords: ["tailor", "discussions"]
+    short: "Tailored discussion"
+  - keywords: ["relevant to your practice"]
+    short: "Relevant to practice"
+
+# ── Data Extractions ────────────────────────────────────────────────────────
+# Each extraction pulls a data block into a named key
+extractions:
+  # Ask 1: RYB Message Recall
+  - id: ryb_mr
+    method: question_code
+    sheet: primary
+    params: { code: "Q2_10Z", max_rows: 20 }
+
+  # Ask 2: TAG Message Recall
+  - id: tag_mr
+    method: question_code
+    sheet: competitor
+    params:
+      code: "Q2_10Z"
+      max_rows: 20
+      label_shortcuts:
+        - keywords: ["CNS metastasis at diag"]
+          short: "CNS mPFS w/ chemo"
+        - keywords: ["29.4"]
+          short: "mPFS 29.4mo (chemo)"
+        - keywords: ["mPFS"]
+          short: "mPFS (chemo)"
+        - keywords: ["89%"]
+          short: "89% stay on treatment"
+        - keywords: ["Grade 1"]
+          short: "ARs mostly Gr1/2"
+        - keywords: ["onset frequency and severity"]
+          short: "Onset/severity reduces"
+        - keywords: ["Longest"]
+          short: "Longest mPFS & mOS"
+        - keywords: ["47.5"]
+          short: "Final OS 47.5mo"
+        - keywords: ["NCCN"]
+          short: "NCCN Cat 1 (mono+chemo)"
+        - keywords: ["30.5"]
+          short: "Median exposure 30.5mo"
+        - keywords: ["43%"]
+          short: "43% risk reduction (chemo)"
+        - keywords: ["once-daily"]
+          short: "Once-daily oral dosing"
+        - keywords: ["convenient"]
+          short: "Once-daily oral dosing"
+
+  # Ask 1 supplement: RYB Message Effectiveness from AA sheet
+  - id: ryb_me
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 30
+      row_end: 40
+      col_map:
+        label: 1
+        short: 2
+        mr_prior: 3
+        mr_current: 4
+        believ_prior: 5
+        believ_current: 6
+        me_prior: 7
+        me_current: 8
+
+  # Ask 3: Rep Performance
+  - id: rep_perf
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 4
+      row_end: 25
+      col_map:
+        label: 1
+        primary_prior: 2
+        primary_current: 3
+        comp_prior: 4
+        comp_current: 5
+      use_label_shortcuts: true
+
+  # Ask 5: CTA — RYB
+  - id: ryb_cta
+    method: multi_question_code
+    sheet: primary
+    params:
+      codes:
+        - { code: "C1_81Z", label: "Compelling reason to prescribe" }
+        - { code: "C1_82Z", label: "Changed opinion" }
+        - { code: "C1_83D1Z", label: "Asked to prescribe (Branded closing)" }
+        - { code: "Q1_84bZ", label: "Educational ask" }
+
+  # Ask 5: CTA — TAG
+  - id: tag_cta
+    method: multi_question_code
+    sheet: competitor
+    params:
+      codes:
+        - { code: "C1_81_TAG_mNSCLC_Z", label: "Compelling reason to prescribe" }
+        - { code: "C1_82_TAG_mNSCLC_Z", label: "Changed opinion" }
+        - { code: "C1_83D_TAG_mNSCLC_Z", label: "Asked to prescribe (Branded closing)" }
+        - { code: "C1_84b_TAG_mNSCLC_Z", label: "Educational ask" }
+
+  # Ask 7: Follow-up reps
+  - id: ryb_followup
+    method: question_code
+    sheet: primary
+    params:
+      code: "C1_84FZ"
+      max_rows: 12
+      label_shortcuts:
+        - keywords: ["Medical Science Liaison"]
+          short: "MSL"
+        - keywords: ["Key Account Manager"]
+          short: "KAM"
+        - keywords: ["Field Reimbursement"]
+          short: "FRM"
+        - keywords: ["Clinical Nurse Educator"]
+          short: "CNE"
+        - keywords: ["No, I did not"]
+          short: "No follow-up set"
+
+  # Ask 8: Rx Intent — RYB
+  - id: ryb_rx
+    method: question_code
+    sheet: primary
+    params: { code: "C1_85DZ", max_rows: 8 }
+
+  # Ask 8: Rx Intent — TAG
+  - id: tag_rx
+    method: question_code
+    sheet: competitor
+    params: { code: "C1_85D_TAG2_mNSCLCZ", max_rows: 8 }
+
+  # Ask 9: Share of Time
+  - id: share_of_time
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 197
+      row_end: 205
+      col_map: { label: 3, prior: 4, current: 7 }
+      pct_mode: straight   # values already percentages
+
+  # Quality metrics (Q1_87Z)
+  - id: ryb_quality
+    method: question_code
+    sheet: primary
+    params: { code: "Q1_87Z", max_rows: 20, use_label_shortcuts: true }
+
+  # HII Compare (col 19=Others Q4, col 20=HI Q4)
+  - id: hii_compare
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q1_87Z"
+      max_rows: 20
+      columns: { hi_current: 20, other_current: 19 }
+      use_label_shortcuts: true
+      min_diff: 3
+
+  # Mariposa rep performance (AA rows 134-151)
+  - id: mariposa_rep
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 136
+      row_end: 151
+      col_map:
+        label: 2
+        overall: 3
+        segment_a: 4
+        segment_b: 5
+      use_label_shortcuts: true
+
+  # TAG recall order (Q2_20Z, rows 250-302)
+  - id: tag_recall_order
+    method: nested_ordinal
+    sheet: competitor
+    params:
+      row_start: 250
+      row_end: 303
+      code_col: 0
+      desc_col: 1
+      ordinal_col: 2
+      ordinals: ["1st", "2nd", "3rd", "4th"]
+
+# ── Asks (Slides) ───────────────────────────────────────────────────────────
+asks:
+  - id: cover
+    slide_type: cover
+    headline: "{{primary.full_name}} Promotional Effectiveness\nTracking {{period_current}} Report"
+    section: ""
+    source_text: ""
+    data_key: ""
+    extra:
+      subtitle: "Answers to key strategic asks"
+      date: "March 2026"
+      client: "{{client}}"
+
+  - id: executive_summary
+    slide_type: executive_summary
+    headline: "Executive Summary — Key Insights from {{period_current}}"
+    section: ""
+    source_text: "Source: Lung SFEA SB — {{period_prior}} & {{period_current}}"
+    data_key: ""
+
+  - id: ryb_mr_me
+    slide_type: dual_bar_with_delta
+    headline: "{{primary.name}} message recall declined broadly; new NCCN messages gained traction while effectiveness remained strong"
+    section: "{{primary.full_name}} MESSAGE RECALL & EFFECTIVENESS — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB Q2_10Z | MR = Message Recall, ME = Message Effectiveness"
+    data_key: ryb_me
+    brand: primary
+    sort_by: mr_current
+    extra:
+      left: { field_prefix: "mr", label: "Message Recall (%)" }
+      right: { field_prefix: "me", label: "Message Effectiveness (%)" }
+
+  - id: tag_mr
+    slide_type: single_bar_with_delta
+    headline: "{{competitor.name}} message recall declined; new messages on risk reduction and daily dosing entered mid-range"
+    section: "{{competitor.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB Q2_10Z"
+    data_key: tag_mr
+    brand: competitor
+    sort_by: current
+
+  - id: rep_perf
+    slide_type: clustered_compare
+    headline: "J&J reps outperform AZ across all 15 rep quality metrics"
+    section: "REP PERFORMANCE — J&J vs AZ — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Sales_Rep_Effectiveness_PET_RF_2 | Top 2 Box (6,7)"
+    data_key: rep_perf
+    sort_by: primary_current
+    extra:
+      series:
+        - { field: "primary", label: "J&J ({{primary.name}})" }
+        - { field: "comp", label: "AZ ({{competitor.name}})" }
+
+  - id: mbd
+    slide_type: dual_bar_qoq
+    headline: "Message effectiveness driven primarily by believability; composite effectiveness remained stable QoQ"
+    section: "MESSAGE BELIEVABILITY & COMPOSITE EFFECTIVENESS — {{primary.name}} — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB — Additonal Analysis | B = Believability, CE = Composite Effectiveness"
+    data_key: ryb_me
+    brand: primary
+    sort_by: me_current
+    extra:
+      left: { field_prefix: "believ", label: "Believability (%)" }
+      right: { field_prefix: "me", label: "Composite Effectiveness (%)" }
+
+  - id: cta
+    slide_type: clustered_compare
+    headline: "{{primary.name}} reps improved on 'changed opinion'; branded closing dipped slightly vs {{period_prior}}"
+    section: "CALL TO ACTION — J&J ({{primary.name}}) vs AZ ({{competitor.name}}) — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — C1_81Z, C1_82Z, C1_83D1Z, Q1_84bZ | Top Box / Yes%"
+    data_key: cta_combined
+    extra:
+      primary_key: ryb_cta
+      comp_key: tag_cta
+      series:
+        - { field: "primary", label: "J&J ({{primary.name}})" }
+        - { field: "comp", label: "AZ ({{competitor.name}})" }
+
+  - id: followup_reps
+    slide_type: single_bar_with_delta
+    headline: "Over half of HCPs did not set follow-up with other J&J reps; MSL referrals declined"
+    section: "ONE J&J VISION — FOLLOW-UP WITH OTHER J&J REPRESENTATIVES — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — C1_84FZ | % of HCPs who set follow-up"
+    data_key: ryb_followup
+    brand: primary
+    sort_by: current
+
+  - id: rx_intent
+    slide_type: two_section_bar
+    headline: "{{primary.name}} intent to increase Rx rose sharply for patients w/o CNS; {{competitor.name}} chemo intent held steady"
+    section: "PRESCRIPTION INTENT (INCREASE Rx) BY PATIENT TYPE — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — C1_85DZ (RYB), C1_85D_TAG2_mNSCLCZ (TAG) | Top 2 Box (6,7)"
+    data_key: rx_combined
+    extra:
+      top: { data_key: "ryb_rx", label: "{{primary.name}} — Intent to Increase Rx", brand: "primary" }
+      bottom: { data_key: "tag_rx", label: "{{competitor.name}}+Chemo — Intent to Increase Rx", brand: "competitor" }
+
+  - id: share_of_time
+    slide_type: qoq_bar_with_delta
+    headline: "Efficacy discussions surged; safety and guidelines topics saw shifts"
+    section: "SHARE OF INTERACTION TIME BY TOPIC — {{primary.name}} — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB — VQ_Share_of_Time_RYB_SFEA | % of interactions"
+    data_key: share_of_time
+    brand: primary
+    sort_by: current
+
+  - id: hii_compare
+    slide_type: clustered_compare
+    headline: "High-impact interactions drive significantly higher rep quality scores across all key metrics"
+    section: "HIGH IMPACT vs NON-HIGH IMPACT INTERACTIONS — KEY DIFFERENTIATORS — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | High Impact = Top Box Overall Quality + Intent to Prescribe"
+    data_key: hii_compare
+    extra:
+      series:
+        - { field: "hi", label: "High Impact", color: "#F75824" }
+        - { field: "other", label: "Non-High Impact", color: "#C0C0C0" }
+
+  - id: quality_overview
+    slide_type: single_bar_with_delta
+    headline: "Overall quality metrics for {{primary.name}} reps remained stable to positive"
+    section: "OVERALL CALL QUALITY METRICS — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | Top 2 Box (6,7)"
+    data_key: ryb_quality
+    brand: primary
+    sort_by: current
+
+  - id: mariposa_rep_perf
+    slide_type: clustered_compare
+    headline: "Mariposa-first interactions show higher rep performance on compelling reason to Rx"
+    section: "REP PERFORMANCE — MARIPOSA 1st DISCUSSED vs NOT — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Additonal Analysis | Top 2 Box (6,7) | Overlapped vs Non-overlapped"
+    data_key: mariposa_rep
+    sort_by: segment_a
+    extra:
+      series:
+        - { field: "segment_a", label: "Mariposa 1st (n=58)" }
+        - { field: "segment_b", label: "Not 1st (n=42)", color: "#BFBFBF" }
+
+  - id: tag_recall_order
+    slide_type: stacked_order
+    headline: "TAG message recall order: NCCN and mPFS messages most frequently recalled first"
+    section: "{{competitor.full_name}} MESSAGE RECALL ORDER — 1st, 2nd, 3rd RECALLED — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q2_20Z | % recalled by order"
+    data_key: tag_recall_order
+    brand: competitor
+    sort_by: total_current
