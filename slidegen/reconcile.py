@@ -22,22 +22,25 @@ from collections import defaultdict
 from slidegen.config import REGISTRY_PATH, SHAPE_PREFIX, PTS_PER_INCH
 
 
-def _load_registry():
-    with open(REGISTRY_PATH) as f:
+def _load_registry(path=None):
+    with open(path or REGISTRY_PATH) as f:
         return json.load(f)
 
 
-def _save_registry(registry):
-    with open(REGISTRY_PATH, "w") as f:
+def _save_registry(registry, path=None):
+    with open(path or REGISTRY_PATH, "w") as f:
         json.dump(registry, f, indent=2)
 
 
-def reconcile(target_filename, slide_num=1):
+def reconcile(target_filename, slide_num=1, registry_path=None):
     """Run full reconciliation against a live PowerPoint instance.
 
     Args:
         target_filename: Bare filename matched against open presentations.
         slide_num: 1-indexed slide number (default 1).
+        registry_path: Path to shape_registry.json. If None, uses default
+            REGISTRY_PATH from config. For pipeline projects, pass the
+            per-wave registry at output/{wave}/shape_registry.json.
 
     Returns:
         dict with keys:
@@ -50,14 +53,15 @@ def reconcile(target_filename, slide_num=1):
     """
     import win32com.client
     IN = PTS_PER_INCH
+    reg_path = registry_path or REGISTRY_PATH
 
     # ── Load registry ────────────────────────────────────────────────────────
     try:
-        registry = _load_registry()
+        registry = _load_registry(reg_path)
     except FileNotFoundError:
         raise FileNotFoundError(
-            f"No registry at {REGISTRY_PATH}. "
-            "Create a slide first with slidegen.create."
+            f"No registry at {reg_path}. "
+            "Create a slide first with slidegen.create or generate_deck()."
         )
 
     # ── Connect to PowerPoint ────────────────────────────────────────────────
@@ -149,7 +153,7 @@ def reconcile(target_filename, slide_num=1):
     registry.setdefault("meta", {})
     registry["meta"]["last_reconciled"] = datetime.now().isoformat(timespec="seconds")
     registry["meta"]["reconcile_source"] = prs.Name
-    _save_registry(registry)
+    _save_registry(registry, reg_path)
 
     return {
         "found": len(found),

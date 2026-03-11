@@ -65,7 +65,11 @@ projects/jnj_rybrevant/
     PET_Q3Q4_2025/source_data.xlsx     # wave-versioned input
     PET_Q1Q2_2026/source_data.xlsx
   output/
-    PET_Q3Q4_2025/deck.pptx           # wave-versioned output
+    PET_Q3Q4_2025/                     # wave-versioned output
+      deck.pptx                        # generated deck
+      slide_data.json                  # data cache (auto-invalidated)
+      shape_registry.json              # shape state + data lineage
+      backups/                         # PPTX backups before edits
     PET_Q1Q2_2026/deck.pptx
   reference/
     PET_Q3Q4_2025/asks.md             # wave-versioned asks
@@ -197,9 +201,17 @@ slidegen/                     # SlideGen system
     project_config.py          # ProjectConfig schema + YAML loader
     data_loaders.py            # Generic data extractors (5 methods)
     slide_renderers.py         # 9 slide type renderers
-    orchestrator.py            # Pipeline entry + per-slide regen
+    orchestrator.py            # Pipeline entry + per-slide regen + PPTX backup
     config_generator.py        # Data discovery + config scaffolding
-  pptx_utils.py               # 50+ helper functions (charts, tables, XML)
+  pptx_utils/                 # Utility package (8 modules)
+    brand.py                   # BRAND{} dict, colors, fonts, constants
+    lxml_helpers.py            # 20 lxml XML chart/axis helpers
+    shapes.py                  # 7 shape primitives
+    layout.py                  # LAYOUTS{} dict + slide chrome functions
+    charts.py                  # CHART_PATTERNS{} + chart builders
+    tables.py                  # Delta/value table builders
+    com.py                     # COM helpers for live editing
+    registry.py                # Registry CRUD operations
   create.py                   # SlideBuilder class
   edit.py                     # LiveEditor class (win32com)
   reconcile.py                # Registry reconciliation

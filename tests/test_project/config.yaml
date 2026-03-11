@@ -1,0 +1,294 @@
+# Test Project — Workflow Testing
+project:
+  name: "Test Project PET"
+  client: "TestCorp"
+  wave: "WAVE_Q1Q2_2026"
+  period_current: "Q2'26"
+  period_prior: "Q1'26"
+
+data_source_path: "data/{{wave}}/source_data.xlsx"
+template_path: "templates/template.pptx"
+output_path: "output/{{wave}}/deck.pptx"
+
+brands:
+  primary:
+    name: "RYB+LAZ"
+    full_name: "Rybrevant + Lazcluze"
+    color_current: "#F75824"
+    color_prior: "#FFC199"
+  competitor:
+    name: "Tagrisso"
+    full_name: "AZ Tagrisso"
+    color_current: "#7030A0"
+    color_prior: "#AD88C8"
+
+fonts:
+  display: "Calibri"
+  body: "Calibri"
+
+sheets:
+  primary:
+    name: "RYB"
+    q_prior_col: 7
+    q_current_col: 17
+  competitor:
+    name: "TAG"
+    q_prior_col: 7
+    q_current_col: 13
+  analysis:
+    name: "Additonal Analysis"
+    q_prior_col: 2
+    q_current_col: 3
+
+sample_sizes:
+  primary:   { prior: 100, current: 100 }
+  competitor: { prior: 70, current: 70 }
+
+label_shortcuts:
+  - keywords: ["overall quality of sales call"]
+    short: "Overall call quality"
+  - keywords: ["knowledgeable", "competitor"]
+    short: "Knowledge: competitors"
+  - keywords: ["knowledgeable", "exon 20"]
+    short: "Knowledge: EGFR Exon 20"
+  - keywords: ["knowledgeable", "product"]
+    short: "Knowledge: product (RYB)"
+  - keywords: ["knowledgeable", "egfr"]
+    short: "Knowledge: EGFR mNSCLC"
+  - keywords: ["organized"]
+    short: "Organized presentation"
+  - keywords: ["compelling reason to prescribe"]
+    short: "Compelling reason to Rx"
+
+extractions:
+  - id: ryb_mr
+    method: question_code
+    sheet: primary
+    params: { code: "Q2_10Z", max_rows: 20 }
+
+  - id: tag_mr
+    method: question_code
+    sheet: competitor
+    params: { code: "Q2_10Z", max_rows: 20 }
+
+  - id: ryb_me
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 30
+      row_end: 40
+      col_map:
+        label: 1
+        short: 2
+        mr_prior: 3
+        mr_current: 4
+        believ_prior: 5
+        believ_current: 6
+        me_prior: 7
+        me_current: 8
+
+  - id: rep_perf
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 4
+      row_end: 25
+      col_map:
+        label: 1
+        primary_prior: 2
+        primary_current: 3
+        comp_prior: 4
+        comp_current: 5
+      use_label_shortcuts: true
+
+  - id: ryb_cta
+    method: multi_question_code
+    sheet: primary
+    params:
+      codes:
+        - { code: "C1_81Z", label: "Compelling reason to prescribe" }
+        - { code: "C1_82Z", label: "Changed opinion" }
+        - { code: "C1_83D1Z", label: "Asked to prescribe (Branded closing)" }
+        - { code: "Q1_84bZ", label: "Educational ask" }
+
+  - id: tag_cta
+    method: multi_question_code
+    sheet: competitor
+    params:
+      codes:
+        - { code: "C1_81_TAG_mNSCLC_Z", label: "Compelling reason to prescribe" }
+        - { code: "C1_82_TAG_mNSCLC_Z", label: "Changed opinion" }
+        - { code: "C1_83D_TAG_mNSCLC_Z", label: "Asked to prescribe (Branded closing)" }
+        - { code: "C1_84b_TAG_mNSCLC_Z", label: "Educational ask" }
+
+  - id: ryb_followup
+    method: question_code
+    sheet: primary
+    params:
+      code: "C1_84FZ"
+      max_rows: 12
+      label_shortcuts:
+        - keywords: ["Medical Science Liaison"]
+          short: "MSL"
+        - keywords: ["Key Account Manager"]
+          short: "KAM"
+        - keywords: ["Field Reimbursement"]
+          short: "FRM"
+        - keywords: ["No, I did not"]
+          short: "No follow-up set"
+
+  - id: ryb_rx
+    method: question_code
+    sheet: primary
+    params: { code: "C1_85DZ", max_rows: 8 }
+
+  - id: tag_rx
+    method: question_code
+    sheet: competitor
+    params: { code: "C1_85D_TAG2_mNSCLCZ", max_rows: 8 }
+
+  - id: share_of_time
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 197
+      row_end: 205
+      col_map: { label: 3, prior: 4, current: 7 }
+      pct_mode: straight
+
+  - id: ryb_quality
+    method: question_code
+    sheet: primary
+    params: { code: "Q1_87Z", max_rows: 20, use_label_shortcuts: true }
+
+  - id: hii_compare
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q1_87Z"
+      max_rows: 20
+      columns: { hi_current: 20, other_current: 19 }
+      use_label_shortcuts: true
+      min_diff: 3
+
+  - id: mariposa_rep
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 136
+      row_end: 151
+      col_map:
+        label: 2
+        overall: 3
+        segment_a: 4
+        segment_b: 5
+      use_label_shortcuts: true
+
+  - id: tag_recall_order
+    method: nested_ordinal
+    sheet: competitor
+    params:
+      row_start: 250
+      row_end: 303
+      code_col: 0
+      desc_col: 1
+      ordinal_col: 2
+      ordinals: ["1st", "2nd", "3rd", "4th"]
+
+asks:
+  - id: cover
+    slide_type: cover
+    headline: "{{primary.full_name}} Promotional Effectiveness\nTracking {{period_current}} Report"
+    section: ""
+    source_text: ""
+    data_key: ""
+    extra:
+      subtitle: "Test project — workflow validation"
+      date: "March 2026"
+      client: "{{client}}"
+
+  - id: executive_summary
+    slide_type: executive_summary
+    headline: "Executive Summary — Key Insights from {{period_current}}"
+    section: ""
+    source_text: "Source: Test Data — {{period_prior}} & {{period_current}}"
+    data_key: ""
+
+  - id: ryb_mr_me
+    slide_type: dual_bar_with_delta
+    headline: "{{primary.name}} message recall and effectiveness trends"
+    section: "{{primary.full_name}} MESSAGE RECALL & EFFECTIVENESS — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Test Data Q2_10Z"
+    data_key: ryb_me
+    brand: primary
+    sort_by: mr_current
+    extra:
+      left: { field_prefix: "mr", label: "Message Recall (%)" }
+      right: { field_prefix: "me", label: "Message Effectiveness (%)" }
+
+  - id: tag_mr
+    slide_type: single_bar_with_delta
+    headline: "{{competitor.name}} message recall trends"
+    section: "{{competitor.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Test Data Q2_10Z"
+    data_key: tag_mr
+    brand: competitor
+    sort_by: current
+
+  - id: rep_perf
+    slide_type: clustered_compare
+    headline: "Rep performance comparison"
+    section: "REP PERFORMANCE — J&J vs AZ — {{period_current}}"
+    source_text: "Source: Test Data"
+    data_key: rep_perf
+    sort_by: primary_current
+    extra:
+      series:
+        - { field: "primary", label: "J&J ({{primary.name}})" }
+        - { field: "comp", label: "AZ ({{competitor.name}})" }
+
+  - id: followup_reps
+    slide_type: single_bar_with_delta
+    headline: "Follow-up with other J&J representatives"
+    section: "ONE J&J VISION — FOLLOW-UP REPS — {{period_current}}"
+    source_text: "Source: Test Data C1_84FZ"
+    data_key: ryb_followup
+    brand: primary
+    sort_by: current
+
+  - id: rx_intent
+    slide_type: two_section_bar
+    headline: "Prescription intent by patient type"
+    section: "PRESCRIPTION INTENT — {{period_current}}"
+    source_text: "Source: Test Data"
+    data_key: rx_combined
+    extra:
+      top: { data_key: "ryb_rx", label: "{{primary.name}} — Intent to Increase Rx", brand: "primary" }
+      bottom: { data_key: "tag_rx", label: "{{competitor.name}}+Chemo — Intent to Increase Rx", brand: "competitor" }
+
+  - id: share_of_time
+    slide_type: qoq_bar_with_delta
+    headline: "Share of interaction time by topic"
+    section: "SHARE OF TIME — {{primary.name}} — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Test Data"
+    data_key: share_of_time
+    brand: primary
+    sort_by: current
+
+  - id: quality_overview
+    slide_type: single_bar_with_delta
+    headline: "Overall quality metrics"
+    section: "QUALITY METRICS — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Test Data Q1_87Z"
+    data_key: ryb_quality
+    brand: primary
+    sort_by: current
+
+  - id: tag_recall_order
+    slide_type: stacked_order
+    headline: "TAG message recall order"
+    section: "{{competitor.full_name}} RECALL ORDER — {{period_current}}"
+    source_text: "Source: Test Data Q2_20Z"
+    data_key: tag_recall_order
+    brand: competitor
+    sort_by: total_current

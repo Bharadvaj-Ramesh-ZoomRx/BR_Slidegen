@@ -19,6 +19,10 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned output subfolder
+│       │       ├── deck.pptx          # Generated deck
+│       │       ├── slide_data.json    # JSON data cache (auto-invalidated)
+│       │       ├── shape_registry.json # Shape state with data lineage
+│       │       └── backups/           # PPTX backups before edits (max 10)
 │       ├── reference/         # Client briefs & asks (gitignored)
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned reference docs
 │       └── config_history/    # Timestamped config backups (gitignored)
@@ -28,16 +32,24 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
 │   │   ├── data_loaders.py    # 5 generic data extractors + load_all_data()
 │   │   ├── slide_renderers.py # 9 slide type renderers (RENDERERS registry)
-│   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen
+│   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding helpers
+│   ├── pptx_utils/            # ★ Utility package (PRD §4.2)
+│   │   ├── __init__.py        # Re-exports everything for backward compat
+│   │   ├── brand.py           # BRAND{} dict, color constants, fonts, slide dims
+│   │   ├── lxml_helpers.py    # 20 lxml XML manipulation functions
+│   │   ├── shapes.py          # 7 shape primitives (textbox, solidrect, etc.)
+│   │   ├── layout.py          # LAYOUTS{} dict + 10 slide chrome functions
+│   │   ├── charts.py          # CHART_PATTERNS{} dict + 4 chart builders
+│   │   ├── tables.py          # 3 table builders (delta col/table, value table)
+│   │   ├── com.py             # 7 COM helpers for live editing
+│   │   └── registry.py        # 6 registry CRUD functions
 │   ├── __init__.py            # Package exports: SlideBuilder, LiveEditor, reconcile
 │   ├── __main__.py            # CLI: python -m slidegen <create|edit|reconcile>
 │   ├── config.py              # Centralized paths and settings
-│   ├── pptx_utils.py          # Utility library (50+ functions, lxml/COM/registry)
 │   ├── create.py              # SlideBuilder class — python-pptx creation + registry
 │   ├── edit.py                # LiveEditor class — win32com live editing + edit log
 │   ├── reconcile.py           # Registry reconciliation from live PowerPoint state
-│   ├── slide_registry.json    # Shape state (created at runtime, gitignored)
 │   └── output/                # Generated slides (gitignored)
 ├── archive/                   # Superseded scripts & old artifacts
 │   ├── src/                   # Legacy pipeline (original POC, hardcoded J&J)
@@ -52,9 +64,10 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
-│   ├── pptx/                  # PPTX read/create/edit skill
-│   ├── jj-slide-style/        # J&J brand styling skill
-│   └── pptx-utils/            # python-pptx helper utilities
+│   ├── slidegen/              # ★ Consolidated SlideGen skill (pipeline + utils + styling)
+│   ├── pptx/                  # General PPTX read/create/edit skill
+│   ├── jj-slide-style/        # J&J brand styling (absorbed into slidegen)
+│   └── pptx-utils/            # pptx_utils reference (absorbed into slidegen)
 ├── column_mapping.csv
 └── .gitignore
 ```
@@ -85,9 +98,12 @@ projects/jnj_rybrevant/config.yaml  →  ProjectConfig (dataclasses)
                                       ↓
 Excel file  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
                                       ↓
-orchestrator  →  RENDERERS[slide_type](slide, config, ask, data)
+orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
                                       ↓
-                                 output.pptx
+                      output/{wave}/deck.pptx
+                      output/{wave}/slide_data.json       (data cache)
+                      output/{wave}/shape_registry.json   (shape state + lineage)
+                      output/{wave}/backups/               (PPTX backups)
 ```
 
 ### Data Extraction Methods
@@ -222,7 +238,7 @@ When the user says **"Edit Slide N — ..."** (e.g. change headline, update data
 1. **Read config** — Load current `config.yaml`, identify the ask at index N-1
 2. **Backup config** — Call `_backup_config()` to save timestamped copy to `config_history/`
 3. **Update config** — Modify the relevant fields in the YAML (headline, data_key, sort_by, etc.)
-4. **Regenerate slide** — Call `regenerate_slide(yaml_path, slide_index=N-1)` — clears and re-renders only that slide
+4. **Regenerate slide** — Call `regenerate_slide(yaml_path, slide_index=N-1)` — automatically creates PPTX backup in `output/{wave}/backups/`, then clears and re-renders only that slide
 5. **Refresh PowerPoint** — Tell user to reopen/refresh the deck in PowerPoint to see changes
 6. **Report** — Summarize what changed
 
@@ -252,8 +268,17 @@ When the user says **"Edit slides with new wave data + new asks — {wave_id}"**
 
 Pipeline-generated slides assign `zrx_{slide:03d}_{shape:03d}` names to all shapes (e.g. `zrx_001_001` through `zrx_001_008` for slide 1). This enables:
 - LiveEditor targeting via COM
-- Shape registry saved to `output/shape_registry.json`
+- Shape registry saved to `output/{wave}/shape_registry.json` with data lineage per slide
 - Per-slide regeneration without affecting other slides
+- PPTX backup before each `regenerate_slide()` call (stored in `output/{wave}/backups/`)
+
+## Data Cache
+
+The pipeline saves extracted data as JSON at `output/{wave}/slide_data.json` after each `generate_deck()`. On `regenerate_slide()`, the cache is used if:
+- Config file hasn't changed (MD5 hash check)
+- Source Excel hasn't been modified (mtime check)
+
+If either is stale, data is re-extracted from Excel and the cache is refreshed.
 
 ## Wave Versioning
 

@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -33,10 +34,16 @@ class ShapeNamer:
     zrx_001_001, zrx_001_002, ... for slide 1.
     """
 
-    def __init__(self, slide_idx: int):
+    def __init__(self, slide_idx: int, ask_id: str = "",
+                 data_key: str = "", config_hash: str = "",
+                 source_file: str = ""):
         self._slide_idx = slide_idx
         self._counter = 0
         self._registry: dict[str, dict] = {}
+        self._ask_id = ask_id
+        self._data_key = data_key
+        self._config_hash = config_hash
+        self._source_file = source_file
 
     def name(self, shape, label: str = "") -> str:
         """Assign a zrx_ name to a shape and record it in the registry."""
@@ -55,6 +62,22 @@ class ShapeNamer:
     @property
     def registry(self) -> dict[str, dict]:
         return self._registry
+
+    @property
+    def slide_metadata(self) -> dict:
+        """Return per-slide metadata including data_source lineage (PRD §6.2)."""
+        meta = {
+            "ask_id": self._ask_id,
+            "generated_at": datetime.now().isoformat(),
+            "shapes": self._registry,
+        }
+        if self._data_key or self._source_file:
+            meta["data_source"] = {
+                "data_key": self._data_key,
+                "config_hash": self._config_hash,
+                "source_file": self._source_file,
+            }
+        return meta
 
 
 def _save_shape_registry(registries: dict, output_dir: str):
@@ -81,6 +104,110 @@ def _backup_config(yaml_path: str) -> str:
     backup_path = os.path.join(history_dir, f"{base}_{ts}.yaml")
     shutil.copy2(yaml_path, backup_path)
     return backup_path
+
+
+# ── PPTX backup (PRD §10.3) ──────────────────────────────────────────────────
+
+_MAX_PPTX_BACKUPS = 10
+
+
+def _backup_pptx(pptx_path: str) -> str | None:
+    """Create a timestamped backup of the deck before editing.
+
+    Stores up to _MAX_PPTX_BACKUPS most recent copies in a backups/ folder
+    alongside the deck. Oldest backups are deleted when the cap is exceeded.
+
+    Returns the backup path, or None if the source doesn't exist.
+    """
+    if not os.path.exists(pptx_path):
+        return None
+
+    backup_dir = os.path.join(os.path.dirname(pptx_path), "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = os.path.splitext(os.path.basename(pptx_path))[0]
+    backup_path = os.path.join(backup_dir, f"{base}_{ts}.pptx")
+    shutil.copy2(pptx_path, backup_path)
+
+    # Prune old backups
+    backups = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith(".pptx")],
+        key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)),
+        reverse=True,
+    )
+    for old in backups[_MAX_PPTX_BACKUPS:]:
+        os.remove(os.path.join(backup_dir, old))
+
+    return backup_path
+
+
+# ── Data cache (JSON) ────────────────────────────────────────────────────────
+
+def _data_cache_path(config: ProjectConfig) -> str:
+    """Return the path to the JSON data cache for the current wave."""
+    output_dir = os.path.dirname(config.output_path)
+    return os.path.join(output_dir, "slide_data.json")
+
+
+def _config_hash(yaml_path: str) -> str:
+    """Fast hash of config file for cache invalidation."""
+    with open(yaml_path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()[:12]
+
+
+def _save_data_cache(data: dict, config: ProjectConfig, yaml_path: str):
+    """Save extracted data as JSON cache alongside the deck."""
+    cache_path = _data_cache_path(config)
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+
+    cache = {
+        "_meta": {
+            "wave": config.wave,
+            "source": config.data_source_path,
+            "extracted_at": datetime.now().isoformat(),
+            "config_hash": _config_hash(yaml_path),
+            "source_mtime": os.path.getmtime(config.data_source_path),
+        },
+    }
+    cache.update(data)
+
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2, default=str)
+
+    print(f"  Data cache saved: {cache_path}")
+
+
+def _load_data_cache(config: ProjectConfig, yaml_path: str) -> dict | None:
+    """Load data from JSON cache if valid (config unchanged, Excel not newer).
+
+    Returns None if cache is stale or missing.
+    """
+    cache_path = _data_cache_path(config)
+    if not os.path.exists(cache_path):
+        return None
+
+    with open(cache_path, "r", encoding="utf-8") as f:
+        cache = json.load(f)
+
+    meta = cache.get("_meta", {})
+
+    # Check config hasn't changed
+    if meta.get("config_hash") != _config_hash(yaml_path):
+        print("  Data cache stale (config changed) — re-extracting")
+        return None
+
+    # Check Excel file hasn't been modified
+    if os.path.exists(config.data_source_path):
+        excel_mtime = os.path.getmtime(config.data_source_path)
+        if excel_mtime > meta.get("source_mtime", 0):
+            print("  Data cache stale (Excel updated) — re-extracting")
+            return None
+
+    # Cache is valid — strip _meta before returning
+    data = {k: v for k, v in cache.items() if k != "_meta"}
+    print(f"  Data loaded from cache ({cache_path})")
+    return data
 
 
 # ── Slide clearing ───────────────────────────────────────────────────────────
@@ -114,7 +241,7 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     print(f"Loading config: {yaml_path}")
     config = load_project_config(yaml_path)
 
-    # 2. Load data
+    # 2. Load data (always re-extract for full deck, then cache)
     print("Extracting data...")
     data = load_all_data(config)
 
@@ -124,6 +251,9 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             continue
         count = len(val) if isinstance(val, list) else "—"
         print(f"  {key}: {count} rows")
+
+    # Save data cache for future regenerate_slide() calls
+    _save_data_cache(data, config, yaml_path)
 
     # 3. Create presentation
     print("\nCreating presentation...")
@@ -150,11 +280,17 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
         layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
         slide = prs.slides.add_slide(layout)
 
-        namer = ShapeNamer(i)
+        cfg_hash = _config_hash(yaml_path)
+        namer = ShapeNamer(
+            i, ask_id=ask.id,
+            data_key=getattr(ask, 'data_key', ''),
+            config_hash=cfg_hash,
+            source_file=config.data_source_path,
+        )
         try:
             renderer(slide, config, ask, data, namer=namer)
             namer.name_remaining(slide)
-            slide_registries[str(i)] = {"ask_id": ask.id, "shapes": namer.registry}
+            slide_registries[str(i)] = namer.slide_metadata
             print(f"  [{i}] {ask.id} ({ask.slide_type})")
         except Exception as e:
             print(f"  [{i}] ERROR on {ask.id}: {e}")
@@ -191,11 +327,22 @@ def regenerate_slide(yaml_path: str, slide_index: int,
         Path to the updated PPTX file.
     """
     config = load_project_config(yaml_path)
-    data = load_all_data(config)
+
+    # Try cached data first (fast); fall back to Excel extraction
+    data = _load_data_cache(config, yaml_path)
+    if data is None:
+        print("Extracting data from Excel...")
+        data = load_all_data(config)
+        _save_data_cache(data, config, yaml_path)
 
     pptx_path = output_path or config.output_path
     if not pptx_path or not os.path.exists(pptx_path):
         raise FileNotFoundError(f"Deck not found: {pptx_path}")
+
+    # Backup before editing (PRD §10.3)
+    backup = _backup_pptx(pptx_path)
+    if backup:
+        print(f"  Backup saved: {backup}")
 
     prs = Presentation(pptx_path)
     if slide_index < 0 or slide_index >= len(prs.slides):
@@ -209,7 +356,12 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     if renderer is None:
         raise ValueError(f"Unknown slide_type: {ask.slide_type}")
 
-    namer = ShapeNamer(slide_index + 1)
+    namer = ShapeNamer(
+        slide_index + 1, ask_id=ask.id,
+        data_key=getattr(ask, 'data_key', ''),
+        config_hash=_config_hash(yaml_path),
+        source_file=config.data_source_path,
+    )
     renderer(slide, config, ask, data, namer=namer)
     namer.name_remaining(slide)
 

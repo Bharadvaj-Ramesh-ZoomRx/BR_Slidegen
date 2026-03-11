@@ -25,6 +25,8 @@ test_*.pptx
 output_deck.pptx
 *.tmp
 archive/pptx.zip
+tests/test_project/config_history/
+tests/test_project/output/
 
 # ── Claude Code auto-memory (session-specific) ──────────────────────────────
 .claude/*

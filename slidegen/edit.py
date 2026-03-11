@@ -58,16 +58,24 @@ def _resolve_color(color):
 class LiveEditor:
     """COM-based live editor for an open PowerPoint presentation."""
 
-    def __init__(self, filename, slide_num=1):
+    def __init__(self, filename, slide_num=1, registry_path=None, log_path=None):
         """Connect to a running PowerPoint and locate the target file.
 
         Args:
             filename: Bare filename (e.g. 'demo_slide.pptx'), matched
                       against open presentations.
             slide_num: 1-indexed slide number to edit (default 1).
+            registry_path: Path to shape_registry.json. If None, uses
+                default REGISTRY_PATH. For pipeline projects, pass the
+                per-wave path at output/{wave}/shape_registry.json.
+            log_path: Path to edit_log.json. If None, uses default
+                EDIT_LOG_PATH. For pipeline projects, pass the per-wave
+                path at output/{wave}/edit_log.json.
         """
         self.filename = filename
         self.slide_num = slide_num
+        self._registry_path = registry_path or REGISTRY_PATH
+        self._log_path = log_path or EDIT_LOG_PATH
         self._ppt_app = None
         self._prs = None
         self._slide = None
@@ -134,12 +142,14 @@ class LiveEditor:
         """Append session edits to the persistent edit log."""
         if not self._edits:
             return
+        log_path = self._log_path
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         existing = []
-        if os.path.exists(EDIT_LOG_PATH):
-            with open(EDIT_LOG_PATH) as f:
+        if os.path.exists(log_path):
+            with open(log_path) as f:
                 existing = json.load(f).get("edits", [])
         existing.extend(self._edits)
-        with open(EDIT_LOG_PATH, "w") as f:
+        with open(log_path, "w") as f:
             json.dump({"edits": existing}, f, indent=2)
 
     # ── Edit operations ──────────────────────────────────────────────────────
