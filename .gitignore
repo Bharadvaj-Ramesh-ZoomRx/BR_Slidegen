@@ -4,6 +4,7 @@ projects/*/data/
 projects/*/templates/
 projects/*/output/
 projects/*/reference/
+projects/*/config_history/
 
 # ── Generated output files ───────────────────────────────────────────────────
 output/

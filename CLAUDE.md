@@ -15,16 +15,21 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   └── jnj_rybrevant/         # J&J Rybrevant PET Q4'25
 │       ├── config.yaml        # YAML config — brands, sheets, extractions, asks
 │       ├── data/              # Source Excel files (gitignored)
-│       ├── templates/         # Template decks (gitignored)
+│       │   └── PET_Q3Q4_2025/ # Wave-versioned data subfolder
+│       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
-│       └── reference/         # Client briefs & asks (gitignored)
+│       │   └── PET_Q3Q4_2025/ # Wave-versioned output subfolder
+│       ├── reference/         # Client briefs & asks (gitignored)
+│       │   └── PET_Q3Q4_2025/ # Wave-versioned reference docs
+│       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
-│   │   ├── __init__.py        # Exports: generate_deck()
+│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
 │   │   ├── data_loaders.py    # 5 generic data extractors + load_all_data()
 │   │   ├── slide_renderers.py # 9 slide type renderers (RENDERERS registry)
-│   │   └── orchestrator.py    # Pipeline entry: config → data → renderers → PPTX
+│   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen
+│   │   └── config_generator.py # Data discovery + config scaffolding helpers
 │   ├── __init__.py            # Package exports: SlideBuilder, LiveEditor, reconcile
 │   ├── __main__.py            # CLI: python -m slidegen <create|edit|reconcile>
 │   ├── config.py              # Centralized paths and settings
@@ -140,20 +145,136 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
 
-# ── Create a slide manually ──
-from slidegen.create import SlideBuilder
-builder = SlideBuilder(template="path/to/template.pptx")
-slide = builder.add_blank_slide()
-builder.add_clustered_bar(slide, categories, series_data, ...)
-builder.save("output.pptx")
+# ── Regenerate a single slide ──
+from slidegen.pipeline import regenerate_slide
+regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
+
+# ── Data discovery (for new projects) ──
+from slidegen.pipeline.config_generator import discover_excel_structure
+summary = discover_excel_structure("projects/new_project/data/source_data.xlsx")
+
+# ── Config backup ──
+from slidegen.pipeline.orchestrator import _backup_config
+_backup_config("projects/jnj_rybrevant/config.yaml")
+# → projects/jnj_rybrevant/config_history/config_20260311_143000.yaml
 
 # ── Edit live (file must be open in PowerPoint) ──
 from slidegen.edit import LiveEditor
 with LiveEditor("output.pptx") as editor:
     editor.set_text("zrx_001", "New text", color="red")
-    editor.move("zrx_002", left=5.0, top=2.0)
-
-# ── Reconcile before editing ──
-from slidegen.reconcile import reconcile
-report = reconcile("output.pptx")
+    editor.set_slide(5)  # switch to slide 5
+    editor.find_shapes_by_prefix("zrx_005")  # list all shapes on slide 5
 ```
+
+## User Input Patterns
+
+All workflows are triggered via **natural language** in the Claude Code terminal:
+
+| Scenario | User Says | Pipeline Call |
+|----------|-----------|---------------|
+| Edit 1 slide (text/sort/data) | `Edit Slide N — ...` | `regenerate_slide()` |
+| Edit slides with new wave data | `Edit slides with new wave data — PET_Q1Q2_2026` | update config → `generate_deck()` |
+| Add/remove/reorder slides | `Add slide after N...` / `Remove Slide N` | `generate_deck()` |
+| Edit slides with new wave data + new asks | `Edit slides with new wave data + new asks — PET_Q1Q2_2026` | update config + extractions → `generate_deck()` |
+| Brand new project | `Create slides for projects/{name}` | full create workflow |
+
+### Example inputs:
+
+```
+Create slides for projects/jnj_rybrevant
+Create slides for projects/pfizer_ibrance wave PET_Q1_2026
+
+Edit Slide 5 — change headline to "Updated Message Recall"
+Edit Slide 3 — sort bars descending by current value
+Edit Slide 9 — use data from Q2_15Z instead of Q2_10Z
+
+Edit slides with new wave data — PET_Q1Q2_2026, Q1'26 vs Q2'26
+Edit slides with new wave data + new asks — PET_Q1Q2_2026
+
+Add a slide after Slide 6 — clustered_compare for HCP satisfaction
+Remove Slide 8
+Move Slide 10 before Slide 5
+Regenerate all slides
+```
+
+## Workflow: Create Slides
+
+When the user says **"Create slides for projects/{name}"** for a new project with data/reference/templates:
+
+1. **Verify folder structure** — Ensure `projects/{name}/data/{wave}/`, `reference/{wave}/`, `templates/` exist
+2. **Discover data** — Run `discover_excel_structure()` on the source Excel to understand sheets, columns, question codes
+3. **Read reference docs** — Parse `reference/{wave}/asks.md` (or `.docx` via `python -m markitdown`) to understand what slides are needed
+4. **Read template** — Run `python -m markitdown template.pptx` to understand available layouts
+5. **Generate config scaffold** — Call `generate_config_scaffold()` for a starter YAML
+6. **Map asks to pipeline** — For each ask from the reference doc:
+   - Match to an existing extraction method (`question_code`, `row_range`, etc.)
+   - Match to an existing slide type (`single_bar_with_delta`, `clustered_compare`, etc.)
+   - If no existing method/type fits → add a new extractor to `data_loaders.py` or new renderer to `slide_renderers.py` (follow existing patterns, don't modify existing code)
+7. **Write config.yaml** — Complete the YAML with all extractions and asks
+8. **Generate deck** — Run `generate_deck("projects/{name}/config.yaml")`
+9. **Visual QA** — Convert to images, inspect for layout issues, fix and re-run
+
+## Workflow: Edit Slide
+
+When the user says **"Edit Slide N — ..."** (e.g. change headline, update data, re-sort):
+
+1. **Read config** — Load current `config.yaml`, identify the ask at index N-1
+2. **Backup config** — Call `_backup_config()` to save timestamped copy to `config_history/`
+3. **Update config** — Modify the relevant fields in the YAML (headline, data_key, sort_by, etc.)
+4. **Regenerate slide** — Call `regenerate_slide(yaml_path, slide_index=N-1)` — clears and re-renders only that slide
+5. **Refresh PowerPoint** — Tell user to reopen/refresh the deck in PowerPoint to see changes
+6. **Report** — Summarize what changed
+
+## Workflow: Edit Slides with New Wave Data
+
+When the user says **"Edit slides with new wave data — {wave_id}"**:
+
+1. **Backup config** — Call `_backup_config()` to save timestamped copy
+2. **Update config** — Change `project.wave`, `period_current`, `period_prior` in config.yaml
+3. **Verify data** — Check `data/{wave_id}/source_data.xlsx` exists
+4. **Regenerate deck** — Run `generate_deck()` — output goes to `output/{wave_id}/deck.pptx`
+5. **Report** — Old wave output is preserved, new wave output is in its own folder
+
+## Workflow: Edit Slides with New Wave Data + New Asks
+
+When the user says **"Edit slides with new wave data + new asks — {wave_id}"**:
+
+1. **Backup config** — Call `_backup_config()` to save timestamped copy
+2. **Update wave** — Change `project.wave`, `period_current`, `period_prior`
+3. **Read new reference** — Parse `reference/{wave_id}/asks.md` for updated asks
+4. **Update config** — Modify extractions and asks in config.yaml to match new reference
+5. **Gap analysis** — Check if new asks need new extractors or renderers; extend if needed
+6. **Regenerate deck** — Run `generate_deck()` — output goes to `output/{wave_id}/deck.pptx`
+7. **Report** — Summarize changes from previous wave
+
+## Shape Naming
+
+Pipeline-generated slides assign `zrx_{slide:03d}_{shape:03d}` names to all shapes (e.g. `zrx_001_001` through `zrx_001_008` for slide 1). This enables:
+- LiveEditor targeting via COM
+- Shape registry saved to `output/shape_registry.json`
+- Per-slide regeneration without affecting other slides
+
+## Wave Versioning
+
+Each project supports wave-based folder versioning for input data and output:
+
+```yaml
+project:
+  wave: "PET_Q3Q4_2025"          # wave identifier
+
+data_source_path: "data/{{wave}}/source_data.xlsx"    # wave-versioned
+template_path: "templates/template.pptx"              # shared (no {{wave}})
+output_path: "output/{{wave}}/deck.pptx"              # wave-versioned
+```
+
+- `{{wave}}` in paths is interpolated from `project.wave` at config load time
+- Template stays flat — shared across waves (typically doesn't change)
+- Data and output get wave subfolders — old waves are preserved
+- To start a new wave: update `project.wave`, `period_current`, `period_prior` in config.yaml and place new data in `data/{new_wave}/`
+- If `wave` is omitted or empty, paths are used as-is (backward compatible)
+
+## Config Versioning
+
+Before any config modification, a timestamped backup is saved:
+- Location: `projects/{name}/config_history/config_{YYYYMMDD_HHMMSS}.yaml`
+- These are gitignored by default

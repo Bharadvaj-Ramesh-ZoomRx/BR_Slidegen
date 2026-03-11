@@ -5,13 +5,16 @@
 project:
   name: "J&J Rybrevant PET"
   client: "Johnson & Johnson"
+  wave: "PET_Q3Q4_2025"
   period_current: "Q4'25"
   period_prior: "Q3'25"
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-data_source_path: "data/source_data.xlsx"
+# {{wave}} is interpolated at load time from project.wave above
+# Template stays flat (shared across waves); data/output are wave-versioned
+data_source_path: "data/{{wave}}/source_data.xlsx"
 template_path: "templates/template.pptx"
-output_path: "output/deck.pptx"
+output_path: "output/{{wave}}/deck.pptx"
 
 # ── Brands ───────────────────────────────────────────────────────────────────
 brands:

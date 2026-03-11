@@ -6,6 +6,6 @@ Usage:
     generate_deck("projects/jnj_rybrevant/config.yaml")
 """
 
-from slidegen.pipeline.orchestrator import generate_deck
+from slidegen.pipeline.orchestrator import generate_deck, regenerate_slide
 
-__all__ = ["generate_deck"]
+__all__ = ["generate_deck", "regenerate_slide"]

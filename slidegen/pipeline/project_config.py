@@ -104,6 +104,7 @@ class ProjectConfig:
 
     # Optional
     label_shortcuts: list[LabelShortcut] = field(default_factory=list)
+    wave: str = ""               # wave identifier (e.g. "PET_Q3Q4_2025")
     output_path: str = ""
     template_path: str = ""
     data_source_path: str = ""
@@ -133,6 +134,9 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         raw = yaml.safe_load(f)
 
     project_dir = os.path.dirname(os.path.abspath(yaml_path))
+
+    # Wave identifier — interpolated into paths as {{wave}}
+    wave = raw.get("project", {}).get("wave", "")
 
     # Brands
     brands = {}
@@ -189,18 +193,19 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
             extra=ask.get("extra", {}),
         ))
 
-    # Resolve paths relative to project root
-    data_path = raw.get("data_source_path", "")
-    if data_path and not os.path.isabs(data_path):
-        data_path = os.path.join(project_dir, data_path)
+    # Resolve paths relative to project root, interpolating {{wave}}
+    def _resolve_path(p: str) -> str:
+        if not p:
+            return p
+        if wave:
+            p = p.replace("{{wave}}", wave)
+        if not os.path.isabs(p):
+            p = os.path.join(project_dir, p)
+        return p
 
-    tmpl_path = raw.get("template_path", "")
-    if tmpl_path and not os.path.isabs(tmpl_path):
-        tmpl_path = os.path.join(project_dir, tmpl_path)
-
-    out_path = raw.get("output_path", "")
-    if out_path and not os.path.isabs(out_path):
-        out_path = os.path.join(project_dir, out_path)
+    data_path = _resolve_path(raw.get("data_source_path", ""))
+    tmpl_path = _resolve_path(raw.get("template_path", ""))
+    out_path = _resolve_path(raw.get("output_path", ""))
 
     return ProjectConfig(
         name=raw["project"]["name"],
@@ -214,6 +219,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         extractions=extractions,
         asks=asks,
         label_shortcuts=label_shortcuts,
+        wave=wave,
         output_path=out_path,
         template_path=tmpl_path,
         data_source_path=data_path,

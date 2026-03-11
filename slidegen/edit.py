@@ -265,6 +265,40 @@ class LiveEditor:
             "height": round(sh.Height / IN, 4),
         }
 
+    def set_slide(self, slide_num: int):
+        """Switch to a different slide number (1-indexed)."""
+        self.slide_num = slide_num
+        self._slide = self._prs.Slides(slide_num)
+
+    def find_shapes_by_prefix(self, prefix: str) -> list[dict]:
+        """Find all shapes whose name starts with the given prefix.
+
+        Useful for finding all shapes on a pipeline-generated slide, e.g.
+        find_shapes_by_prefix("zrx_005") returns all shapes on slide 5.
+
+        Returns:
+            list of dicts with keys: name, type, left, top, width, height, text
+        """
+        IN = PTS_PER_INCH
+        results = []
+        for i in range(1, self._slide.Shapes.Count + 1):
+            sh = self._slide.Shapes(i)
+            if sh.Name.startswith(prefix):
+                info = {
+                    "name": sh.Name,
+                    "type": sh.Type,
+                    "left": round(sh.Left / IN, 3),
+                    "top": round(sh.Top / IN, 3),
+                    "width": round(sh.Width / IN, 3),
+                    "height": round(sh.Height / IN, 3),
+                }
+                try:
+                    info["text"] = sh.TextFrame.TextRange.Text[:80]
+                except Exception:
+                    info["text"] = None
+                results.append(info)
+        return results
+
     def undo_last(self):
         """Undo the most recent edit by re-applying 'before' values.
 

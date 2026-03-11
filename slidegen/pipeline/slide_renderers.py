@@ -1,7 +1,7 @@
 """
 slide_renderers.py — Reusable slide type renderers.
 
-Each renderer takes (slide, config, ask, data, brand_cfg) and builds
+Each renderer takes (slide, config, ask, data, *, namer=None) and builds
 the slide content generically from the ask definition + extracted data.
 
 Slide types:
@@ -102,7 +102,7 @@ def _make_legend(slide, items: list[tuple], left: float, top: float, font_name: 
 # RENDERERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def render_cover(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_cover(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Title/cover slide."""
     headline = _resolve_template(ask.headline, config)
     extra = ask.extra
@@ -115,7 +115,7 @@ def render_cover(slide, config: ProjectConfig, ask: AskConfig, data: dict):
     )
 
 
-def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Bullet-list executive summary. Insights are in ask.extra['insights']."""
     headline = _resolve_template(ask.headline, config)
     slide_header(slide, headline, font=config.font_display)
@@ -135,7 +135,7 @@ def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data:
         slide_footer(slide, source, font=config.font_body)
 
 
-def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Single horizontal bar chart with a QoQ delta column."""
     _slide_chrome(slide, config, ask)
 
@@ -184,7 +184,7 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     ], 2.0, ly, font)
 
 
-def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Two side-by-side bar charts (e.g. MR + ME) each with delta columns."""
     _slide_chrome(slide, config, ask)
 
@@ -284,7 +284,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     ], 2.0, ly, font)
 
 
-def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Two side-by-side clustered bar charts (Q4 vs Q3) each with delta columns."""
     _slide_chrome(slide, config, ask)
 
@@ -402,7 +402,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     ], 2.5, ly, font)
 
 
-def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Clustered horizontal bar comparing two groups + delta columns."""
     _slide_chrome(slide, config, ask)
 
@@ -525,7 +525,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
                         font_name=font)
 
 
-def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Clustered Q4 vs Q3 bar chart with delta column."""
     _slide_chrome(slide, config, ask)
 
@@ -586,7 +586,7 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     )
 
 
-def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Two vertically stacked single-bar sections (e.g. RYB Rx + TAG Rx)."""
     _slide_chrome(slide, config, ask)
 
@@ -649,7 +649,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
             y_offset += 1.7
 
 
-def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dict):
+def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Stacked bar with ordinal breakdown (1st/2nd/3rd/4th recalled)."""
     _slide_chrome(slide, config, ask)
 

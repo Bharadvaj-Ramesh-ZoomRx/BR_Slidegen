@@ -16,9 +16,13 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
 # Or from Python
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
+
+# Regenerate a single slide (0-based index)
+from slidegen.pipeline import regenerate_slide
+regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
 ```
 
-Output: `projects/jnj_rybrevant/output/deck.pptx`
+Output: `projects/jnj_rybrevant/output/PET_Q3Q4_2025/deck.pptx`
 
 ### Legacy pipeline (original POC)
 
@@ -43,21 +47,83 @@ projects/jnj_rybrevant/output/deck.pptx  # Generated deck
 ### Adding a New Project
 
 1. Create `projects/your_project/config.yaml` — define brands, colors, sheets, extractions, asks
-2. Place source Excel as `projects/your_project/data/source_data.xlsx`
+2. Place source Excel as `projects/your_project/data/{wave}/source_data.xlsx`
 3. Optionally place a template as `projects/your_project/templates/template.pptx`
 4. Run: `python -m slidegen.pipeline.orchestrator projects/your_project/config.yaml`
 
 No Python changes needed — all project-specific config lives in the YAML file.
 
+### Wave Versioning
+
+Data and output are versioned by wave (e.g. `PET_Q3Q4_2025`, `PET_Q1Q2_2026`). Templates are shared across waves.
+
+```
+projects/jnj_rybrevant/
+  config.yaml
+  templates/template.pptx              # shared across waves
+  data/
+    PET_Q3Q4_2025/source_data.xlsx     # wave-versioned input
+    PET_Q1Q2_2026/source_data.xlsx
+  output/
+    PET_Q3Q4_2025/deck.pptx           # wave-versioned output
+    PET_Q1Q2_2026/deck.pptx
+  reference/
+    PET_Q3Q4_2025/asks.md             # wave-versioned asks
+```
+
+In `config.yaml`, `{{wave}}` in paths is interpolated from `project.wave`:
+```yaml
+project:
+  wave: "PET_Q3Q4_2025"
+data_source_path: "data/{{wave}}/source_data.xlsx"
+template_path: "templates/template.pptx"           # no {{wave}} — shared
+output_path: "output/{{wave}}/deck.pptx"
+```
+
+## Workflows (Claude Code Terminal)
+
+All workflows are triggered via natural language:
+
+| Scenario | User Says | What Happens |
+|----------|-----------|--------------|
+| Brand new project | `Create slides for projects/{name}` | Full create workflow |
+| Edit 1 slide | `Edit Slide N — ...` | `regenerate_slide()` — single slide regen |
+| New wave, same asks | `Edit slides with new wave data — PET_Q1Q2_2026` | Update config wave → `generate_deck()` |
+| New wave + new asks | `Edit slides with new wave data + new asks — PET_Q1Q2_2026` | Update config + extractions → `generate_deck()` |
+| Add/remove/reorder | `Add slide after N...` / `Remove Slide N` | Modify asks → `generate_deck()` |
+
+### Examples
+
+```
+# ── Create ──
+Create slides for projects/jnj_rybrevant
+Create slides for projects/pfizer_ibrance wave PET_Q1_2026
+
+# ── Edit single slide ──
+Edit Slide 5 — change headline to "Updated Message Recall"
+Edit Slide 3 — sort bars descending by current value
+Edit Slide 9 — use data from Q2_15Z instead of Q2_10Z
+
+# ── New wave ──
+Edit slides with new wave data — PET_Q1Q2_2026, Q1'26 vs Q2'26
+Edit slides with new wave data + new asks — PET_Q1Q2_2026
+
+# ── Add / remove / reorder ──
+Add a slide after Slide 6 — clustered_compare for HCP satisfaction
+Remove Slide 8
+Move Slide 10 before Slide 5
+Regenerate all slides
+```
+
 ## Data Setup
 
 Source Excel and client assets are **gitignored** (proprietary survey data). To run:
 
-1. Place source Excel as `projects/jnj_rybrevant/data/source_data.xlsx`
+1. Place source Excel as `projects/jnj_rybrevant/data/PET_Q3Q4_2025/source_data.xlsx`
 2. Place template deck as `projects/jnj_rybrevant/templates/template.pptx`
-3. `projects/jnj_rybrevant/output/` is auto-created on first run
+3. `projects/jnj_rybrevant/output/PET_Q3Q4_2025/` is auto-created on first run
 
-Paths in `config.yaml` are relative to the project folder (e.g. `data/source_data.xlsx`).
+Paths in `config.yaml` are relative to the project folder. Data and output use `{{wave}}` subfolders (e.g. `data/{{wave}}/source_data.xlsx`); templates are shared across waves.
 
 ### Standard File Names
 
@@ -131,7 +197,8 @@ slidegen/                     # SlideGen system
     project_config.py          # ProjectConfig schema + YAML loader
     data_loaders.py            # Generic data extractors (5 methods)
     slide_renderers.py         # 9 slide type renderers
-    orchestrator.py            # Pipeline entry point
+    orchestrator.py            # Pipeline entry + per-slide regen
+    config_generator.py        # Data discovery + config scaffolding
   pptx_utils.py               # 50+ helper functions (charts, tables, XML)
   create.py                   # SlideBuilder class
   edit.py                     # LiveEditor class (win32com)
