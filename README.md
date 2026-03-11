@@ -24,10 +24,10 @@ regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
 
 Output: `projects/jnj_rybrevant/output/PET_Q3Q4_2025/deck.pptx`
 
-### Legacy pipeline (original POC)
+### Legacy pipeline (archived)
 
 ```bash
-python src/generate_asks.py   # Hardcoded J&J deck (14 slides)
+python archive/src/generate_asks.py   # Hardcoded J&J deck (14 slides, POC)
 ```
 
 ## Architecture
@@ -204,14 +204,14 @@ slidegen/                     # SlideGen system
   edit.py                     # LiveEditor class (win32com)
   reconcile.py                # Registry reconciliation
 
-src/                          # Legacy pipeline (original POC)
-  generate_asks.py            # Hardcoded 14-slide J&J deck
-  extract_data.py             # Excel → pkl
-  generate_pptx.py            # pkl → deck
-  validate_data.py            # Cross-check pkl vs Excel
-
-scripts/                      # Ad-hoc data exploration
-archive/                      # Superseded scripts
+archive/                      # Superseded scripts & old artifacts
+  src/                        # Legacy pipeline (original POC)
+    generate_asks.py          # Hardcoded 14-slide J&J deck
+    extract_data.py           # Excel → pkl
+    generate_pptx.py          # pkl → deck
+    validate_data.py          # Cross-check pkl vs Excel
+  scripts/                    # Ad-hoc data exploration
+    discover_data.py          # Excel sheet explorer
 docs/                         # Design docs & architecture notes
 ```
 

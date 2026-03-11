@@ -39,14 +39,17 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   ├── reconcile.py           # Registry reconciliation from live PowerPoint state
 │   ├── slide_registry.json    # Shape state (created at runtime, gitignored)
 │   └── output/                # Generated slides (gitignored)
-├── src/                       # Legacy pipeline (original POC, hardcoded J&J)
-│   ├── generate_asks.py       # Monolithic 14-slide J&J deck generator
-│   ├── extract_data.py        # Excel → output/slide_data_v2.pkl
-│   ├── generate_pptx.py       # pkl → full multi-slide deck
-│   └── validate_data.py       # Cross-check pkl against raw Excel
-├── scripts/                   # Ad-hoc exploration & discovery
-│   └── discover_data.py       # Explores Excel sheets, outputs column_mapping.csv
 ├── archive/                   # Superseded scripts & old artifacts
+│   ├── src/                   # Legacy pipeline (original POC, hardcoded J&J)
+│   │   ├── generate_asks.py   # Monolithic 14-slide J&J deck generator
+│   │   ├── extract_data.py    # Excel → output/slide_data_v2.pkl
+│   │   ├── generate_pptx.py   # pkl → full multi-slide deck
+│   │   ├── generate_slide1.py # Single-slide POC generator
+│   │   └── validate_data.py   # Cross-check pkl against raw Excel
+│   ├── scripts/               # Ad-hoc exploration & discovery
+│   │   └── discover_data.py   # Explores Excel sheets, outputs column_mapping.csv
+│   ├── explore*.py            # Early data exploration scripts
+│   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
 │   ├── pptx/                  # PPTX read/create/edit skill
@@ -65,16 +68,14 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
 #   from slidegen.pipeline import generate_deck
 #   generate_deck("projects/jnj_rybrevant/config.yaml")
 
-# ── Legacy Pipeline (hardcoded J&J) ──
-python src/generate_asks.py        # Monolithic 14-slide deck
-
 # ── SlideGen System ──
 python -m slidegen create                   # Demo slide creation
 python -m slidegen edit <filename.pptx>     # Interactive live editor
 python -m slidegen reconcile <filename.pptx> # Sync registry from PowerPoint
 
-# ── Data discovery ──
-python scripts/discover_data.py
+# ── Legacy (archived) ──
+python archive/src/generate_asks.py        # Monolithic 14-slide deck (POC)
+python archive/scripts/discover_data.py    # Data exploration
 ```
 
 ## Pipeline Architecture
