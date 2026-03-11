@@ -80,15 +80,19 @@ class ShapeNamer:
         return meta
 
 
-def _save_shape_registry(registries: dict, output_dir: str):
+def _save_shape_registry(registries: dict, output_dir: str,
+                         slide_to_ask: list[int] | None = None):
     """Save the combined shape registry for all slides."""
     path = os.path.join(output_dir, "shape_registry.json")
     os.makedirs(output_dir, exist_ok=True)
+    payload = {
+        "created": datetime.now().isoformat(),
+        "slides": registries,
+    }
+    if slide_to_ask is not None:
+        payload["slide_to_ask"] = slide_to_ask
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "created": datetime.now().isoformat(),
-            "slides": registries,
-        }, f, indent=2)
+        json.dump(payload, f, indent=2)
 
 
 # ── Config backup ────────────────────────────────────────────────────────────
@@ -150,10 +154,15 @@ def _data_cache_path(config: ProjectConfig) -> str:
     return os.path.join(output_dir, "slide_data.json")
 
 
+def _file_hash(path: str) -> str:
+    """Fast MD5 hash of a file for cache invalidation."""
+    with open(path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()[:12]
+
+
 def _config_hash(yaml_path: str) -> str:
     """Fast hash of config file for cache invalidation."""
-    with open(yaml_path, "rb") as f:
-        return hashlib.md5(f.read()).hexdigest()[:12]
+    return _file_hash(yaml_path)
 
 
 def _save_data_cache(data: dict, config: ProjectConfig, yaml_path: str):
@@ -161,13 +170,14 @@ def _save_data_cache(data: dict, config: ProjectConfig, yaml_path: str):
     cache_path = _data_cache_path(config)
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
 
+    source_hash = _file_hash(config.data_source_path) if os.path.exists(config.data_source_path) else ""
     cache = {
         "_meta": {
             "wave": config.wave,
             "source": config.data_source_path,
             "extracted_at": datetime.now().isoformat(),
             "config_hash": _config_hash(yaml_path),
-            "source_mtime": os.path.getmtime(config.data_source_path),
+            "source_hash": source_hash,
         },
     }
     cache.update(data)
@@ -197,10 +207,11 @@ def _load_data_cache(config: ProjectConfig, yaml_path: str) -> dict | None:
         print("  Data cache stale (config changed) — re-extracting")
         return None
 
-    # Check Excel file hasn't been modified
+    # Check Excel file hasn't been modified (hash-based, race-safe)
     if os.path.exists(config.data_source_path):
-        excel_mtime = os.path.getmtime(config.data_source_path)
-        if excel_mtime > meta.get("source_mtime", 0):
+        current_hash = _file_hash(config.data_source_path)
+        cached_hash = meta.get("source_hash", meta.get("source_mtime", ""))
+        if current_hash != cached_hash:
             print("  Data cache stale (Excel updated) — re-extracting")
             return None
 
@@ -269,20 +280,24 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
 
     # 4. Build slides
     slide_registries = {}
+    # Track which ask index produced each slide (skipped asks don't get slides)
+    slide_to_ask: list[int] = []
+    cfg_hash = _config_hash(yaml_path)
     print("\nBuilding slides...")
-    for i, ask in enumerate(config.asks, 1):
+    for ask_idx, ask in enumerate(config.asks):
         renderer = RENDERERS.get(ask.slide_type)
         if renderer is None:
-            print(f"  [{i}] SKIP — unknown slide_type: {ask.slide_type}")
+            print(f"  [ask {ask_idx}] SKIP — unknown slide_type: {ask.slide_type}")
             continue
 
         # Add blank slide
         layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
         slide = prs.slides.add_slide(layout)
+        slide_num = len(prs.slides)
+        slide_to_ask.append(ask_idx)
 
-        cfg_hash = _config_hash(yaml_path)
         namer = ShapeNamer(
-            i, ask_id=ask.id,
+            slide_num, ask_id=ask.id,
             data_key=getattr(ask, 'data_key', ''),
             config_hash=cfg_hash,
             source_file=config.data_source_path,
@@ -290,10 +305,10 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
         try:
             renderer(slide, config, ask, data, namer=namer)
             namer.name_remaining(slide)
-            slide_registries[str(i)] = namer.slide_metadata
-            print(f"  [{i}] {ask.id} ({ask.slide_type})")
+            slide_registries[str(slide_num)] = namer.slide_metadata
+            print(f"  [{slide_num}] {ask.id} ({ask.slide_type})")
         except Exception as e:
-            print(f"  [{i}] ERROR on {ask.id}: {e}")
+            print(f"  [{slide_num}] ERROR on {ask.id}: {e}")
             from slidegen.pptx_utils import textbox, C_RED
             textbox(slide, f"Error: {e}", 1, 3, 10, 1, fsize=12, color=C_RED)
 
@@ -304,7 +319,8 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
 
     os.makedirs(os.path.dirname(out), exist_ok=True)
     prs.save(out)
-    _save_shape_registry(slide_registries, os.path.dirname(out))
+    _save_shape_registry(slide_registries, os.path.dirname(out),
+                         slide_to_ask=slide_to_ask)
     print(f"\nSaved: {out}")
     print(f"Total slides: {len(prs.slides)}")
 
@@ -351,7 +367,23 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     slide = prs.slides[slide_index]
     _clear_slide(slide)
 
-    ask = config.asks[slide_index]
+    # Resolve the correct ask index — slide_to_ask mapping accounts for
+    # asks that were skipped during generate_deck() (unknown slide_type).
+    registry_path = os.path.join(os.path.dirname(pptx_path), "shape_registry.json")
+    ask_index = slide_index  # default: assume 1:1 mapping
+    if os.path.exists(registry_path):
+        with open(registry_path, "r", encoding="utf-8") as f:
+            reg = json.load(f)
+        slide_to_ask = reg.get("slide_to_ask")
+        if slide_to_ask and slide_index < len(slide_to_ask):
+            ask_index = slide_to_ask[slide_index]
+
+    if ask_index >= len(config.asks):
+        raise IndexError(
+            f"Ask index {ask_index} (from slide {slide_index}) out of range "
+            f"(config has {len(config.asks)} asks)"
+        )
+    ask = config.asks[ask_index]
     renderer = RENDERERS.get(ask.slide_type)
     if renderer is None:
         raise ValueError(f"Unknown slide_type: {ask.slide_type}")

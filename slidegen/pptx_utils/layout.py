@@ -7,7 +7,10 @@ badges, cover slides, dividers, legends, trend arrows, quadrant fills.
 PRD §4.4: LAYOUTS{} dict with named presets.
 """
 
+from __future__ import annotations
+
 import os
+from typing import Optional
 
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
@@ -72,8 +75,8 @@ LAYOUTS = {
 
 # ── Slide chrome functions ───────────────────────────────────────────────────
 
-def slide_header(slide, headline, module_label="Personal Promotion Module",
-                 font=None):
+def slide_header(slide, headline: str, module_label: str = "Personal Promotion Module",
+                 font: Optional[str] = None) -> None:
     """Add the standard ZoomRx slide header:
       - thin red accent line at very top
       - module label (top-right, small grey)
@@ -107,15 +110,16 @@ def slide_header(slide, headline, module_label="Personal Promotion Module",
     horiz_line(slide, 0.0, 1.32, SLIDE_W_IN, color=C_RED, width_pt=1.0)
 
 
-def slide_footer(slide, footer_text, font=None):
+def slide_footer(slide, footer_text: str, font: Optional[str] = None) -> None:
     """Add standard footer text at bottom of slide."""
     textbox(slide, footer_text,
             0.15, 7.20, 13.0, 0.28,
             fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
 
 
-def manual_legend(slide, q4_n, q3_n,
-                  chart_left, chart_right, chart_bottom):
+def manual_legend(slide, q4_n: int, q3_n: int,
+                  chart_left: float, chart_right: float,
+                  chart_bottom: float) -> None:
     """Add the shared Q3/Q4/delta colour legend below a pair of charts."""
     leg_top = chart_bottom + 0.10
     leg_ctr = (chart_left + chart_right) / 2
@@ -138,7 +142,9 @@ def manual_legend(slide, q4_n, q3_n,
             leg_l + 5.40, leg_top - 0.01, 3.00, 0.18, fsize=8, color=C_GREY)
 
 
-def section_header_bar(slide, label, top=1.40, icon_path=None, font=None):
+def section_header_bar(slide, label: str, top: float = 1.40,
+                       icon_path: Optional[str] = None,
+                       font: Optional[str] = None):
     """Add the gray icon+label strip used as a chart/question title."""
     bar_l = 0.15
     bar_w = SLIDE_W_IN - 0.30
@@ -160,7 +166,7 @@ def section_header_bar(slide, label, top=1.40, icon_path=None, font=None):
     return bg
 
 
-def module_badge(slide, label, color=None):
+def module_badge(slide, label: str, color: Optional[RGBColor] = None) -> None:
     """Add a colored pill badge in the top-right corner."""
     if color is None:
         color = C_RED
@@ -175,7 +181,7 @@ def module_badge(slide, label, color=None):
             align=PP_ALIGN.CENTER, font=FONT_TEXT)
 
 
-def section_breadcrumb(slide, text):
+def section_breadcrumb(slide, text: str) -> None:
     """Add small right-aligned breadcrumb text in the top-right."""
     textbox(slide, text,
             8.0, 0.36, 5.20, 0.20,
@@ -183,7 +189,7 @@ def section_breadcrumb(slide, text):
             align=PP_ALIGN.RIGHT, font=FONT_TEXT)
 
 
-def divider_slide(slide, title, logo_path=None):
+def divider_slide(slide, title: str, logo_path: Optional[str] = None) -> None:
     """Build a full-slide section divider."""
     solidrect(slide, 0, 0, SLIDE_W_IN, SLIDE_H_IN, RGBColor(0xF8, 0xF8, 0xF8))
     solidrect(slide, 0, 0, 0.08, SLIDE_H_IN, C_RED)
@@ -198,8 +204,9 @@ def divider_slide(slide, title, logo_path=None):
             Inches(1.50), Inches(0.50))
 
 
-def cover_slide(slide, title, subtitle, date, client_name,
-                jj_logo_path=None, zrx_logo_path=None):
+def cover_slide(slide, title: str, subtitle: str, date: str, client_name: str,
+                jj_logo_path: Optional[str] = None,
+                zrx_logo_path: Optional[str] = None) -> None:
     """Build the full red-background title cover slide."""
     solidrect(slide, 0, 0, SLIDE_W_IN, SLIDE_H_IN, C_RED)
     textbox(slide, title,
@@ -227,7 +234,7 @@ def cover_slide(slide, title, subtitle, date, client_name,
             Inches(2.10), Inches(6.70), Inches(1.50), Inches(0.50))
 
 
-def trend_arrow_icon(slide, direction, left, top):
+def trend_arrow_icon(slide, direction: str, left: float, top: float) -> None:
     """Add a small directional trend arrow icon at a position."""
     colors = {"up": C_GREEN, "down": C_RED,
               "flat": RGBColor(0xFF, 0xC0, 0x00)}
@@ -240,10 +247,12 @@ def trend_arrow_icon(slide, direction, left, top):
             align=PP_ALIGN.CENTER, font=FONT_TEXT)
 
 
-def scatter_quadrant_fills(slide, chart_left, chart_top,
-                            chart_width, chart_height,
-                            tl_color=None, tr_color=None,
-                            bl_color=None, br_color=None):
+def scatter_quadrant_fills(slide, chart_left: float, chart_top: float,
+                            chart_width: float, chart_height: float,
+                            tl_color: Optional[RGBColor] = None,
+                            tr_color: Optional[RGBColor] = None,
+                            bl_color: Optional[RGBColor] = None,
+                            br_color: Optional[RGBColor] = None) -> None:
     """Place four colored background rectangles behind a scatter chart."""
     if tl_color is None: tl_color = RGBColor(0xDE, 0xEB, 0xF7)
     if tr_color is None: tr_color = RGBColor(0xE2, 0xEF, 0xDA)

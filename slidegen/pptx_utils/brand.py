@@ -59,15 +59,20 @@ BRAND = {
     },
 }
 
-# ── Legacy color aliases (backward compatibility) ────────────────────────────
+# ── Legacy color aliases (derived from BRAND["jnj"]) ─────────────────────────
+# These exist for backward compat; new code should prefer BRAND[client_key].
 
-C_RYB_Q4   = RGBColor(0xF7, 0x58, 0x24)   # deep orange  — Q4 bars, primary accent
-C_RYB_Q3   = RGBColor(0xFF, 0xC1, 0x99)   # pale orange  — Q3 bars
-C_TAG      = RGBColor(0x70, 0x30, 0xA0)   # purple       — AZ / Tagrisso
-C_RED      = RGBColor(0xFF, 0x00, 0x00)   # J&J red      — title bar, headline
-C_GREEN    = RGBColor(0x00, 0xB0, 0x50)   # positive delta
+_jnj = BRAND["jnj"]
+
+C_RYB_Q4   = _jnj["primary_current"]       # deep orange  — Q4 bars, primary accent
+C_RYB_Q3   = _jnj["primary_prior"]         # pale orange  — Q3 bars
+C_TAG      = _jnj["competitor"]             # purple       — AZ / Tagrisso
+C_RED      = _jnj["accent"]                # J&J red      — title bar, headline
+C_GREEN    = _jnj["positive"]              # positive delta
+C_GREY     = _jnj["neutral_grey"]          # body text
+
+# Structural colors (client-independent)
 C_WHITE    = RGBColor(0xFF, 0xFF, 0xFF)
-C_GREY     = RGBColor(0x50, 0x50, 0x50)   # body text
 C_FTGREY   = RGBColor(0x7F, 0x7F, 0x7F)   # footer / faint text
 C_LBGREY   = RGBColor(0xF4, 0xF4, 0xF4)   # alternating table row bg
 C_HDRGREY  = RGBColor(0x40, 0x40, 0x40)   # delta table header bg
@@ -80,7 +85,7 @@ COM_ORANGE = 0x2458F7
 COM_GREEN  = 0x50B000
 COM_GREY   = 0x505050
 
-# ── Fonts (legacy aliases) ───────────────────────────────────────────────────
+# ── Fonts (derived from BRAND["jnj"]) ────────────────────────────────────────
 
-FONT_DISPLAY = "Johnson Display"
-FONT_TEXT    = "Johnson Text"
+FONT_DISPLAY = _jnj["font_display"]
+FONT_TEXT    = _jnj["font_body"]

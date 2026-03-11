@@ -5,7 +5,10 @@ All positions/sizes in inches. Uses python-pptx API (no raw lxml except
 for dashed_separator which needs prstDash).
 """
 
+from __future__ import annotations
+
 import os
+from typing import Optional
 
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
@@ -15,9 +18,10 @@ from .brand import C_GREY, C_RED, C_FTGREY, C_LTGREY, C_WHITE, FONT_TEXT, FONT_D
 from .lxml_helpers import _get_or_add
 
 
-def textbox(slide, text, left, top, width, height,
-            fsize=9, bold=False, color=None, align=PP_ALIGN.LEFT,
-            italic=False, wrap=True, font=FONT_TEXT):
+def textbox(slide, text: str, left: float, top: float, width: float, height: float,
+            fsize: float = 9, bold: bool = False, color: Optional[RGBColor] = None,
+            align=PP_ALIGN.LEFT, italic: bool = False, wrap: bool = True,
+            font: str = FONT_TEXT):
     """Add a text box. All positions/sizes in inches."""
     if color is None:
         color = C_GREY
@@ -37,7 +41,8 @@ def textbox(slide, text, left, top, width, height,
     return shape
 
 
-def solidrect(slide, left, top, width, height, fill, line=None):
+def solidrect(slide, left: float, top: float, width: float, height: float,
+              fill: RGBColor, line: Optional[RGBColor] = None):
     """Add a filled rectangle. All positions/sizes in inches.
     line=None removes border; line=RGBColor draws a border."""
     shape = slide.shapes.add_shape(
@@ -52,7 +57,8 @@ def solidrect(slide, left, top, width, height, fill, line=None):
     return shape
 
 
-def horiz_line(slide, left, top, width, color=None, width_pt=1.0):
+def horiz_line(slide, left: float, top: float, width: float,
+               color: Optional[RGBColor] = None, width_pt: float = 1.0):
     """Add a horizontal line. Positions in inches, width_pt in points."""
     if color is None:
         color = C_RED
@@ -64,7 +70,8 @@ def horiz_line(slide, left, top, width, color=None, width_pt=1.0):
     return shape
 
 
-def insert_image(slide, img_path, left, top, width, height, name=None):
+def insert_image(slide, img_path: str, left: float, top: float,
+                 width: float, height: float, name: Optional[str] = None):
     """Place an external PNG or JPG at specified inch coordinates.
 
     Returns: the picture shape, or None if img_path does not exist.
@@ -79,8 +86,9 @@ def insert_image(slide, img_path, left, top, width, height, name=None):
     return pic
 
 
-def dashed_separator(slide, left, top, width,
-                      color=None, width_pt=0.75, dash="dash"):
+def dashed_separator(slide, left: float, top: float, width: float,
+                      color: Optional[RGBColor] = None, width_pt: float = 0.75,
+                      dash: str = "dash"):
     """Add a horizontal dashed line separator.
 
     Used to visually divide a slide into upper/lower chart panels.
@@ -99,7 +107,8 @@ def dashed_separator(slide, left, top, width,
     return shape
 
 
-def stat_callout(slide, value, delta, label, left, top):
+def stat_callout(slide, value, delta: Optional[float], label: str,
+                 left: float, top: float) -> None:
     """Add a large single-stat display: oversized number, delta, and label."""
     textbox(slide, str(value),
             left, top, 2.0, 0.80,
@@ -118,9 +127,10 @@ def stat_callout(slide, value, delta, label, left, top):
             align=PP_ALIGN.CENTER, font=FONT_TEXT)
 
 
-def callout_box(slide, left, top, width, height, text=None,
-                border_color=None, dashed=True, fill_color=None,
-                fsize=8, text_color=None):
+def callout_box(slide, left: float, top: float, width: float, height: float,
+                text: Optional[str] = None, border_color: Optional[RGBColor] = None,
+                dashed: bool = True, fill_color: Optional[RGBColor] = None,
+                fsize: float = 8, text_color: Optional[RGBColor] = None):
     """Add a rounded-rectangle annotation callout box."""
     if border_color is None:
         border_color = C_RED

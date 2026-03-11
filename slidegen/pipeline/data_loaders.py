@@ -6,8 +6,11 @@ from generate_asks.py are consolidated here into reusable extractors.
 """
 
 from __future__ import annotations
+import logging
 import pandas as pd
 from typing import Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 
 # ── Value converters ─────────────────────────────────────────────────────────
@@ -235,8 +238,14 @@ def extract_question_code_multi_col(
             break
 
     if min_diff > 0:
+        pre_filter = len(results)
         results = [r for r in results if abs(r.get("diff", 0)) > min_diff]
         results.sort(key=lambda x: abs(x.get("diff", 0)), reverse=True)
+        if pre_filter > 0 and len(results) == 0:
+            logger.warning(
+                "extract_question_code_multi_col: min_diff=%.1f filtered all "
+                "%d rows to 0 for code '%s'", min_diff, pre_filter, code
+            )
 
     return results
 
@@ -410,6 +419,10 @@ def load_all_data(config) -> dict:
 
         else:
             print(f"  [WARN] Unknown extraction method: {ex.method} for {ex.id}")
+
+        # Warn if extraction returned no rows
+        if ex.id in data and isinstance(data[ex.id], list) and len(data[ex.id]) == 0:
+            logger.warning("Extraction '%s' (method=%s) returned 0 rows", ex.id, ex.method)
 
     # Store sample sizes
     data["_sample_sizes"] = config.sample_sizes

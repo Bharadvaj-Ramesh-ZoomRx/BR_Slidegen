@@ -4,10 +4,14 @@ com.py — COM helpers for live editing via win32com.
 All positions in inches. Requires PowerPoint to be running on Windows.
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
 from .brand import IN
 
 
-def com_connect(target_filename):
+def com_connect(target_filename: str):
     """Connect to a running PowerPoint instance and return the named presentation.
 
     Args:
@@ -34,7 +38,7 @@ def com_connect(target_filename):
     )
 
 
-def com_find_shape(com_slide, name):
+def com_find_shape(com_slide, name: str):
     """Find a shape on a COM slide by its zrx_ name.
 
     Args:
@@ -49,11 +53,12 @@ def com_find_shape(com_slide, name):
             return sh
     raise RuntimeError(
         f"Shape '{name}' not found on slide. "
-        f"Run reconcile_registry.py and check for renames."
+        f"Run 'python -m slidegen reconcile' and check for renames."
     )
 
 
-def com_set_text(shape, text, color_bgr=None, size_pt=None, bold=None):
+def com_set_text(shape, text: str, color_bgr: Optional[int] = None,
+                 size_pt: Optional[float] = None, bold: Optional[bool] = None) -> None:
     """Set text content and optional formatting on a COM shape.
 
     Args:
@@ -73,24 +78,24 @@ def com_set_text(shape, text, color_bgr=None, size_pt=None, bold=None):
         tr.Font.Bold = bold
 
 
-def com_set_fill(shape, color_bgr):
+def com_set_fill(shape, color_bgr: int) -> None:
     """Set fill colour on a COM shape (BGR int, e.g. 0x2458F7 for orange)."""
     shape.Fill.ForeColor.RGB = color_bgr
 
 
-def com_move(shape, left_in, top_in):
+def com_move(shape, left_in: float, top_in: float) -> None:
     """Move a COM shape to a new position (inches)."""
     shape.Left = left_in * IN
     shape.Top  = top_in  * IN
 
 
-def com_resize(shape, width_in, height_in):
+def com_resize(shape, width_in: float, height_in: float) -> None:
     """Resize a COM shape (inches)."""
     shape.Width  = width_in  * IN
     shape.Height = height_in * IN
 
 
-def com_get_position(shape):
+def com_get_position(shape) -> tuple[float, float, float, float]:
     """Return current (left, top, width, height) in inches from a COM shape."""
     return (
         round(shape.Left   / IN, 4),

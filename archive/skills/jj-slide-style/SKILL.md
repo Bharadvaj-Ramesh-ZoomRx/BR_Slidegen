@@ -1,6 +1,6 @@
 ---
 name: jj-slide-style
-description: Use when designing ZoomRx/JnJ PowerPoint slide layouts. Provides visual design patterns, slide archetypes, chart type selection guide, and brand constants. Trigger when designing a new slide, choosing a chart type, applying brand colors, deciding on layout, or translating a data description into a slide. Works alongside pptx-utils skill for implementation.
+description: "Reference skill for detailed slide archetype specs, chart type selection, and brand constants. Use only when the slidegen skill cross-references this skill's detailed reference files. For all pipeline work (creating/editing slides), use the slidegen skill instead."
 ---
 
 # jj-slide-style

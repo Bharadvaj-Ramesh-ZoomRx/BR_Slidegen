@@ -1,6 +1,6 @@
 ---
 name: slidegen
-description: "Use when working with the SlideGen pipeline — creating, editing, or regenerating YAML-driven PowerPoint decks. Trigger when: creating slides for a project, editing slide N, switching wave data, adding/removing slides, writing renderers or extractors, using pptx_utils functions, or working with the shape registry. Covers the full pipeline from config to PPTX output."
+description: "Use when working with the SlideGen pipeline — creating, editing, or regenerating YAML-driven PowerPoint decks. Trigger when: creating slides for a project, editing slide N, switching wave data, adding/removing slides, writing renderers or extractors, using pptx_utils functions, working with the shape registry, choosing chart types, applying brand colors, or designing slide layouts. This is the primary skill for all SlideGen and pptx_utils work."
 ---
 
 # SlideGen Skill
@@ -159,6 +159,44 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered + delta |
 | `two_section_bar` | Two vertically stacked bar sections |
 | `stacked_order` | Stacked bar with ordinal breakdown + total column |
+
+### slide_type → extra Fields
+
+Each `slide_type` expects specific `extra` fields in the ask config:
+
+| slide_type | extra fields | Description |
+|------------|-------------|-------------|
+| `cover` | `subtitle`, `date`, `client` | Cover slide metadata |
+| `executive_summary` | `insights: [str, ...]` | List of bullet-point insights |
+| `single_bar_with_delta` | _(none required)_ | Uses `data_key` directly |
+| `dual_bar_with_delta` | `left: {field_prefix, label, delta_header}`, `right: {field_prefix, label, delta_header}` | Two side-by-side charts |
+| `dual_bar_qoq` | `left: {field_prefix, label, delta_header}`, `right: {field_prefix, label, delta_header}` | Two clustered Q4-vs-Q3 charts |
+| `clustered_compare` | `series: [{field, label, color}, ...]` or `primary_key` + `comp_key` for auto-merge | Two-brand comparison |
+| `qoq_bar_with_delta` | _(none required)_ | Uses `data_key` directly |
+| `two_section_bar` | `top: {data_key, label, brand}`, `bottom: {data_key, label, brand}` | Stacked sections |
+| `stacked_order` | `ordinals: ["1st", "2nd", "3rd", "4th"]` | Ordinal labels (defaults to 4) |
+
+---
+
+## Slide Archetypes
+
+| Archetype | When to use | Key functions |
+|---|---|---|
+| Cover | First slide of deck | `cover_slide()` |
+| Section divider | Between major sections | `divider_slide()` |
+| Standard bar chart | MR/ME reach/preference data | `slide_header`, `add_delta_col`, `manual_legend` |
+| Dot-plot / abacus | Message-level attribute ratings | `set_series_marker`, `hide_axis` |
+| Line / trend chart | Time-series, R3M rolling | `set_series_line_style`, `set_series_smooth` |
+| Scorecard table | Multi-metric summary | `add_delta_col`, `trend_arrow_icon` |
+| Callout / insight | Exec summary, qualitative findings | `callout_box`, `textbox` |
+| Scatter / quadrant | Importance vs performance | `scatter_quadrant_fills` |
+| Donut / pie | Share-of-wallet, interaction mix | `set_pie_slice_colors`, `set_donut_hole_size` |
+
+For full layout specs and implementation sequences, see `references/slide-archetypes.md`.
+For chart selection guidance, see `references/chart-types.md`.
+For brand constants and spacing, see `references/brand-constants.md`.
+For function signatures, see `references/function-ref.md`.
+For chart pattern checklists, see `references/chart-patterns.md`.
 
 ---
 

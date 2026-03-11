@@ -128,24 +128,65 @@ class ProjectConfig:
 
 # ── YAML Loader ──────────────────────────────────────────────────────────────
 
+def _require(raw: dict, key: str, yaml_path: str, parent: str = ""):
+    """Raise a clear error if a required key is missing from the config."""
+    if key not in raw:
+        context = f" in '{parent}'" if parent else ""
+        raise ValueError(
+            f"Missing required key '{key}'{context} in {yaml_path}"
+        )
+    return raw[key]
+
+
+def _validate_ask(ask: dict, idx: int, yaml_path: str):
+    """Validate required fields in an ask entry."""
+    required = ("id", "slide_type", "headline", "section", "source_text", "data_key")
+    for field_name in required:
+        if field_name not in ask:
+            raise ValueError(
+                f"Missing required field '{field_name}' in asks[{idx}] "
+                f"(id={ask.get('id', '?')}) in {yaml_path}"
+            )
+
+
+def _validate_extraction(ex: dict, idx: int, yaml_path: str):
+    """Validate required fields in an extraction entry."""
+    for field_name in ("id", "method", "sheet"):
+        if field_name not in ex:
+            raise ValueError(
+                f"Missing required field '{field_name}' in extractions[{idx}] "
+                f"(id={ex.get('id', '?')}) in {yaml_path}"
+            )
+
+
 def load_project_config(yaml_path: str) -> ProjectConfig:
     """Load a project YAML file into a ProjectConfig."""
     with open(yaml_path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
+    if not isinstance(raw, dict):
+        raise ValueError(f"Config file must be a YAML mapping, got {type(raw).__name__}: {yaml_path}")
+
     project_dir = os.path.dirname(os.path.abspath(yaml_path))
 
+    # Validate top-level required sections
+    project = _require(raw, "project", yaml_path)
+    for key in ("name", "client", "period_current", "period_prior"):
+        _require(project, key, yaml_path, parent="project")
+
     # Wave identifier — interpolated into paths as {{wave}}
-    wave = raw.get("project", {}).get("wave", "")
+    wave = project.get("wave", "")
 
     # Brands
+    brands_raw = _require(raw, "brands", yaml_path)
     brands = {}
-    for key, bd in raw["brands"].items():
+    for key, bd in brands_raw.items():
         brands[key] = BrandConfig.from_dict(bd)
 
     # Sheets
+    sheets_raw = _require(raw, "sheets", yaml_path)
     sheets = {}
-    for key, sd in raw["sheets"].items():
+    for key, sd in sheets_raw.items():
         sheets[key] = SheetConfig(
             name=sd["name"],
             q_prior_col=sd["q_prior_col"],
@@ -169,7 +210,8 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
 
     # Extractions
     extractions = []
-    for ex in raw.get("extractions", []):
+    for idx, ex in enumerate(raw.get("extractions", [])):
+        _validate_extraction(ex, idx, yaml_path)
         extractions.append(DataExtractionConfig(
             id=ex["id"],
             method=ex["method"],
@@ -179,7 +221,8 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
 
     # Asks
     asks = []
-    for ask in raw.get("asks", []):
+    for idx, ask in enumerate(raw.get("asks", [])):
+        _validate_ask(ask, idx, yaml_path)
         asks.append(AskConfig(
             id=ask["id"],
             slide_type=ask["slide_type"],
@@ -208,10 +251,10 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     out_path = _resolve_path(raw.get("output_path", ""))
 
     return ProjectConfig(
-        name=raw["project"]["name"],
-        client=raw["project"]["client"],
-        period_current=raw["project"]["period_current"],
-        period_prior=raw["project"]["period_prior"],
+        name=project["name"],
+        client=project["client"],
+        period_current=project["period_current"],
+        period_prior=project["period_prior"],
         brands=brands,
         fonts=raw.get("fonts", {"display": "Calibri", "body": "Calibri"}),
         sheets=sheets,

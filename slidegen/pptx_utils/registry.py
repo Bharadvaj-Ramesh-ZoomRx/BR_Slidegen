@@ -5,9 +5,12 @@ The registry (slide_registry.json) tracks all named shapes in the deck,
 enabling targeted COM edits and per-slide regeneration.
 """
 
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime
+from typing import Optional
 
 from .brand import IN
 
@@ -21,7 +24,7 @@ except ImportError:
     )
 
 
-def load_registry(path=None):
+def load_registry(path: Optional[str] = None) -> dict:
     """Load slide_registry.json and return the dict."""
     if path is None:
         path = REGISTRY_PATH
@@ -29,7 +32,7 @@ def load_registry(path=None):
         return json.load(f)
 
 
-def save_registry(registry, path=None):
+def save_registry(registry: dict, path: Optional[str] = None) -> None:
     """Save registry dict back to slide_registry.json."""
     if path is None:
         path = REGISTRY_PATH
@@ -37,18 +40,19 @@ def save_registry(registry, path=None):
         json.dump(registry, f, indent=2)
 
 
-def registry_get(name, path=None):
+def registry_get(name: str, path: Optional[str] = None) -> dict:
     """Return the record for a single shape by name. Raises KeyError if not found."""
     reg = load_registry(path)
     if name not in reg["shapes"]:
         raise KeyError(
             f"Shape '{name}' not in registry. "
-            f"Run phase2_create.py or reconcile_registry.py first."
+            f"Run 'python -m slidegen create' or 'python -m slidegen reconcile' first."
         )
     return reg["shapes"][name]
 
 
-def registry_tag_slide(slide_idx, module, section, data_source="", path=None):
+def registry_tag_slide(slide_idx: int, module: str, section: str,
+                       data_source: str = "", path: Optional[str] = None) -> None:
     """Store a slide-level metadata record in the registry.
 
     Enables 'rebuild slide 14 from scratch' without touching other slides.
@@ -73,7 +77,8 @@ def registry_tag_slide(slide_idx, module, section, data_source="", path=None):
     save_registry(reg, path)
 
 
-def registry_find_by_type(shape_type, slide_idx=None, path=None):
+def registry_find_by_type(shape_type: str, slide_idx: Optional[int] = None,
+                          path: Optional[str] = None) -> list[tuple[str, dict]]:
     """Query the registry for all shapes matching a type string.
 
     Enables bulk COM operations such as 'update all footer text on all slides'
@@ -95,7 +100,7 @@ def registry_find_by_type(shape_type, slide_idx=None, path=None):
     ]
 
 
-def registry_diff_slide(slide_idx, com_slide, path=None):
+def registry_diff_slide(slide_idx: int, com_slide, path: Optional[str] = None) -> list[dict]:
     """Diff the registry snapshot against live COM state for a single slide.
 
     More ergonomic than reconcile_registry.py when you only care about one slide.

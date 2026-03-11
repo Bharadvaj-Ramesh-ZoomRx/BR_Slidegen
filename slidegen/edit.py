@@ -99,17 +99,22 @@ class LiveEditor:
                 "Make sure PowerPoint is running."
             )
 
+        # Match by exact filename first, then fall back to substring match
+        open_files = []
+        substring_match = None
         for i in range(1, self._ppt_app.Presentations.Count + 1):
             p = self._ppt_app.Presentations(i)
-            if self.filename in p.Name:
+            open_files.append(p.Name)
+            if p.Name == self.filename:
                 self._prs = p
                 break
+            if substring_match is None and self.filename in p.Name:
+                substring_match = p
+
+        if self._prs is None and substring_match is not None:
+            self._prs = substring_match
 
         if self._prs is None:
-            open_files = [
-                self._ppt_app.Presentations(i).Name
-                for i in range(1, self._ppt_app.Presentations.Count + 1)
-            ]
             raise RuntimeError(
                 f"'{self.filename}' not found in open presentations.\n"
                 f"Open files: {open_files}"

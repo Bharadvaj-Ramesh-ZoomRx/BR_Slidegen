@@ -64,10 +64,9 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
-│   ├── slidegen/              # ★ Consolidated SlideGen skill (pipeline + utils + styling)
-│   ├── pptx/                  # General PPTX read/create/edit skill
-│   ├── jj-slide-style/        # J&J brand styling (absorbed into slidegen)
-│   └── pptx-utils/            # pptx_utils reference (absorbed into slidegen)
+│   ├── slidegen/              # ★ Primary skill (pipeline + utils + styling + references)
+│   │   └── references/        # Consolidated: function-ref, chart-patterns, brand-constants, archetypes
+│   └── pptx/                  # General PPTX read/create/edit skill (non-pipeline)
 ├── column_mapping.csv
 └── .gitignore
 ```

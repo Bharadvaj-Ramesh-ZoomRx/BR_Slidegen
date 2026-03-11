@@ -5,6 +5,10 @@ Reusable chart + table patterns: bar charts (single, clustered) with
 data labels, and the CHART_PATTERNS{} configuration dict (PRD section 4.5).
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
 from lxml import etree
 
 from pptx.chart.data import CategoryChartData
@@ -45,8 +49,9 @@ CHART_PATTERNS = {
 
 # ── Chart builder functions ──────────────────────────────────────────────────
 
-def enable_data_labels(series, color, fsize=8, num_fmt='0"%"', pos="outEnd",
-                       font_name=None):
+def enable_data_labels(series, color: RGBColor, fsize: float = 8,
+                       num_fmt: str = '0"%"', pos: str = "outEnd",
+                       font_name: Optional[str] = None) -> None:
     """Enable and style data labels on a chart series.
 
     Args:
@@ -90,7 +95,7 @@ def enable_data_labels(series, color, fsize=8, num_fmt='0"%"', pos="outEnd",
     latin.set("typeface", font_name or FONT_TEXT)
 
 
-def delete_data_label(series, point_idx):
+def delete_data_label(series, point_idx: int) -> None:
     """Hide the data label for a specific point (e.g. hide small segments in stacked bars)."""
     dLbls = series._element.find(qn("c:dLbls"))
     if dLbls is not None:
@@ -101,8 +106,10 @@ def delete_data_label(series, point_idx):
         delete_el.set("val", "1")
 
 
-def add_single_bar_chart(slide, categories, values, left, top, width, height,
-                         fill_color, cat_font_size=7, gap=80, font_name=None):
+def add_single_bar_chart(slide, categories: list[str], values: list[float],
+                         left: float, top: float, width: float, height: float,
+                         fill_color: RGBColor, cat_font_size: float = 7,
+                         gap: int = 80, font_name: Optional[str] = None):
     """Add a horizontal bar chart with one series + data labels.
 
     Returns (chart_frame, chart).
@@ -133,9 +140,13 @@ def add_single_bar_chart(slide, categories, values, left, top, width, height,
     return cf, ch
 
 
-def add_clustered_bar_chart(slide, categories, series_list, left, top, width, height,
-                            colors=None, legend=True, gap=100, overlap=0,
-                            cat_font_size=7, label_fsize=7, font_name=None):
+def add_clustered_bar_chart(slide, categories: list[str],
+                            series_list: list[tuple[str, list[float]]],
+                            left: float, top: float, width: float, height: float,
+                            colors: Optional[list[RGBColor]] = None,
+                            legend: bool = True, gap: int = 100, overlap: int = 0,
+                            cat_font_size: float = 7, label_fsize: float = 7,
+                            font_name: Optional[str] = None):
     """Add a clustered horizontal bar chart with multiple series.
 
     series_list: [("Series Name", [vals...]), ...]

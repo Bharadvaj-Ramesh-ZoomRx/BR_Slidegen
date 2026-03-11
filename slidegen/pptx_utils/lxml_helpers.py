@@ -7,13 +7,18 @@ scripts — use these functions instead.
 PRD §4.2 / Appendix D: All lxml manipulation centralized here.
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
 from lxml import etree
+from pptx.dml.color import RGBColor
 from pptx.oxml.ns import qn
 
 from .brand import C_LTGREY
 
 
-def _get_or_add(parent, tag):
+def _get_or_add(parent: etree._Element, tag: str) -> etree._Element:
     """Get an existing child XML element or create it if absent."""
     el = parent.find(qn(tag))
     if el is None:
@@ -21,7 +26,7 @@ def _get_or_add(parent, tag):
     return el
 
 
-def invert_cat_axis(chart):
+def invert_cat_axis(chart) -> None:
     """Show first category at top of a horizontal bar chart (maxMin orientation).
     Call after chart creation. Without this, highest-value items appear at bottom."""
     catAx   = chart.category_axis._element
@@ -30,7 +35,7 @@ def invert_cat_axis(chart):
     orient.set("val", "maxMin")
 
 
-def hide_cat_labels(chart):
+def hide_cat_labels(chart) -> None:
     """Hide the category-axis tick labels (Y-axis on horizontal bar).
     Use on the right-hand chart when the left chart already shows the labels."""
     catAx = chart.category_axis._element
@@ -38,7 +43,7 @@ def hide_cat_labels(chart):
     tlp.set("val", "none")
 
 
-def set_datalabel_pos_outside_end(series):
+def set_datalabel_pos_outside_end(series) -> None:
     """Force data labels to appear outside-end (right of bar for horizontal charts)."""
     dLbls = series._element.find(qn("c:dLbls"))
     if dLbls is not None:
@@ -46,14 +51,14 @@ def set_datalabel_pos_outside_end(series):
         pos.set("val", "outEnd")
 
 
-def set_series_no_border(series):
+def set_series_no_border(series) -> None:
     """Remove the visible border line on a bar series."""
     spPr = series._element.get_or_add_spPr()
     ln   = _get_or_add(spPr, "a:ln")
     _get_or_add(ln, "a:noFill")
 
 
-def set_val_axis_number_format(axis, fmt="0"):
+def set_val_axis_number_format(axis, fmt: str = "0") -> None:
     """Set number format on value-axis tick labels (e.g. '0' for integers, '0%')."""
     axEl   = axis._element
     numFmt = _get_or_add(axEl, "c:numFmt")
@@ -61,7 +66,7 @@ def set_val_axis_number_format(axis, fmt="0"):
     numFmt.set("sourceLinked", "0")
 
 
-def set_plot_area_gap(chart, gap_pct=80):
+def set_plot_area_gap(chart, gap_pct: int = 80) -> None:
     """Set gap between bar clusters (% of bar width). Lower = fatter bars.
     Typical values: 50 (fat), 80 (standard), 150 (thin)."""
     barChart = chart.plots[0]._element
@@ -71,7 +76,7 @@ def set_plot_area_gap(chart, gap_pct=80):
     gapWidth.set("val", str(gap_pct))
 
 
-def set_overlap(chart, overlap=0):
+def set_overlap(chart, overlap: int = 0) -> None:
     """Set bar overlap within a cluster. Negative = gap between bars in cluster.
     Typical: 0 (touching), -10 (small gap), -30 (wider gap)."""
     barChart = chart.plots[0]._element
@@ -81,8 +86,9 @@ def set_overlap(chart, overlap=0):
     ov.set("val", str(overlap))
 
 
-def set_series_marker(series, marker_type="circle", size=10,
-                      fill_color=None, line_color=None):
+def set_series_marker(series, marker_type: str = "circle", size: int = 10,
+                      fill_color: Optional[RGBColor] = None,
+                      line_color: Optional[RGBColor] = None) -> None:
     """Set marker style on a chart series (line / scatter / dot-plot charts).
 
     Args:
@@ -112,7 +118,8 @@ def set_series_marker(series, marker_type="circle", size=10,
             lclr.set("val", str(line_color))
 
 
-def set_series_line_style(series, width_pt=1.5, dash="solid", visible=True):
+def set_series_line_style(series, width_pt: float = 1.5, dash: str = "solid",
+                          visible: bool = True) -> None:
     """Set line style on a chart series (line / combo charts).
 
     Args:
@@ -137,13 +144,13 @@ def set_series_line_style(series, width_pt=1.5, dash="solid", visible=True):
         prstDash.set("val", dash)
 
 
-def set_series_smooth(series, smooth=True):
+def set_series_smooth(series, smooth: bool = True) -> None:
     """Toggle smooth (bezier) vs straight line segments for a line series."""
     smooth_el = _get_or_add(series._element, "c:smooth")
     smooth_el.set("val", "1" if smooth else "0")
 
 
-def set_marker_data_label_pos(series, pos="r"):
+def set_marker_data_label_pos(series, pos: str = "r") -> None:
     """Set the position of data labels on a line+marker series.
 
     Args:
@@ -154,7 +161,7 @@ def set_marker_data_label_pos(series, pos="r"):
         _get_or_add(dLbls, "c:dLblPos").set("val", pos)
 
 
-def set_data_label_color(series, color_rgb):
+def set_data_label_color(series, color_rgb: RGBColor) -> None:
     """Override text color inside data labels for a series.
 
     python-pptx exposes data labels but not their run-level font color.
@@ -174,8 +181,9 @@ def set_data_label_color(series, color_rgb):
     clr.set("val", str(color_rgb))
 
 
-def add_val_axis_reference_line(chart, x_value, label="",
-                                 color=None, dash="dash", width_pt=1.0):
+def add_val_axis_reference_line(chart, x_value: float, label: str = "",
+                                 color: Optional[RGBColor] = None,
+                                 dash: str = "dash", width_pt: float = 1.0) -> None:
     """Inject a vertical reference line at a fixed value axis position.
 
     Adds a supplementary scatter series pinned to x_value with y spanning
@@ -233,14 +241,14 @@ def add_val_axis_reference_line(chart, x_value, label="",
     plotArea.append(etree.fromstring(cat_ax_xml))
 
 
-def set_stacked_label_pos(series, pos="ctr"):
+def set_stacked_label_pos(series, pos: str = "ctr") -> None:
     """Set data label position inside stacked bar segments."""
     dLbls = series._element.find(qn("c:dLbls"))
     if dLbls is not None:
         _get_or_add(dLbls, "c:dLblPos").set("val", pos)
 
 
-def set_pie_slice_colors(chart, colors):
+def set_pie_slice_colors(chart, colors: list[RGBColor]) -> None:
     """Set fill color per slice on a pie or donut chart by index."""
     ser_el = chart.series[0]._element
     for i, color in enumerate(colors):
@@ -257,13 +265,13 @@ def set_pie_slice_colors(chart, colors):
         etree.SubElement(ln, qn("a:noFill"))
 
 
-def set_donut_hole_size(chart, pct=50):
+def set_donut_hole_size(chart, pct: int = 50) -> None:
     """Control the inner hole radius of a donut chart."""
     plot_el = chart.plots[0]._element
     _get_or_add(plot_el, "c:holeSize").set("val", str(int(pct)))
 
 
-def hide_axis(chart, axis="val"):
+def hide_axis(chart, axis: str = "val") -> None:
     """Fully suppress a chart axis (line, ticks, labels, and gridlines)."""
     ax_el = (chart.value_axis if axis == "val" else chart.category_axis)._element
     _get_or_add(ax_el, "c:delete").set("val", "1")
@@ -274,7 +282,8 @@ def hide_axis(chart, axis="val"):
             ax_el.remove(child)
 
 
-def set_gridlines(chart, axis="val", major=True, minor=False):
+def set_gridlines(chart, axis: str = "val", major: bool = True,
+                   minor: bool = False) -> None:
     """Enable or disable major/minor gridlines on a chart axis."""
     ax_el = (chart.value_axis if axis == "val" else chart.category_axis)._element
     for tag, show in (("c:majorGridlines", major), ("c:minorGridlines", minor)):
@@ -285,7 +294,8 @@ def set_gridlines(chart, axis="val", major=True, minor=False):
             ax_el.remove(existing)
 
 
-def set_series_color(series, fill_color, line_color=None):
+def set_series_color(series, fill_color: RGBColor,
+                     line_color: Optional[RGBColor] = None) -> None:
     """Set the fill (and optionally border) color of a bar or line series."""
     spPr = series._element.get_or_add_spPr()
     for tag in ("a:noFill", "a:solidFill", "a:gradFill", "a:pattFill"):

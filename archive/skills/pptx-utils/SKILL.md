@@ -1,15 +1,15 @@
 ---
 name: pptx-utils
-description: Use when building or editing PowerPoint slides with python-pptx and win32com in ZoomRx/JnJ projects. Provides helpers for chart formatting, shape builders, COM live editing, and the slide registry system. Trigger when writing slide creation scripts, adding charts, formatting series, building layouts, or editing live PPTX files. Always import from pptx_utils.py - never write raw lxml or hardcode brand colors inline.
+description: "Reference skill for pptx_utils function signatures, chart pattern checklists, and COM helpers. Use only when you need detailed function-level reference (see references/function-ref.md). For all pipeline work (creating/editing slides), use the slidegen skill instead."
 ---
 
 # pptx-utils
 
 ## Overview
 
-`pptx_utils.py` is the master helper library for all ZoomRx/JnJ PowerPoint generation. It exports 50+ functions across five categories: brand constants, XML chart helpers, shape builders, COM live-edit helpers, and registry helpers.
+`slidegen.pptx_utils` is the master helper package for all SlideGen PowerPoint generation. It exports 50+ functions across five categories: brand constants, XML chart helpers, shape builders, COM live-edit helpers, and registry helpers.
 
-**Core rule:** `from pptx_utils import *` in every slide script. Never write raw lxml or hardcode hex colors.
+**Core rule:** `from slidegen.pptx_utils import *` in every slide script. Never write raw lxml or hardcode hex colors.
 
 ---
 
@@ -18,13 +18,13 @@ description: Use when building or editing PowerPoint slides with python-pptx and
 ```
 Is the file open in PowerPoint right now?
   YES  ->  COM workflow (win32com)
-           1. python reconcile_registry.py
+           1. python -m slidegen reconcile file.pptx
            2. prs  = com_connect("file.pptx")
            3. sh   = com_find_shape(slide, "zrx_NNN")
            4. com_set_text / com_move / com_resize / com_set_fill
 
   NO   ->  Creation workflow (python-pptx)
-           1. from pptx_utils import *
+           1. from slidegen.pptx_utils import *
            2. prs  = Presentation(TEMPLATE)
            3. slide = prs.slides.add_slide(blank_layout)
            4. Build shapes -> name each zrx_NNN -> prs.save() -> save_registry()
@@ -36,7 +36,7 @@ Is the file open in PowerPoint right now?
 
 ```python
 from pptx import Presentation
-from pptx_utils import *
+from slidegen.pptx_utils import *
 from datetime import datetime
 
 prs = Presentation(r"ppt via python\JJ PET RYBREVANT+LAZCLUZE Q4'25 Report.pptx")
@@ -72,7 +72,7 @@ save_registry({
 - Inches everywhere in creation code -- pptx_utils converts to EMU/points internally
 - Write `slide_registry.json` after every creation script -- never skip
 - ASCII-only in print statements (cp1252 terminal encoding)
-- Run `reconcile_registry.py` before every COM edit session
+- Run `python -m slidegen reconcile <file.pptx>` before every COM edit session
 - Never mix python-pptx and win32com on the same open file
 
 ---
@@ -100,4 +100,4 @@ save_registry({
 See `references/function-ref.md` for all 50+ function signatures organized by category.
 See `references/chart-patterns.md` for chart type checklists and the decision guide.
 
-The library file is at `assets/pptx_utils.py` -- copy it to your project root.
+The library is at `slidegen/pptx_utils/` (a package with brand.py, charts.py, tables.py, etc.). Import via `from slidegen.pptx_utils import *`.

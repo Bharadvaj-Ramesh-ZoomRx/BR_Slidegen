@@ -17,6 +17,7 @@ Slide types:
 """
 
 from __future__ import annotations
+import logging
 
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
@@ -40,6 +41,45 @@ from slidegen.pptx_utils import (
 )
 from slidegen.pipeline.data_loaders import delta
 from slidegen.pipeline.project_config import ProjectConfig, AskConfig, parse_color
+
+logger = logging.getLogger(__name__)
+
+
+# ── Layout constants ─────────────────────────────────────────────────────────
+# Y-axis positions (inches)
+SECTION_BAR_TOP = 1.40
+CHART_TOP_STD = 1.85       # standard chart top below section bar
+CHART_TOP_DUAL = 1.80      # dual bar charts (slightly higher)
+LEGEND_GAP = 0.15           # gap below chart before legend
+FOOTER_TOP = 7.20
+
+# Chart dimensions (inches)
+SINGLE_BAR_WIDTH = 9.0
+DUAL_BAR_WIDTH = 5.0
+CLUSTERED_BAR_WIDTH = 8.5
+DELTA_COL_WIDTH = 0.65
+DELTA_COL_NARROW = 0.55
+
+# Chart sizing constraints
+MAX_CHART_HEIGHT = 4.5
+MAX_DUAL_CHART_HEIGHT = 4.2
+MAX_CLUSTERED_HEIGHT = 4.8
+MAX_QOQ_HEIGHT = 4.0
+ROW_SCALE_FACTOR = 0.85     # delta table row height as fraction of chart row
+
+# Bar chart gap/overlap
+BAR_GAP_STD = 80
+CLUSTERED_OVERLAP = -10
+CLUSTERED_GAP = 65
+
+# Label truncation lengths
+LABEL_MAX_SINGLE = 40
+LABEL_MAX_DUAL = 35
+LABEL_MAX_CLUSTERED = 45
+LABEL_MAX_STACKED = 40
+
+# Small segment threshold for stacked bars (%)
+STACKED_HIDE_THRESHOLD = 3
 
 
 # ── Template resolution ───────────────────────────────────────────────────────
@@ -67,7 +107,7 @@ def _slide_chrome(slide, config: ProjectConfig, ask: AskConfig):
 
     section = _resolve_template(ask.section, config)
     if section:
-        section_header_bar(slide, section, top=1.40, font=config.font_body)
+        section_header_bar(slide, section, top=SECTION_BAR_TOP, font=config.font_body)
 
     source = _resolve_template(ask.source_text, config)
     if source:
@@ -148,19 +188,19 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
 
-    labels = [r.get("short", r.get("desc", ""))[:40] for r in rows]
+    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_SINGLE] for r in rows]
     current_vals = [r.get("current") or 0 for r in rows]
     prior_vals = [r.get("prior") for r in rows]
 
     n = len(labels)
-    chart_top = 1.85
-    chart_h = min(4.5, n * 0.40)
+    chart_top = CHART_TOP_STD
+    chart_h = min(MAX_CHART_HEIGHT, n * 0.40)
     row_h = chart_h / max(n, 1)
 
     # Bar chart
     add_single_bar_chart(
         slide, labels, current_vals,
-        left=0.30, top=chart_top, width=9.0, height=chart_h,
+        left=0.30, top=chart_top, width=SINGLE_BAR_WIDTH, height=chart_h,
         fill_color=color_current, font_name=font,
     )
 
@@ -169,12 +209,13 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
               for c, p in zip(current_vals, prior_vals)]
     add_delta_table(
         slide, deltas,
-        left=9.40, top=chart_top, width=0.65, row_height=row_h * 0.85,
+        left=9.40, top=chart_top, width=DELTA_COL_WIDTH,
+        row_height=row_h * ROW_SCALE_FACTOR,
         header_text="QoQ Δ", font_name=font,
     )
 
     # Legend
-    ly = chart_top + chart_h + 0.15
+    ly = chart_top + chart_h + LEGEND_GAP
     sample = config.sample_sizes.get(ask.brand or "primary")
     n_label = f" (n={sample.current})" if sample else ""
     _make_legend(slide, [
@@ -203,10 +244,10 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     left_prefix = left_cfg.get("field_prefix", "mr")
     right_prefix = right_cfg.get("field_prefix", "me")
 
-    labels = [r.get("short", r.get("desc", ""))[:35] for r in rows]
+    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
     n = len(labels)
-    chart_top = 1.80
-    chart_h = min(4.2, n * 0.42)
+    chart_top = CHART_TOP_DUAL
+    chart_h = min(MAX_DUAL_CHART_HEIGHT, n * 0.42)
     row_h = chart_h / max(n, 1)
 
     # Left data
@@ -225,7 +266,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     # Left chart
     add_single_bar_chart(
         slide, labels, left_current,
-        left=0.30, top=chart_top, width=5.0, height=chart_h,
+        left=0.30, top=chart_top, width=DUAL_BAR_WIDTH, height=chart_h,
         fill_color=color_current, font_name=font,
     )
 
@@ -235,7 +276,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     left_delta_header = left_cfg.get("delta_header", f"{left_prefix.upper()} Δ")
     add_delta_table(
         slide, left_deltas,
-        left=5.35, top=chart_top, width=0.65, row_height=row_h * 0.85,
+        left=5.35, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=left_delta_header, font_name=font,
     )
 
@@ -251,7 +292,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
 
     cf2 = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(6.20), Inches(chart_top), Inches(5.0), Inches(chart_h), cd2)
+        Inches(6.20), Inches(chart_top), Inches(DUAL_BAR_WIDTH), Inches(chart_h), cd2)
     ch2 = cf2.chart
     ch2.has_legend = False
     s2 = ch2.series[0]
@@ -261,7 +302,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     hide_axis(ch2, "val")
     hide_cat_labels(ch2)
     invert_cat_axis(ch2)
-    set_plot_area_gap(ch2, 80)
+    set_plot_area_gap(ch2, BAR_GAP_STD)
 
     # Right delta
     right_deltas = [delta(c, p) if p is not None else None
@@ -269,12 +310,12 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     right_delta_header = right_cfg.get("delta_header", f"{right_prefix.upper()} Δ")
     add_delta_table(
         slide, right_deltas,
-        left=11.25, top=chart_top, width=0.65, row_height=row_h * 0.85,
+        left=11.25, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=right_delta_header, font_name=font,
     )
 
     # Legend
-    ly = chart_top + chart_h + 0.15
+    ly = chart_top + chart_h + LEGEND_GAP
     sample = config.sample_sizes.get(ask.brand or "primary")
     n_label = f" (n={sample.current})" if sample else ""
     _make_legend(slide, [
@@ -303,10 +344,10 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     left_prefix = left_cfg.get("field_prefix", "believ")
     right_prefix = right_cfg.get("field_prefix", "me")
 
-    labels = [r.get("short", r.get("desc", ""))[:35] for r in rows]
+    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
     n = len(labels)
-    chart_top = 1.80
-    chart_h = min(4.2, n * 0.42)
+    chart_top = CHART_TOP_DUAL
+    chart_h = min(MAX_DUAL_CHART_HEIGHT, n * 0.42)
     row_h = chart_h / max(n, 1)
 
     # Left data
@@ -343,8 +384,8 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     ch1.category_axis.tick_labels.font.size = Pt(7)
     ch1.category_axis.tick_labels.font.name = font
     invert_cat_axis(ch1)
-    set_plot_area_gap(ch1, 80)
-    set_overlap(ch1, -10)
+    set_plot_area_gap(ch1, BAR_GAP_STD)
+    set_overlap(ch1, CLUSTERED_OVERLAP)
 
     # Left delta
     left_deltas = [delta(c, p) for c, p in zip(left_current, left_prior)]
@@ -352,7 +393,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
                                      left_prefix[0].upper() + " Δ")
     add_delta_table(
         slide, left_deltas,
-        left=5.15, top=chart_top, width=0.55, row_height=row_h * 0.85,
+        left=5.15, top=chart_top, width=DELTA_COL_NARROW, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=left_delta_header, font_name=font,
     )
 
@@ -381,8 +422,8 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     hide_axis(ch2, "val")
     hide_cat_labels(ch2)
     invert_cat_axis(ch2)
-    set_plot_area_gap(ch2, 80)
-    set_overlap(ch2, -10)
+    set_plot_area_gap(ch2, BAR_GAP_STD)
+    set_overlap(ch2, CLUSTERED_OVERLAP)
 
     # Right delta
     right_deltas = [delta(c, p) for c, p in zip(right_current, right_prior)]
@@ -390,12 +431,12 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
                                        right_prefix.upper() + " Δ")
     add_delta_table(
         slide, right_deltas,
-        left=10.75, top=chart_top, width=0.55, row_height=row_h * 0.85,
+        left=10.75, top=chart_top, width=DELTA_COL_NARROW, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=right_delta_header, font_name=font,
     )
 
     # Legend
-    ly = chart_top + chart_h + 0.15
+    ly = chart_top + chart_h + LEGEND_GAP
     _make_legend(slide, [
         (color_current, config.period_current),
         (color_prior, config.period_prior),
@@ -414,6 +455,11 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     # If data_key not found, check for primary_key + comp_key pattern
     if not rows and "primary_key" in extra:
+        logger.warning(
+            "clustered_compare '%s': data_key '%s' not found, merging "
+            "primary_key '%s' + comp_key '%s' instead",
+            ask.id, ask.data_key, extra.get("primary_key"), extra.get("comp_key"),
+        )
         primary_rows = data.get(extra["primary_key"], [])
         comp_rows = data.get(extra["comp_key"], [])
         # Merge: align by desc/label
@@ -450,7 +496,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         s1_label, s2_label = config.primary.name, config.competitor.name
         s1_color, s2_color = config.primary.color_current, config.competitor.color_current
 
-    labels = [r.get("desc", "")[:45] for r in rows]
+    labels = [r.get("desc", "")[:LABEL_MAX_CLUSTERED] for r in rows]
 
     # Extract values — support both flat (hi_current, other_current) and
     # prefixed (primary_current, comp_current) naming
@@ -465,8 +511,8 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         s2_prior.append(r.get(f"{s2_field}_prior"))
 
     n = len(labels)
-    chart_top = 1.85
-    chart_h = min(4.8, n * 0.32)
+    chart_top = CHART_TOP_STD
+    chart_h = min(MAX_CLUSTERED_HEIGHT, n * 0.32)
     row_h = chart_h / max(n, 1)
 
     # Clustered bar
@@ -477,7 +523,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     cf = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(0.30), Inches(chart_top), Inches(8.5), Inches(chart_h), cd)
+        Inches(0.30), Inches(chart_top), Inches(CLUSTERED_BAR_WIDTH), Inches(chart_h), cd)
     ch = cf.chart
     ch.has_legend = True
     ch.legend.position = XL_LEGEND_POSITION.BOTTOM
@@ -497,7 +543,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
     ch.category_axis.tick_labels.font.size = Pt(6.5)
     ch.category_axis.tick_labels.font.name = font
     invert_cat_axis(ch)
-    set_plot_area_gap(ch, 65)
+    set_plot_area_gap(ch, CLUSTERED_GAP)
     set_overlap(ch, -15)
 
     # Delta columns
@@ -508,20 +554,20 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         # Two delta columns (QoQ for each series)
         d1 = [delta(c, p) if p is not None else None for c, p in zip(s1_current, s1_prior)]
         d2 = [delta(c, p) if p is not None else None for c, p in zip(s2_current, s2_prior)]
-        add_delta_table(slide, d1, left=9.10, top=chart_top, width=0.65,
-                        row_height=row_h * 0.85,
+        add_delta_table(slide, d1, left=9.10, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h * ROW_SCALE_FACTOR,
                         header_text=s1_label.split("(")[0].strip() + " Δ",
                         font_name=font)
-        add_delta_table(slide, d2, left=9.85, top=chart_top, width=0.65,
-                        row_height=row_h * 0.85,
+        add_delta_table(slide, d2, left=9.85, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h * ROW_SCALE_FACTOR,
                         header_text=s2_label.split("(")[0].strip() + " Δ",
                         font_name=font)
     else:
         # Gap column (difference between series)
         gaps = [round((c1 or 0) - (c2 or 0), 1) for c1, c2 in zip(s1_current, s2_current)]
         header = extra.get("gap_header", "Gap (pp)")
-        add_delta_table(slide, gaps, left=9.10, top=chart_top, width=0.65,
-                        row_height=row_h * 0.85, header_text=header,
+        add_delta_table(slide, gaps, left=9.10, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h * ROW_SCALE_FACTOR, header_text=header,
                         font_name=font)
 
 
@@ -538,13 +584,13 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
 
-    labels = [r.get("desc", "")[:35] for r in rows]
+    labels = [r.get("desc", "")[:LABEL_MAX_DUAL] for r in rows]
     current_vals = [r.get("current") or 0 for r in rows]
     prior_vals = [r.get("prior") or 0 for r in rows]
 
     n = len(labels)
-    chart_top = 1.85
-    chart_h = min(4.0, n * 0.50)
+    chart_top = CHART_TOP_STD
+    chart_h = min(MAX_QOQ_HEIGHT, n * 0.50)
     row_h = chart_h / max(n, 1)
 
     # Clustered bar
@@ -574,14 +620,14 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     ch.category_axis.tick_labels.font.size = Pt(8)
     ch.category_axis.tick_labels.font.name = font
     invert_cat_axis(ch)
-    set_plot_area_gap(ch, 80)
-    set_overlap(ch, -10)
+    set_plot_area_gap(ch, BAR_GAP_STD)
+    set_overlap(ch, CLUSTERED_OVERLAP)
 
     # Delta
     deltas = [delta(c, p) for c, p in zip(current_vals, prior_vals)]
     add_delta_table(
         slide, deltas,
-        left=8.60, top=chart_top, width=0.65, row_height=row_h * 0.85,
+        left=8.60, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
         header_text="QoQ Δ", font_name=font,
     )
 
@@ -592,7 +638,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
 
     extra = ask.extra
     font = config.font_body
-    chart_top = 1.85
+    chart_top = CHART_TOP_STD
 
     sections = [("top", extra.get("top", {})), ("bottom", extra.get("bottom", {}))]
     y_offset = chart_top
@@ -609,7 +655,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
                 fsize=9, bold=True, color=brand.color_current, font=config.font_display)
 
         if sec_rows:
-            labels = [r.get("desc", "")[:35] for r in sec_rows]
+            labels = [r.get("desc", "")[:LABEL_MAX_DUAL] for r in sec_rows]
             current_vals = [r.get("current") or 0 for r in sec_rows]
             prior_vals = [r.get("prior") for r in sec_rows]
             n = len(labels)
@@ -632,15 +678,15 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
             ch.category_axis.tick_labels.font.size = Pt(8)
             ch.category_axis.tick_labels.font.name = font
             invert_cat_axis(ch)
-            set_plot_area_gap(ch, 80)
+            set_plot_area_gap(ch, BAR_GAP_STD)
 
             # Delta
             d = [delta(c, p) if p is not None else None
                  for c, p in zip(current_vals, prior_vals)]
             add_delta_table(
                 slide, d,
-                left=6.0, top=y_offset, width=0.55,
-                row_height=ch_h / max(n, 1) * 0.85,
+                left=6.0, top=y_offset, width=DELTA_COL_NARROW,
+                row_height=ch_h / max(n, 1) * ROW_SCALE_FACTOR,
                 header_text="Δ", font_name=font,
             )
 
@@ -665,7 +711,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
     # Take top 10
     order_top = rows[:min(10, len(rows))]
 
-    labels = [r.get("desc", "")[:40] for r in order_top]
+    labels = [r.get("desc", "")[:LABEL_MAX_STACKED] for r in order_top]
 
     # Determine ordinals from data keys
     ordinals = ask.extra.get("ordinals", ["1st", "2nd", "3rd", "4th"])
@@ -675,8 +721,8 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
     total_vals = [r.get("total_current", 0) for r in order_top]
 
     n = len(labels)
-    chart_top = 1.85
-    chart_h = min(4.5, n * 0.42)
+    chart_top = CHART_TOP_STD
+    chart_h = min(MAX_CHART_HEIGHT, n * 0.42)
     row_h = chart_h / max(n, 1)
 
     # Build stacked bar chart
@@ -690,7 +736,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
 
     cf = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_STACKED,
-        Inches(0.30), Inches(chart_top), Inches(8.5), Inches(chart_h), cd)
+        Inches(0.30), Inches(chart_top), Inches(CLUSTERED_BAR_WIDTH), Inches(chart_h), cd)
     ch = cf.chart
     ch.has_legend = True
     ch.legend.position = XL_LEGEND_POSITION.BOTTOM
@@ -714,22 +760,22 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
         set_series_no_border(series)
         enable_data_labels(series, label_colors[idx] if idx < len(label_colors) else C_GREY,
                           fsize=6, pos="ctr", font_name=font)
-        # Hide labels on small segments (<=3%)
+        # Hide labels on small segments
         if idx < len(ordinal_vals):
             for pt_idx, val in enumerate(ordinal_vals[idx]):
-                if val <= 3:
+                if val <= STACKED_HIDE_THRESHOLD:
                     delete_data_label(series, pt_idx)
 
     hide_axis(ch, "val")
     ch.category_axis.tick_labels.font.size = Pt(7)
     ch.category_axis.tick_labels.font.name = font
     invert_cat_axis(ch)
-    set_plot_area_gap(ch, 80)
+    set_plot_area_gap(ch, BAR_GAP_STD)
 
     # Total column
     add_value_table(
         slide, total_vals,
-        left=9.10, top=chart_top, width=0.70, row_height=row_h * 0.85,
+        left=9.10, top=chart_top, width=0.70, row_height=row_h * ROW_SCALE_FACTOR,
         header_text="Total %", value_color=color_current, font_name=font,
     )
 
@@ -738,7 +784,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
     qoq_deltas = [delta(c, p) for c, p in zip(total_vals, total_prior)]
     add_delta_table(
         slide, qoq_deltas,
-        left=9.90, top=chart_top, width=0.65, row_height=row_h * 0.85,
+        left=9.90, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
         header_text="QoQ Δ", font_name=font,
     )
 
