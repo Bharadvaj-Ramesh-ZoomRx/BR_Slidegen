@@ -14,7 +14,22 @@ project:
 # Template stays flat (shared across waves); data/output are wave-versioned
 data_source_path: "data/{{wave}}/source_data.xlsx"
 template_path: "templates/template.pptx"
+section_icon_path: "templates/section_icon.png"
 output_path: "output/{{wave}}/deck.pptx"
+
+# ── PowerPoint Sections ───────────────────────────────────────────────────────
+# Each section starts at the named ask and runs until the next section begins
+sections:
+  - name: "Introduction"
+    start: cover
+  - name: "Where J&J stands"
+    start: ryb_mr_me
+  - name: "Where can J&J team act?"
+    start: cta
+  - name: "Key Findings — Brand Perception & Rep Visit Impact"
+    start: share_of_time
+  - name: "Appendix"
+    start: tag_recall_order
 
 # ── Brands ───────────────────────────────────────────────────────────────────
 brands:
@@ -302,13 +317,21 @@ asks:
     slide_type: dual_bar_with_delta
     headline: "{{primary.name}} message recall declined broadly; new NCCN messages gained traction while effectiveness remained strong"
     section: "{{primary.full_name}} MESSAGE RECALL & EFFECTIVENESS — {{period_current}} vs {{period_prior}}"
-    source_text: "Source: Lung SFEA SB Q2_10Z | MR = Message Recall, ME = Message Effectiveness"
+    source_text: "Source: Lung SFEA SB Q2_10Z | MR = Message Recall, ME = Message Effectiveness | ^Message effectiveness is the geometric mean of % of high ratings (6, 7 out of 7) for motivation, differentiation, and believability attributes of messages"
     data_key: ryb_me
     brand: primary
     sort_by: mr_current
     extra:
-      left: { field_prefix: "mr", label: "Message Recall (%)" }
-      right: { field_prefix: "me", label: "Message Effectiveness (%)" }
+      category_header: "Tag$"
+      breadcrumb: "Key Findings - Personal Promotions"
+      left:
+        field_prefix: "mr"
+        label: "Recall (IA = 35%)\n(s = 100)"
+        delta_header: "Δ"
+      right:
+        field_prefix: "me"
+        label: "Effectiveness^ (IA = 74%)\n(d = 41)"
+        delta_header: "Δ"
 
   - id: tag_mr
     slide_type: single_bar_with_delta

@@ -30,7 +30,8 @@ from pptx.oxml.ns import qn
 from slidegen.pptx_utils import (
     C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_RED,
     textbox, solidrect, slide_header, slide_footer,
-    section_header_bar, callout_box, hide_axis, set_series_color,
+    section_header_bar, section_breadcrumb, chart_header_row,
+    callout_box, dashed_separator, hide_axis, set_series_color,
     set_plot_area_gap, set_overlap, set_series_no_border,
     invert_cat_axis, hide_cat_labels, set_data_label_color,
     _get_or_add,
@@ -49,23 +50,39 @@ logger = logging.getLogger(__name__)
 # Y-axis positions (inches)
 SECTION_BAR_TOP = 1.40
 CHART_TOP_STD = 1.85       # standard chart top below section bar
-CHART_TOP_DUAL = 1.80      # dual bar charts (slightly higher)
 LEGEND_GAP = 0.15           # gap below chart before legend
-FOOTER_TOP = 7.20
+FOOTER_TOP = 6.93           # footer Y position (spec)
 
-# Chart dimensions (inches)
+# Chart dimensions (inches) — generic
 SINGLE_BAR_WIDTH = 9.0
-DUAL_BAR_WIDTH = 5.0
 CLUSTERED_BAR_WIDTH = 8.5
 DELTA_COL_WIDTH = 0.65
 DELTA_COL_NARROW = 0.55
 
+# Dual bar (Archetype 3 — MR+ME) positions from spec
+DUAL_HEADER_ROW_TOP = 1.40   # red header row Y (just below section bar)
+DUAL_HEADER_ROW_H = 0.30     # red header row height
+DUAL_CHART_TOP = 1.68        # chart top (below header row)
+DUAL_MR_LEFT = 0.20          # left chart X
+DUAL_MR_WIDTH = 7.30         # left chart width (wider — has cat labels)
+DUAL_MR_DELTA_LEFT = 7.54    # left delta column X
+DUAL_ME_LEFT = 8.26          # right chart X
+DUAL_ME_WIDTH = 4.40         # right chart width (narrower — no cat labels)
+DUAL_ME_DELTA_LEFT = 12.70   # right delta column X
+DUAL_DELTA_WIDTH = 0.62      # delta column width
+DUAL_SEPARATOR_X = 8.16      # vertical dashed separator X
+DUAL_MAX_CHART_HEIGHT = 5.05  # max chart height (fills to footer area)
+
 # Chart sizing constraints
 MAX_CHART_HEIGHT = 4.5
-MAX_DUAL_CHART_HEIGHT = 4.2
 MAX_CLUSTERED_HEIGHT = 4.8
 MAX_QOQ_HEIGHT = 4.0
 ROW_SCALE_FACTOR = 0.85     # delta table row height as fraction of chart row
+
+# Compat aliases for renderers not yet updated to Archetype 3 layout
+CHART_TOP_DUAL = 1.80                # used by render_dual_bar_qoq
+DUAL_BAR_WIDTH = 5.0                 # used by render_dual_bar_qoq
+MAX_DUAL_CHART_HEIGHT = 4.2          # used by render_dual_bar_qoq
 
 # Bar chart gap/overlap
 BAR_GAP_STD = 80
@@ -101,13 +118,20 @@ def _resolve_template(text: str, config: ProjectConfig) -> str:
 # ── Shared layout helpers ─────────────────────────────────────────────────────
 
 def _slide_chrome(slide, config: ProjectConfig, ask: AskConfig):
-    """Add header, section bar, and footer to a slide."""
+    """Add header, section bar, breadcrumb, and footer to a slide."""
     headline = _resolve_template(ask.headline, config)
     slide_header(slide, headline, font=config.font_display)
 
     section = _resolve_template(ask.section, config)
     if section:
-        section_header_bar(slide, section, top=SECTION_BAR_TOP, font=config.font_body)
+        section_header_bar(slide, section, top=SECTION_BAR_TOP,
+                           icon_path=config.section_icon_path or None,
+                           font=config.font_body)
+
+    # Breadcrumb (top-right, e.g. "Appendix" or "Key Findings")
+    breadcrumb = ask.extra.get("breadcrumb", "") if ask.extra else ""
+    if breadcrumb:
+        section_breadcrumb(slide, _resolve_template(breadcrumb, config))
 
     source = _resolve_template(ask.source_text, config)
     if source:
@@ -226,7 +250,11 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
 
 
 def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
-    """Two side-by-side bar charts (e.g. MR + ME) each with delta columns."""
+    """Two side-by-side bar charts (e.g. MR + ME) each with delta columns.
+
+    Uses Archetype 3 layout: MR wider (7.30") with cat labels,
+    ME narrower (4.40") without cat labels, red header row above charts.
+    """
     _slide_chrome(slide, config, ask)
 
     rows = data.get(ask.data_key, [])
@@ -246,8 +274,8 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
 
     labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
     n = len(labels)
-    chart_top = CHART_TOP_DUAL
-    chart_h = min(MAX_DUAL_CHART_HEIGHT, n * 0.42)
+    chart_top = DUAL_CHART_TOP
+    chart_h = min(DUAL_MAX_CHART_HEIGHT, n * 0.42)
     row_h = chart_h / max(n, 1)
 
     # Left data
@@ -258,41 +286,56 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     right_current = [r.get(f"{right_prefix}_current") or 0 for r in rows]
     right_prior = [r.get(f"{right_prefix}_prior") for r in rows]
 
-    # Left chart label
+    # ── Red header row (config-driven column titles) ─────────────────────
+    cat_header = extra.get("category_header", "")
     left_label = left_cfg.get("label", "Left (%)")
-    textbox(slide, left_label, 0.30, 1.72, 3.0, 0.25,
-            fsize=9, bold=True, color=C_GREY, font=config.font_display)
+    right_label = right_cfg.get("label", "Right (%)")
 
-    # Left chart
+    header_columns = [
+        {"label": cat_header, "left": DUAL_MR_LEFT, "width": 2.0,
+         "align": PP_ALIGN.LEFT},
+        {"label": left_label,
+         "left": DUAL_MR_LEFT + 2.0,
+         "width": DUAL_MR_WIDTH + DUAL_DELTA_WIDTH - 2.0},
+        {"label": right_label,
+         "left": DUAL_ME_LEFT,
+         "width": DUAL_ME_WIDTH + DUAL_DELTA_WIDTH},
+    ]
+    chart_header_row(slide, header_columns, top=DUAL_HEADER_ROW_TOP,
+                     height=DUAL_HEADER_ROW_H, font=font)
+
+    # ── Left chart (MR — wider, with category labels) ────────────────────
     add_single_bar_chart(
         slide, labels, left_current,
-        left=0.30, top=chart_top, width=DUAL_BAR_WIDTH, height=chart_h,
+        left=DUAL_MR_LEFT, top=chart_top, width=DUAL_MR_WIDTH, height=chart_h,
         fill_color=color_current, font_name=font,
     )
 
-    # Left delta
+    # Left delta column
     left_deltas = [delta(c, p) if p is not None else None
                    for c, p in zip(left_current, left_prior)]
-    left_delta_header = left_cfg.get("delta_header", f"{left_prefix.upper()} Δ")
+    left_delta_header = left_cfg.get("delta_header", "Δ")
     add_delta_table(
         slide, left_deltas,
-        left=5.35, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
+        left=DUAL_MR_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
+        row_height=row_h * ROW_SCALE_FACTOR,
         header_text=left_delta_header, font_name=font,
     )
 
-    # Right chart label
-    right_label = right_cfg.get("label", "Right (%)")
-    textbox(slide, right_label, 6.20, 1.72, 3.5, 0.25,
-            fsize=9, bold=True, color=C_GREY, font=config.font_display)
+    # ── Vertical dashed separator ────────────────────────────────────────
+    sep_h = chart_h + DUAL_HEADER_ROW_H
+    dashed_separator(slide, DUAL_SEPARATOR_X, DUAL_HEADER_ROW_TOP,
+                     sep_h, color=C_FTGREY, width_pt=0.5, vertical=True)
 
-    # Right chart (hide category labels — shown on left)
+    # ── Right chart (ME — narrower, no category labels) ──────────────────
     cd2 = CategoryChartData()
     cd2.categories = labels
     cd2.add_series(config.period_current, right_current)
 
     cf2 = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(6.20), Inches(chart_top), Inches(DUAL_BAR_WIDTH), Inches(chart_h), cd2)
+        Inches(DUAL_ME_LEFT), Inches(chart_top),
+        Inches(DUAL_ME_WIDTH), Inches(chart_h), cd2)
     ch2 = cf2.chart
     ch2.has_legend = False
     s2 = ch2.series[0]
@@ -304,17 +347,18 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     invert_cat_axis(ch2)
     set_plot_area_gap(ch2, BAR_GAP_STD)
 
-    # Right delta
+    # Right delta column
     right_deltas = [delta(c, p) if p is not None else None
                     for c, p in zip(right_current, right_prior)]
-    right_delta_header = right_cfg.get("delta_header", f"{right_prefix.upper()} Δ")
+    right_delta_header = right_cfg.get("delta_header", "Δ")
     add_delta_table(
         slide, right_deltas,
-        left=11.25, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
+        left=DUAL_ME_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
+        row_height=row_h * ROW_SCALE_FACTOR,
         header_text=right_delta_header, font_name=font,
     )
 
-    # Legend
+    # ── Legend ────────────────────────────────────────────────────────────
     ly = chart_top + chart_h + LEGEND_GAP
     sample = config.sample_sizes.get(ask.brand or "primary")
     n_label = f" (n={sample.current})" if sample else ""

@@ -78,43 +78,75 @@ LAYOUTS = {
 def slide_header(slide, headline: str, module_label: str = "Personal Promotion Module",
                  font: Optional[str] = None) -> None:
     """Add the standard ZoomRx slide header:
-      - thin red accent line at very top
       - module label (top-right, small grey)
       - headline text (large, red, bold)
       - red module badge (top-right rectangle)
-      - separator line below header
     """
     f_display = font or FONT_DISPLAY
     f_text = font or FONT_TEXT
 
-    # Red accent line
-    solidrect(slide, 0, 0.15, SLIDE_W_IN, 0.02, C_RED)
-
-    # Module label
+    # Module label (small grey text above badge)
     textbox(slide, module_label,
-            5.5, 0.01, 7.70, 0.22,
+            5.5, 0.05, 7.70, 0.22,
             fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_text)
 
     # Headline
     textbox(slide, headline,
-            0.20, 0.20, 10.55, 1.05,
-            fsize=12, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=f_display)
+            0.20, 0.16, 10.55, 0.66,
+            fsize=22, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=f_display)
 
-    # Module badge
-    solidrect(slide, 10.90, 0.20, 2.25, 0.95, C_RED)
-    textbox(slide, "PERSONAL\nPROMOTION\nMODULE",
-            10.90, 0.20, 2.25, 0.95,
-            fsize=8, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_display)
-
-    # Separator line
-    horiz_line(slide, 0.0, 1.32, SLIDE_W_IN, color=C_RED, width_pt=1.0)
+    # Module badge (compact single-line pill, top-right)
+    badge_w = 2.20
+    badge_h = 0.36
+    badge_l = SLIDE_W_IN - badge_w - 0.10
+    badge_t = 0.91
+    solidrect(slide, badge_l, badge_t, badge_w, badge_h, C_RED)
+    textbox(slide, module_label.upper(),
+            badge_l, badge_t, badge_w, badge_h,
+            fsize=7, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_text)
 
 
 def slide_footer(slide, footer_text: str, font: Optional[str] = None) -> None:
-    """Add standard footer text at bottom of slide."""
+    """Add standard footer text at bottom of slide.
+
+    Starts at x=2.70 to avoid overlapping the J&J logo on the slide master
+    (logo occupies x=0.32–2.61 at y=7.02).
+    """
     textbox(slide, footer_text,
-            0.15, 7.20, 13.0, 0.28,
+            2.70, 6.78, 10.20, 0.72,
             fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
+
+
+def chart_header_row(slide, columns: list[dict], top: float, height: float = 0.30,
+                     bg_color: Optional[RGBColor] = None,
+                     font: Optional[str] = None) -> None:
+    """Add a colored header row above the chart area with column titles.
+
+    Each column dict has: label (str), left (float), width (float),
+    and optional align (PP_ALIGN, default CENTER).
+
+    The background spans the full slide width. Column labels are positioned
+    individually within the row.
+
+    Args:
+        columns: [{"label": "Tag$", "left": 0.20, "width": 2.0}, ...]
+        top: Y position in inches
+        height: row height in inches (default 0.30)
+        bg_color: background color (default C_RED)
+        font: font name override
+    """
+    fill = bg_color or C_RED
+    f = font or FONT_TEXT
+
+    # Full-width background strip
+    solidrect(slide, 0, top, SLIDE_W_IN, height, fill)
+
+    # Column labels
+    for col in columns:
+        align = col.get("align", PP_ALIGN.CENTER)
+        textbox(slide, col["label"],
+                col["left"], top, col["width"], height,
+                fsize=8, bold=True, color=C_WHITE, align=align, font=f)
 
 
 def manual_legend(slide, q4_n: int, q3_n: int,

@@ -238,6 +238,142 @@ def _clear_slide(slide):
             sp_tree.remove(child)
 
 
+_P14_NS = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+_SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+
+
+def _clear_sections(prs):
+    """Remove all PowerPoint sections from the presentation."""
+    from pptx.oxml.ns import qn
+    from lxml import etree
+
+    ext_lst = prs.part._element.find(qn('p:extLst'))
+    if ext_lst is None:
+        return
+    for ext in list(ext_lst):
+        if ext.get("uri") == _SECTION_EXT_URI:
+            section_lst = ext.find(f"{{{_P14_NS}}}sectionLst")
+            if section_lst is not None:
+                # Remove all sections
+                for section in list(section_lst):
+                    section_lst.remove(section)
+
+
+def _create_sections(prs, sections_config: list[dict], ask_id_to_slide_idx: dict):
+    """Create PowerPoint sections from config.
+
+    sections_config: [{"name": "Section Name", "start": "ask_id"}, ...]
+    ask_id_to_slide_idx: {"ask_id": 0-based slide index}
+
+    Each section starts at the slide for `start` ask_id and runs until
+    the next section begins.
+    """
+    from pptx.oxml.ns import qn
+    from lxml import etree
+    import uuid
+
+    if not sections_config:
+        return
+
+    # Get the sldIdLst to find slide IDs
+    sld_id_lst = prs.part._element.find(qn('p:sldIdLst'))
+    sld_ids = [elem.get("id") for elem in sld_id_lst]
+    total_slides = len(sld_ids)
+
+    # Build section ranges: [(name, start_idx, end_idx), ...]
+    ranges = []
+    for i, sec in enumerate(sections_config):
+        start_ask = sec.get("start", "")
+        start_idx = ask_id_to_slide_idx.get(start_ask, 0)
+        ranges.append((sec["name"], start_idx))
+
+    # Sort by start index
+    ranges.sort(key=lambda x: x[1])
+
+    # Find or create the sectionLst element
+    ext_lst = prs.part._element.find(qn('p:extLst'))
+    if ext_lst is None:
+        ext_lst = etree.SubElement(prs.part._element, qn('p:extLst'))
+
+    # Find the section extension
+    section_ext = None
+    for ext in ext_lst:
+        if ext.get("uri") == _SECTION_EXT_URI:
+            section_ext = ext
+            break
+
+    if section_ext is None:
+        section_ext = etree.SubElement(ext_lst, qn('p:ext'))
+        section_ext.set("uri", _SECTION_EXT_URI)
+
+    section_lst = section_ext.find(f"{{{_P14_NS}}}sectionLst")
+    if section_lst is None:
+        section_lst = etree.SubElement(
+            section_ext,
+            f"{{{_P14_NS}}}sectionLst")
+
+    # Build sections
+    for i, (name, start_idx) in enumerate(ranges):
+        end_idx = ranges[i + 1][1] if i + 1 < len(ranges) else total_slides
+
+        section_el = etree.SubElement(section_lst, f"{{{_P14_NS}}}section")
+        section_el.set("name", name)
+        section_el.set("id", "{" + str(uuid.uuid4()).upper() + "}")
+
+        sld_id_lst_el = etree.SubElement(section_el, f"{{{_P14_NS}}}sldIdLst")
+        for idx in range(start_idx, end_idx):
+            if idx < len(sld_ids):
+                sld_id_el = etree.SubElement(sld_id_lst_el, f"{{{_P14_NS}}}sldId")
+                sld_id_el.set("id", sld_ids[idx])
+
+    print(f"  Created {len(ranges)} sections")
+
+
+def _load_template(config: ProjectConfig):
+    """Load template PPTX, returning (Presentation, blank_layout).
+
+    If a template exists, loads it and removes all original slides so that only
+    the slide masters/layouts remain (logos, fonts, backgrounds are preserved).
+    Falls back to a blank presentation if no template is available.
+    """
+    from pptx.oxml.ns import qn
+
+    if config.template_path and os.path.exists(config.template_path):
+        prs = Presentation(config.template_path)
+        original_count = len(prs.slides)
+
+        # Find the "Blank" layout (preferred for data slides)
+        blank_layout = None
+        for layout in prs.slide_layouts:
+            if layout.name == "Blank":
+                blank_layout = layout
+                break
+        if blank_layout is None:
+            blank_layout = prs.slide_layouts[0]
+
+        # Delete all original template slides — we only want the masters/layouts
+        sld_id_lst = prs.part._element.find(qn('p:sldIdLst'))
+        for _ in range(original_count):
+            first = sld_id_lst[0]
+            rId = first.get(qn('r:id'))
+            prs.part.drop_rel(rId)
+            sld_id_lst.remove(first)
+
+        # Clear old template sections (they reference deleted slides)
+        _clear_sections(prs)
+
+        print(f"  Template loaded: {os.path.basename(config.template_path)}"
+              f" (master/layouts retained, {original_count} slides cleared)")
+        return prs, blank_layout
+    else:
+        prs = Presentation()
+        prs.slide_width = Emu(12192000)   # 13.33 inches
+        prs.slide_height = Emu(6858000)   # 7.50 inches
+        layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
+        print("  No template — using blank presentation")
+        return prs, layout
+
+
 def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     """Generate a full slide deck from a YAML project config.
 
@@ -266,22 +402,15 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     # Save data cache for future regenerate_slide() calls
     _save_data_cache(data, config, yaml_path)
 
-    # 3. Create presentation
+    # 3. Create presentation from template (preserves master logos/fonts)
     print("\nCreating presentation...")
-    # Always create a fresh presentation with standard widescreen dimensions.
-    # Template layouts could be used but slide removal is fragile in python-pptx.
-    prs = Presentation()
-    prs.slide_width = Emu(12192000)   # 13.33 inches
-    prs.slide_height = Emu(6858000)   # 7.50 inches
-    if config.template_path and os.path.exists(config.template_path):
-        print(f"  Template available: {os.path.basename(config.template_path)} (not loaded — using blank)")
-    else:
-        print("  Blank presentation")
+    prs, blank_layout = _load_template(config)
 
     # 4. Build slides
     slide_registries = {}
     # Track which ask index produced each slide (skipped asks don't get slides)
     slide_to_ask: list[int] = []
+    ask_id_to_slide_idx: dict[str, int] = {}  # for section mapping
     cfg_hash = _config_hash(yaml_path)
     print("\nBuilding slides...")
     for ask_idx, ask in enumerate(config.asks):
@@ -290,11 +419,11 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             print(f"  [ask {ask_idx}] SKIP — unknown slide_type: {ask.slide_type}")
             continue
 
-        # Add blank slide
-        layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
-        slide = prs.slides.add_slide(layout)
+        # Add slide using template layout (inherits master slide logos/chrome)
+        slide = prs.slides.add_slide(blank_layout)
         slide_num = len(prs.slides)
         slide_to_ask.append(ask_idx)
+        ask_id_to_slide_idx[ask.id] = slide_num - 1  # 0-based
 
         namer = ShapeNamer(
             slide_num, ask_id=ask.id,
@@ -311,6 +440,10 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             print(f"  [{slide_num}] ERROR on {ask.id}: {e}")
             from slidegen.pptx_utils import textbox, C_RED
             textbox(slide, f"Error: {e}", 1, 3, 10, 1, fsize=12, color=C_RED)
+
+    # 4b. Create PowerPoint sections (if defined in config)
+    if config.sections:
+        _create_sections(prs, config.sections, ask_id_to_slide_idx)
 
     # 5. Save
     out = output_path or config.output_path

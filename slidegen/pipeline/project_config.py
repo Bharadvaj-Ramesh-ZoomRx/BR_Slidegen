@@ -74,6 +74,7 @@ class AskConfig:
     brand: str = "primary"       # which brand this ask is for
     sort_by: Optional[str] = None
     sort_desc: bool = True
+    template_slide: Optional[int] = None  # 1-based template slide to clone (future use)
     extra: dict = field(default_factory=dict)  # slide-type-specific params
 
 
@@ -104,10 +105,12 @@ class ProjectConfig:
 
     # Optional
     label_shortcuts: list[LabelShortcut] = field(default_factory=list)
+    sections: list[dict] = field(default_factory=list)  # PPT sections: [{"name": ..., "start": ask_id}]
     wave: str = ""               # wave identifier (e.g. "PET_Q3Q4_2025")
     output_path: str = ""
     template_path: str = ""
     data_source_path: str = ""
+    section_icon_path: str = ""  # small icon for section header bars
 
     @property
     def primary(self) -> BrandConfig:
@@ -233,6 +236,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
             brand=ask.get("brand", "primary"),
             sort_by=ask.get("sort_by"),
             sort_desc=ask.get("sort_desc", True),
+            template_slide=ask.get("template_slide"),
             extra=ask.get("extra", {}),
         ))
 
@@ -249,6 +253,10 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     data_path = _resolve_path(raw.get("data_source_path", ""))
     tmpl_path = _resolve_path(raw.get("template_path", ""))
     out_path = _resolve_path(raw.get("output_path", ""))
+    icon_path = _resolve_path(raw.get("section_icon_path", ""))
+
+    # Sections (optional): [{"name": "...", "start": "ask_id"}, ...]
+    sections = raw.get("sections", [])
 
     return ProjectConfig(
         name=project["name"],
@@ -262,8 +270,10 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         extractions=extractions,
         asks=asks,
         label_shortcuts=label_shortcuts,
+        sections=sections,
         wave=wave,
         output_path=out_path,
         template_path=tmpl_path,
         data_source_path=data_path,
+        section_icon_path=icon_path,
     )

@@ -86,19 +86,25 @@ def insert_image(slide, img_path: str, left: float, top: float,
     return pic
 
 
-def dashed_separator(slide, left: float, top: float, width: float,
+def dashed_separator(slide, left: float, top: float, length: float,
                       color: Optional[RGBColor] = None, width_pt: float = 0.75,
-                      dash: str = "dash"):
-    """Add a horizontal dashed line separator.
+                      dash: str = "dash", vertical: bool = False):
+    """Add a dashed line separator (horizontal or vertical).
 
-    Used to visually divide a slide into upper/lower chart panels.
+    Args:
+        length: line length in inches (width if horizontal, height if vertical)
+        vertical: if True, draw a vertical line instead of horizontal
     """
     if color is None:
         color = C_LTGREY
+    if vertical:
+        end_left, end_top = left, top + length
+    else:
+        end_left, end_top = left + length, top
     shape = slide.shapes.add_connector(
         1,  # MSO_CONNECTOR.STRAIGHT
         Inches(left), Inches(top),
-        Inches(left + width), Inches(top))
+        Inches(end_left), Inches(end_top))
     shape.line.color.rgb = color
     shape.line.width = Pt(width_pt)
     spPr = shape._element.spPr

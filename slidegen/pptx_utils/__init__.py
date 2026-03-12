@@ -50,6 +50,7 @@ from .layout import (
     LAYOUTS,
     slide_header, slide_footer, manual_legend,
     section_header_bar, module_badge, section_breadcrumb,
+    chart_header_row,
     divider_slide, cover_slide,
     trend_arrow_icon, scatter_quadrant_fills,
 )
