@@ -34,6 +34,7 @@ from slidegen.pptx_utils import (
     callout_box, dashed_separator, hide_axis, set_series_color,
     set_plot_area_gap, set_overlap, set_series_no_border,
     invert_cat_axis, hide_cat_labels, set_data_label_color,
+    set_chart_plot_area, set_val_axis_scale,
     _get_or_add,
     enable_data_labels, delete_data_label,
     add_single_bar_chart, add_clustered_bar_chart,
@@ -291,6 +292,9 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     left_label = left_cfg.get("label", "Left (%)")
     right_label = right_cfg.get("label", "Right (%)")
 
+    left_delta_header = left_cfg.get("delta_header", "Δ")
+    right_delta_header = right_cfg.get("delta_header", "Δ")
+
     header_columns = [
         {"label": cat_header, "left": DUAL_MR_LEFT, "width": 2.0,
          "align": PP_ALIGN.LEFT},
@@ -304,21 +308,33 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     chart_header_row(slide, header_columns, top=DUAL_HEADER_ROW_TOP,
                      height=DUAL_HEADER_ROW_H, font=font)
 
+    # ── Shared axis scale (so same % = same visual bar width) ────────────
+    all_vals = left_current + right_current
+    axis_max = max(all_vals) if all_vals else 100
+    # Round up to next 10 for clean axis bounds
+    axis_max = min(100, ((int(axis_max) // 10) + 1) * 10)
+
+    # Delta row height: total delta table height = chart height
+    # (header roughly matches chart's auto top-padding)
+    from slidegen.pptx_utils.tables import HEADER_ROW_HEIGHT_IN
+    delta_row_h = (chart_h - HEADER_ROW_HEIGHT_IN) / max(n, 1)
+
     # ── Left chart (MR — wider, with category labels) ────────────────────
-    add_single_bar_chart(
+    cf1, ch1 = add_single_bar_chart(
         slide, labels, left_current,
         left=DUAL_MR_LEFT, top=chart_top, width=DUAL_MR_WIDTH, height=chart_h,
         fill_color=color_current, font_name=font,
     )
+    ch1.has_title = False
+    set_val_axis_scale(ch1, 0, axis_max)
 
     # Left delta column
     left_deltas = [delta(c, p) if p is not None else None
                    for c, p in zip(left_current, left_prior)]
-    left_delta_header = left_cfg.get("delta_header", "Δ")
     add_delta_table(
         slide, left_deltas,
         left=DUAL_MR_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
-        row_height=row_h * ROW_SCALE_FACTOR,
+        row_height=delta_row_h,
         header_text=left_delta_header, font_name=font,
     )
 
@@ -338,6 +354,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         Inches(DUAL_ME_WIDTH), Inches(chart_h), cd2)
     ch2 = cf2.chart
     ch2.has_legend = False
+    ch2.has_title = False
     s2 = ch2.series[0]
     set_series_color(s2, color_current)
     set_series_no_border(s2)
@@ -346,15 +363,15 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     hide_cat_labels(ch2)
     invert_cat_axis(ch2)
     set_plot_area_gap(ch2, BAR_GAP_STD)
+    set_val_axis_scale(ch2, 0, axis_max)
 
     # Right delta column
     right_deltas = [delta(c, p) if p is not None else None
                     for c, p in zip(right_current, right_prior)]
-    right_delta_header = right_cfg.get("delta_header", "Δ")
     add_delta_table(
         slide, right_deltas,
         left=DUAL_ME_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
-        row_height=row_h * ROW_SCALE_FACTOR,
+        row_height=delta_row_h,
         header_text=right_delta_header, font_name=font,
     )
 

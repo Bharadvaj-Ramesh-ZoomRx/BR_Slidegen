@@ -37,6 +37,7 @@ from .lxml_helpers import (
     add_val_axis_reference_line, set_stacked_label_pos,
     set_pie_slice_colors, set_donut_hole_size,
     hide_axis, set_gridlines, set_series_color,
+    set_chart_plot_area, set_val_axis_scale,
 )
 
 # ── Shape primitives ─────────────────────────────────────────────────────────

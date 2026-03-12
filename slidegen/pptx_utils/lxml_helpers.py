@@ -315,3 +315,36 @@ def set_series_color(series, fill_color: RGBColor,
         for child in list(ln):
             ln.remove(child)
         _get_or_add(ln, "a:noFill")
+
+
+def set_chart_plot_area(chart, x: float = 0.0, y: float = 0.0,
+                        w: float = 1.0, h: float = 1.0) -> None:
+    """Set chart plot area position using manual layout (fractions of chart frame).
+
+    Args:
+        x, y: top-left corner as fraction (0.0–1.0)
+        w, h: width/height as fraction (0.0–1.0)
+    """
+    chart_el = chart._element.find(qn("c:chart"))
+    plotArea = chart_el.find(qn("c:plotArea"))
+    layout = _get_or_add(plotArea, "c:layout")
+    ml = _get_or_add(layout, "c:manualLayout")
+    for tag, val in [("c:xMode", "edge"), ("c:yMode", "edge"),
+                     ("c:x", str(x)), ("c:y", str(y)),
+                     ("c:w", str(w)), ("c:h", str(h))]:
+        elem = _get_or_add(ml, tag)
+        elem.set("val", val)
+
+
+def set_val_axis_scale(chart, min_val: float = 0, max_val: float = 100) -> None:
+    """Set explicit min/max scale on the value axis.
+
+    Use to synchronize bar lengths across multiple charts so that
+    the same percentage value produces the same visual bar width.
+    """
+    ax = chart.value_axis._element
+    scaling = _get_or_add(ax, "c:scaling")
+    min_el = _get_or_add(scaling, "c:min")
+    min_el.set("val", str(min_val))
+    max_el = _get_or_add(scaling, "c:max")
+    max_el.set("val", str(max_val))

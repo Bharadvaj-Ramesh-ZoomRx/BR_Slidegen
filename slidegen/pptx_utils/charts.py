@@ -124,6 +124,7 @@ def add_single_bar_chart(slide, categories: list[str], values: list[float],
         chart_data)
     ch = cf.chart
     ch.has_legend = False
+    ch.has_title = False
 
     s = ch.series[0]
     set_series_color(s, fill_color)
@@ -163,6 +164,7 @@ def add_clustered_bar_chart(slide, categories: list[str],
         Inches(left), Inches(top), Inches(width), Inches(height),
         chart_data)
     ch = cf.chart
+    ch.has_title = False
 
     if colors is None:
         colors = [C_RYB_Q4, C_TAG]

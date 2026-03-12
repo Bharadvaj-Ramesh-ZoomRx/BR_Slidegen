@@ -135,27 +135,39 @@ def add_delta_col(slide, deltas: list[float | None],
 
 def add_delta_table(slide, deltas: list[float | None],
                     left: float, top: float, width: float, row_height: float,
-                    header_text: str = "QoQ \u0394", font_name: str | None = None):
+                    header_text: str = "QoQ \u0394", font_name: str | None = None,
+                    show_header: bool = True):
     """Add a single-column delta table with green/red conditional coloring.
 
     Args:
         deltas: list of float/None values
         row_height: height of each data row in inches
+        show_header: if False, omit the header row (use when header is
+            already in a chart_header_row above).
     Returns the table shape.
     """
     n = len(deltas)
-    total_h = HEADER_ROW_HEIGHT_IN + n * row_height
+    if show_header:
+        total_h = HEADER_ROW_HEIGHT_IN + n * row_height
+        n_rows = n + 1
+    else:
+        total_h = n * row_height
+        n_rows = n
 
     tbl_shape = slide.shapes.add_table(
-        n + 1, 1,
+        n_rows, 1,
         Inches(left), Inches(top), Inches(width), Inches(total_h))
     tbl = tbl_shape.table
 
-    _render_header(tbl, header_text, font_name)
+    if show_header:
+        _render_header(tbl, header_text, font_name)
+        data_offset = 1
+    else:
+        data_offset = 0
 
     for i, d in enumerate(deltas):
         text, color = _delta_text_color(d)
-        _render_data_row(tbl, i + 1, text, color, row_height, font_name)
+        _render_data_row(tbl, i + data_offset, text, color, row_height, font_name)
 
     tbl.columns[0].width = Inches(width)
     return tbl_shape
