@@ -209,20 +209,34 @@ Every data slide includes:
 
 ---
 
+## Layout & Spacing Rules
+
+1. **Minimize white space** — Charts must fill the available vertical space between the section bar (Y≈1.85) and footer (Y≈6.78). Use `MIN_CHART_HEIGHT` (3.0") so slides with few data rows don't leave large empty areas.
+2. **Chart height formula**: `chart_h = max(MIN_CHART_HEIGHT, min(MAX_*_HEIGHT, n * per_row))` — always clamp with both a floor and ceiling.
+3. **Same scale for side-by-side charts** — When two charts are rendered next to each other (e.g. dual_bar_with_delta), set the same `set_val_axis_scale(ch, 0, axis_max)` on both so equal percentages produce equal bar widths.
+4. **Suppress auto chart titles** — Always set `ch.has_title = False` after creating a chart. PowerPoint auto-generates a title from the series name (`autoTitleDeleted="0"`) which overlaps bar content.
+5. **Delta table alignment** — The delta table header height (0.28") roughly matches the chart's auto top-padding, keeping data rows aligned with bars. Use `row_height = (chart_h - HEADER_ROW_HEIGHT_IN) / n` so total delta height equals chart height.
+6. **Footer avoids master logo** — Footer text starts at `x=2.70` (after the J&J logo which occupies x=0.32–2.61 on the slide master).
+7. **No unnecessary decorative lines** — The template's slide master provides all chrome. Don't add accent lines or separators that aren't in the template.
+
+---
+
 ## Positioning Grid
 
 ```
 Y=0.00  Top of slide
-Y=0.15  Accent line
-Y=0.20  Headline / module badge
-Y=1.32  Separator line
-Y=1.40  section_header_bar
-Y=1.85  Chart top (standard)
-Y=7.20  slide_footer
+Y=0.05  Module label (small grey, right-aligned)
+Y=0.16  Headline (bold red, left-aligned)
+Y=0.91  Module badge (red pill, top-right)
+Y=1.40  section_header_bar / chart_header_row
+Y=1.68  Chart top (dual bar, below header row)
+Y=1.85  Chart top (standard, below section bar)
+Y=6.78  slide_footer (starts at x=2.70 to avoid logo)
 Y=7.50  Bottom of slide (SLIDE_H_IN)
 
 X=0.20  Left margin
 X=0.30  Chart left edge
+X=2.70  Footer text left edge (after master logo)
 X=13.33 Right of slide (SLIDE_W_IN)
 ```
 

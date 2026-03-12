@@ -78,6 +78,7 @@ DUAL_MAX_CHART_HEIGHT = 5.05  # max chart height (fills to footer area)
 MAX_CHART_HEIGHT = 4.5
 MAX_CLUSTERED_HEIGHT = 4.8
 MAX_QOQ_HEIGHT = 4.0
+MIN_CHART_HEIGHT = 3.0       # minimum chart height to avoid excessive white space
 ROW_SCALE_FACTOR = 0.85     # delta table row height as fraction of chart row
 
 # Compat aliases for renderers not yet updated to Archetype 3 layout
@@ -219,7 +220,7 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
 
     n = len(labels)
     chart_top = CHART_TOP_STD
-    chart_h = min(MAX_CHART_HEIGHT, n * 0.40)
+    chart_h = max(MIN_CHART_HEIGHT, min(MAX_CHART_HEIGHT, n * 0.40))
     row_h = chart_h / max(n, 1)
 
     # Bar chart
@@ -408,7 +409,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
     n = len(labels)
     chart_top = CHART_TOP_DUAL
-    chart_h = min(MAX_DUAL_CHART_HEIGHT, n * 0.42)
+    chart_h = max(MIN_CHART_HEIGHT, min(MAX_DUAL_CHART_HEIGHT, n * 0.42))
     row_h = chart_h / max(n, 1)
 
     # Left data
@@ -573,7 +574,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     n = len(labels)
     chart_top = CHART_TOP_STD
-    chart_h = min(MAX_CLUSTERED_HEIGHT, n * 0.32)
+    chart_h = max(MIN_CHART_HEIGHT, min(MAX_CLUSTERED_HEIGHT, n * 0.32))
     row_h = chart_h / max(n, 1)
 
     # Clustered bar
@@ -651,7 +652,7 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
 
     n = len(labels)
     chart_top = CHART_TOP_STD
-    chart_h = min(MAX_QOQ_HEIGHT, n * 0.50)
+    chart_h = max(MIN_CHART_HEIGHT, min(MAX_QOQ_HEIGHT, n * 0.50))
     row_h = chart_h / max(n, 1)
 
     # Clustered bar
@@ -720,7 +721,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
             current_vals = [r.get("current") or 0 for r in sec_rows]
             prior_vals = [r.get("prior") for r in sec_rows]
             n = len(labels)
-            ch_h = max(1.2, n * 0.55)
+            ch_h = max(1.5, n * 0.55)
 
             cd = CategoryChartData()
             cd.categories = labels
@@ -783,7 +784,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
 
     n = len(labels)
     chart_top = CHART_TOP_STD
-    chart_h = min(MAX_CHART_HEIGHT, n * 0.42)
+    chart_h = max(MIN_CHART_HEIGHT, min(MAX_CHART_HEIGHT, n * 0.42))
     row_h = chart_h / max(n, 1)
 
     # Build stacked bar chart
