@@ -7,5 +7,6 @@ Usage:
 """
 
 from slidegen.pipeline.orchestrator import generate_deck, regenerate_slide
+from slidegen.pipeline.data_loaders import index_excel
 
-__all__ = ["generate_deck", "regenerate_slide"]
+__all__ = ["generate_deck", "regenerate_slide", "index_excel"]

@@ -226,46 +226,54 @@ Move Slide 10 before Slide 5
 Regenerate all slides
 ```
 
-## Workflow: Create Slides (Full 5-Stage Pipeline)
+## Workflow: Create Slides (Full Pipeline)
 
 When the user says **"Create slides for projects/{name}"** or **"Run the full create workflow"**:
 
-**IMPORTANT: After each stage, pause and present a summary of what was generated to the user. Wait for the user to confirm before proceeding to the next stage.** This ensures the user can review and correct the output at each step before it feeds into downstream stages.
+**IMPORTANT: After Stages 1, 2, and 3, pause and present a summary to the user. Wait for confirmation before proceeding.** Stage 0 runs automatically first. Stages 4-5 are internal — proceed directly from Stage 3 confirmation through to deck output without pausing.
+
+### Stage 0 — Index Excel → JSON (automatic)
+Converts `source_data.xlsx` into `context/{wave}/source_data.json` with a `_sheets` key indexing every row's question code and description across all sheets. Runs automatically before Stage 1. All downstream stages can search `_sheets` for question codes without touching Excel again. Uses `index_excel()` from `slidegen.pipeline`.
+```python
+from slidegen.pipeline import index_excel
+index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
+            "projects/{name}/context/{wave}/source_data.json")
+```
 
 ### Stage 1 — Build Project Context (`/build-project-context`)
 Reads source documents from `input/wave/{wave}/` (call_notes.docx, pet_project_kbq.odt, market_context.md, kbqs.md, prior_wave_es.md) and synthesizes them into `context/{wave}/project_context.md` — a structured file covering study design, KBQs, wave-specific hypotheses, analytical priorities, methodology notes, and message reference.
 **→ Pause:** Show section headers + key content summary. Ask user to confirm before Stage 2.
 
 ### Stage 2 — Generate Hypothesis Bank (`/hypotheses`)
-Reads market_context.md, project_context.md, kbqs.md, and survey_context.md from the input/context folders. Produces `context/{wave}/hypothesis_bank.md` — testable predictions organized by KBQ domain, each with rationale, "Test with:" question codes, methodology artifact flags, and action item flags. No Excel hypothesis file needed — all hypotheses are derived from context files.
+Reads market_context.md, project_context.md, kbqs.md, and survey_context.md from the input/context folders. Can reference `source_data.json` → `_sheets` to verify question codes exist in the data. Produces `context/{wave}/hypothesis_bank.md` — testable predictions organized by KBQ domain, each with rationale, "Test with:" question codes, methodology artifact flags, and action item flags.
 **→ Pause:** Show total hypothesis count, domain breakdown, methodology artifacts, and action items. Ask user to confirm before Stage 3.
 
 ### Stage 3 — Build Slide Plan (`/slide-plan`)
-Reads the hypothesis bank, KBQs, and survey context. Clusters hypotheses into slides by shared question codes and story themes, deduplicates, sequences into narrative sections. Produces `context/{wave}/slide_plan.md` — one entry per slide with chart type, question codes, segment cuts, and narrative arc.
+Reads the hypothesis bank, KBQs, and survey context. Can reference `source_data.json` → `_sheets` to verify chart feasibility (e.g., does Q2_20Z exist in RYB?). Clusters hypotheses into slides, deduplicates, sequences into narrative sections. Produces `context/{wave}/slide_plan.md`.
 **→ Pause:** Show slide count, section breakdown, and slide titles. Ask user to confirm before Stage 4.
 
-### Stage 4 — Generate config.yaml
-Maps the slide plan to YAML extractions and asks. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. Uses the 5 extraction methods and 9 slide types to match the analytical specification.
-**→ Pause:** Show extraction count, ask count, and any gaps (slides in the plan that couldn't be mapped). Ask user to confirm before Stage 5.
+### Stage 4 — Generate config.yaml (internal — no user gate)
+Maps the slide plan to YAML extractions and asks. **Must search `source_data.json` → `_sheets` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 5.
 
 ### Stage 5 — Run `generate_deck()`
-Executes the pipeline: loads config → extracts data (or reads JSON cache) → renders all slides → saves `output/{wave}/deck.pptx`.
-**→ Pause:** Report success/failure, slide count, and output path.
+Executes the pipeline: loads config → extracts data (or reads JSON cache) → renders all slides → saves `output/{wave}/deck.pptx`. If `source_data.json` has only the index (from Stage 0), automatically extracts from Excel and saves the full JSON.
+**→ Report:** Show success/failure, slide count, output path, and any gaps.
 
 ```
-input/wave/{wave}/*.md + *.xlsx + *.docx + *.odt
+input/wave/{wave}/source_data.xlsx
+    ↓ Stage 0: index_excel()          ← automatic, no gate
+context/{wave}/source_data.json (_sheets index)
+input/wave/{wave}/*.md + *.docx + *.odt
     ↓ Stage 1: /build-project-context
 context/{wave}/project_context.md
     ✋ User confirms
-    ↓ Stage 2: /hypotheses
+    ↓ Stage 2: /hypotheses             (can reference _sheets)
 context/{wave}/hypothesis_bank.md
     ✋ User confirms
-    ↓ Stage 3: /slide-plan
+    ↓ Stage 3: /slide-plan             (can reference _sheets)
 context/{wave}/slide_plan.md
     ✋ User confirms
-    ↓ Stage 4: config.yaml
-projects/{name}/config.yaml
-    ✋ User confirms
+    ↓ Stage 4: config.yaml             ← internal, searches _sheets
     ↓ Stage 5: generate_deck()
 output/{wave}/deck.pptx
 ```

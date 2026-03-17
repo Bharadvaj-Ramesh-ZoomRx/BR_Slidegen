@@ -26,7 +26,7 @@ pip install pandas openpyxl python-pptx lxml pyyaml pywin32
 4. Optionally place a template deck in `projects/your_project/templates/template.pptx`
 5. In the Claude Code terminal, say: **`Create slides for projects/your_project`**
 
-Claude Code runs a 5-stage pipeline: builds project context → generates hypotheses → creates slide plan → writes config.yaml → builds the deck.
+Claude Code runs a 6-stage pipeline: indexes Excel → builds project context → generates hypotheses → creates slide plan → writes config.yaml → builds the deck.
 
 ### Run an Existing Project
 
@@ -82,24 +82,31 @@ Regenerate all slides
 
 ## Architecture
 
-### Full Create Pipeline (5 Stages)
+### Full Create Pipeline (Stage 0–5)
 
 ```
 input/wave/{wave}/                       # User drop zone
   source_data.xlsx                       #   Survey data
   market_context.md, kbqs.md, ...        #   Reference docs
         ↓
+Stage 0: index_excel()                   # Excel → JSON index (automatic)
+        ↓
+context/{wave}/source_data.json          #   _sheets: row-level code+desc index
+        ↓
 Stage 1: /build-project-context          # Synthesize → project_context.md
-Stage 2: /hypotheses                     # Generate → hypothesis_bank.md
-Stage 3: /slide-plan                     # Plan → slide_plan.md
-Stage 4: config.yaml                     # Map slides to extractions + renderers
+    ✋ User confirms
+Stage 2: /hypotheses                     # Generate → hypothesis_bank.md (can reference _sheets)
+    ✋ User confirms
+Stage 3: /slide-plan                     # Plan → slide_plan.md (can reference _sheets)
+    ✋ User confirms
+Stage 4: config.yaml                     # Map slides to extractions (searches _sheets)
 Stage 5: generate_deck()                 # Build → deck.pptx
         ↓
 context/{wave}/                          # System-generated intermediates
   project_context.md                     #   Stage 1 output
   hypothesis_bank.md                     #   Stage 2 output
   slide_plan.md                          #   Stage 3 output
-  source_data.json                       #   Auto-extracted from Excel (JSON cache)
+  source_data.json                       #   Stage 0 index + Stage 5 extracted data
 output/{wave}/
   deck.pptx                             #   Generated deck
   shape_registry.json                    #   Shape state + data lineage

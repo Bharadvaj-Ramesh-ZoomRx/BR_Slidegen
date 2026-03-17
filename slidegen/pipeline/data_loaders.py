@@ -133,17 +133,32 @@ def extract_multi_question_code(
     """Extract one row per question code (e.g. CTA metrics).
 
     Each code entry: {"code": "C1_81Z", "label": "Compelling reason to prescribe"}
-    Finds the code row, then looks for "top"/"yes" sub-row or takes first data row.
+    Optional "pick" key: match a specific sub-row code (e.g. "DIA", "WCNS", "A2").
+    Without "pick", finds the code row, then looks for "top"/"yes" sub-row or takes first data row.
     """
     results = []
     for entry in codes:
         code = entry["code"]
         label = entry["label"]
+        pick = entry.get("pick")
         for i in range(len(sheet)):
             if sheet.iloc[i, code_col] == code:
-                for j in range(i, min(i + 8, len(sheet))):
+                for j in range(i, min(i + 15, len(sheet))):
+                    cell = str(sheet.iloc[j, code_col]) if pd.notna(sheet.iloc[j, code_col]) else ""
                     desc = str(sheet.iloc[j, desc_col]) if pd.notna(sheet.iloc[j, desc_col]) else ""
-                    if "top" in desc.lower() or "yes" in desc.lower() or j == i + 1:
+                    if pick:
+                        if cell == pick:
+                            q_prior = sheet.iloc[j, q_prior_col]
+                            q_current = sheet.iloc[j, q_current_col]
+                            if pd.notna(q_prior) and pd.notna(q_current):
+                                results.append({
+                                    "desc": label,
+                                    "code": code,
+                                    "prior": converter(q_prior),
+                                    "current": converter(q_current),
+                                })
+                            break
+                    elif "top" in desc.lower() or "yes" in desc.lower() or j == i + 1:
                         q_prior = sheet.iloc[j, q_prior_col]
                         q_current = sheet.iloc[j, q_current_col]
                         if pd.notna(q_prior) and pd.notna(q_current):
@@ -321,6 +336,76 @@ def extract_nested_ordinal(
     return results
 
 
+# ── Excel → JSON indexing (Stage 0) ─────────────────────────────────────────
+
+def index_excel(excel_path: str, json_path: str) -> dict:
+    """Convert Excel to JSON index — runs as Stage 0 before any analysis.
+
+    Reads all sheets from the Excel file and builds a row-level index with
+    code (col 0) and description (col 1) for every non-empty row. The result
+    is saved as source_data.json with a ``_sheets`` key containing the index.
+
+    Downstream stages (hypotheses, slide plan, config generation) can search
+    ``_sheets`` for question codes without touching Excel again.
+
+    If source_data.json already exists and the Excel hasn't changed (hash
+    check), returns the existing data without re-indexing.
+
+    Args:
+        excel_path: Path to source_data.xlsx
+        json_path:  Path to write/read source_data.json
+
+    Returns:
+        dict with ``_meta`` and ``_sheets`` keys (and any existing extractions)
+    """
+    import openpyxl
+
+    # Check for existing fresh index
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+        meta = existing.get("_meta", {})
+        if meta.get("excel_hash") == _file_hash(excel_path) and "_sheets" in existing:
+            print(f"  source_data.json up to date — {len(existing['_sheets'])} sheets indexed")
+            return existing
+
+    # Build raw sheet index from Excel
+    print(f"  Indexing Excel: {os.path.basename(excel_path)}")
+    wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+    sheets_index = {}
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = []
+        for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+            code = str(row[0]).strip() if row[0] is not None else ""
+            desc = str(row[1]).strip()[:120] if len(row) > 1 and row[1] is not None else ""
+            if code or desc:
+                rows.append({"row": row_idx, "code": code, "desc": desc})
+        sheets_index[sheet_name] = rows
+        print(f"    {sheet_name}: {len(rows)} rows")
+    wb.close()
+
+    # Build or update payload
+    payload = {}
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+
+    payload["_meta"] = {
+        "extracted_at": datetime.now().isoformat(),
+        "excel_file": os.path.basename(excel_path),
+        "excel_hash": _file_hash(excel_path),
+    }
+    payload["_sheets"] = sheets_index
+
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, default=str)
+
+    print(f"  Saved: {json_path}")
+    return payload
+
+
 # ── JSON auto-cache ─────────────────────────────────────────────────────────
 
 def _file_hash(path: str) -> str:
@@ -360,9 +445,17 @@ def _load_source_json(config) -> dict | None:
             print("  source_data.json stale (Excel changed) — re-extracting")
             return None
 
-    # Strip _meta, return data dict
+    # Strip _meta, return data dict (keep _sheets for discovery)
     data = {k: v for k, v in payload.items() if k != "_meta"}
-    print(f"  Loaded from JSON: {json_path} ({len(data) - 1} extractions)")
+    n_extractions = sum(1 for k in data if not k.startswith("_"))
+
+    # If JSON only has _sheets (index-only from Stage 0) but no extractions,
+    # signal re-extraction needed
+    if n_extractions == 0:
+        print("  source_data.json has index only (no extractions) — extracting from Excel")
+        return None
+
+    print(f"  Loaded from JSON: {json_path} ({n_extractions} extractions)")
     return data
 
 
@@ -409,6 +502,20 @@ def _extract_all_from_excel(config) -> dict:
             sheet_name=sheet_cfg.name,
             header=None,
         )
+
+    # Build raw sheet index for downstream discovery (Stage 4)
+    # Stores col0 (code) and col1 (desc) for every row, keyed by sheet
+    raw_index = {}
+    for sheet_key, df in sheets_data.items():
+        rows = []
+        for i in range(len(df)):
+            code = df.iloc[i, 0]
+            desc = df.iloc[i, 1] if df.shape[1] > 1 else None
+            code_str = str(code).strip() if pd.notna(code) else ""
+            desc_str = str(desc).strip()[:120] if pd.notna(desc) else ""
+            if code_str or desc_str:
+                rows.append({"row": i, "code": code_str, "desc": desc_str})
+        raw_index[sheet_key] = rows
 
     # Build global label shortener
     global_shortener = None
@@ -502,6 +609,9 @@ def _extract_all_from_excel(config) -> dict:
         # Warn if extraction returned no rows
         if ex.id in data and isinstance(data[ex.id], list) and len(data[ex.id]) == 0:
             logger.warning("Extraction '%s' (method=%s) returned 0 rows", ex.id, ex.method)
+
+    # Attach raw sheet index for discovery by Stage 4 / config generation
+    data["_sheets"] = raw_index
 
     return data
 
