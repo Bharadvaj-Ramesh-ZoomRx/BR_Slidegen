@@ -146,79 +146,17 @@ def _backup_pptx(pptx_path: str) -> str | None:
     return backup_path
 
 
-# ── Data cache (JSON) ────────────────────────────────────────────────────────
-
-def _data_cache_path(config: ProjectConfig) -> str:
-    """Return the path to the JSON data cache for the current wave."""
-    output_dir = os.path.dirname(config.output_path)
-    return os.path.join(output_dir, "slide_data.json")
-
+# ── Config hash ──────────────────────────────────────────────────────────────
 
 def _file_hash(path: str) -> str:
-    """Fast MD5 hash of a file for cache invalidation."""
+    """Fast MD5 hash of a file."""
     with open(path, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()[:12]
 
 
 def _config_hash(yaml_path: str) -> str:
-    """Fast hash of config file for cache invalidation."""
+    """Fast hash of config file for shape registry lineage."""
     return _file_hash(yaml_path)
-
-
-def _save_data_cache(data: dict, config: ProjectConfig, yaml_path: str):
-    """Save extracted data as JSON cache alongside the deck."""
-    cache_path = _data_cache_path(config)
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-
-    source_hash = _file_hash(config.data_source_path) if os.path.exists(config.data_source_path) else ""
-    cache = {
-        "_meta": {
-            "wave": config.wave,
-            "source": config.data_source_path,
-            "extracted_at": datetime.now().isoformat(),
-            "config_hash": _config_hash(yaml_path),
-            "source_hash": source_hash,
-        },
-    }
-    cache.update(data)
-
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(cache, f, indent=2, default=str)
-
-    print(f"  Data cache saved: {cache_path}")
-
-
-def _load_data_cache(config: ProjectConfig, yaml_path: str) -> dict | None:
-    """Load data from JSON cache if valid (config unchanged, Excel not newer).
-
-    Returns None if cache is stale or missing.
-    """
-    cache_path = _data_cache_path(config)
-    if not os.path.exists(cache_path):
-        return None
-
-    with open(cache_path, "r", encoding="utf-8") as f:
-        cache = json.load(f)
-
-    meta = cache.get("_meta", {})
-
-    # Check config hasn't changed
-    if meta.get("config_hash") != _config_hash(yaml_path):
-        print("  Data cache stale (config changed) — re-extracting")
-        return None
-
-    # Check Excel file hasn't been modified (hash-based, race-safe)
-    if os.path.exists(config.data_source_path):
-        current_hash = _file_hash(config.data_source_path)
-        cached_hash = meta.get("source_hash", meta.get("source_mtime", ""))
-        if current_hash != cached_hash:
-            print("  Data cache stale (Excel updated) — re-extracting")
-            return None
-
-    # Cache is valid — strip _meta before returning
-    data = {k: v for k, v in cache.items() if k != "_meta"}
-    print(f"  Data loaded from cache ({cache_path})")
-    return data
 
 
 # ── Slide clearing ───────────────────────────────────────────────────────────
@@ -388,8 +326,8 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     print(f"Loading config: {yaml_path}")
     config = load_project_config(yaml_path)
 
-    # 2. Load data (always re-extract for full deck, then cache)
-    print("Extracting data...")
+    # 2. Load data (from JSON if available, else extract from Excel)
+    print("Loading data...")
     data = load_all_data(config)
 
     # Print extraction summary
@@ -398,9 +336,6 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             continue
         count = len(val) if isinstance(val, list) else "—"
         print(f"  {key}: {count} rows")
-
-    # Save data cache for future regenerate_slide() calls
-    _save_data_cache(data, config, yaml_path)
 
     # 3. Create presentation from template (preserves master logos/fonts)
     print("\nCreating presentation...")
@@ -477,12 +412,8 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     """
     config = load_project_config(yaml_path)
 
-    # Try cached data first (fast); fall back to Excel extraction
-    data = _load_data_cache(config, yaml_path)
-    if data is None:
-        print("Extracting data from Excel...")
-        data = load_all_data(config)
-        _save_data_cache(data, config, yaml_path)
+    # Load data (from JSON if available, else extract from Excel)
+    data = load_all_data(config)
 
     pptx_path = output_path or config.output_path
     if not pptx_path or not os.path.exists(pptx_path):

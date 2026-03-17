@@ -15,8 +15,8 @@ pip install pandas openpyxl python-pptx lxml pyyaml pywin32
 ### Create a New Project
 
 1. Create the project folder: `projects/your_project/`
-2. Place source Excel in `projects/your_project/data/{wave}/source_data.xlsx`
-3. Place client asks/brief in `projects/your_project/reference/{wave}/` (markdown or docx)
+2. Place source Excel in `projects/your_project/input/wave/{wave}/source_data.xlsx`
+3. Place reference docs (KBQs, market context, survey context) in the same wave folder
 4. Optionally place a template deck in `projects/your_project/templates/template.pptx`
 5. In the Claude Code terminal, say: **`Create slides for projects/your_project`**
 
@@ -78,24 +78,28 @@ Regenerate all slides
 
 ```
 projects/{name}/
-  data/{wave}/source_data.xlsx     # Input: survey data (Excel)
-  reference/{wave}/asks.md         # Input: client asks
-  templates/template.pptx          # Input: slide template (optional)
+  input/wave/{wave}/source_data.xlsx  # Input: survey data (Excel)
+  input/wave/{wave}/*.md              # Input: reference docs (KBQs, market context, etc.)
+  templates/template.pptx             # Input: slide template (optional)
         ↓
 slidegen/pipeline/
-  config_generator.py              # Auto-discover Excel → scaffold config.yaml
-  project_config.py                # Load YAML → ProjectConfig dataclasses
-  data_loaders.py                  # Extract data blocks from Excel (5 methods)
-  slide_renderers.py               # Render slides (9 types)
-  orchestrator.py                  # Tie config + data + renderers → PPTX
+  project_config.py                   # Load YAML → ProjectConfig dataclasses
+  data_loaders.py                     # Extract data from Excel → JSON auto-cache
+  slide_renderers.py                  # Render slides (9 types)
+  orchestrator.py                     # Tie config + data + renderers → PPTX
         ↓
 projects/{name}/
-  config.yaml                      # Generated config (brands, sheets, extractions, asks)
-  output/{wave}/deck.pptx          # Generated deck
-  output/{wave}/slide_data.json    # Data cache (auto-invalidated)
-  output/{wave}/shape_registry.json # Shape state + data lineage
-  output/{wave}/backups/           # PPTX backups before edits
+  config.yaml                         # Generated config (brands, sheets, extractions, asks)
+  context/{wave}/source_data.json     # Auto-extracted data (JSON cache)
+  context/{wave}/hypothesis_bank.md   # System-generated analysis intermediates
+  output/{wave}/deck.pptx             # Generated deck
+  output/{wave}/shape_registry.json   # Shape state + data lineage
+  output/{wave}/backups/              # PPTX backups before edits
 ```
+
+### Data Loading (Auto-JSON)
+
+On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices. The JSON auto-invalidates when the Excel file changes (hash check). Delete `source_data.json` to force re-extraction.
 
 ### Data Extraction Methods
 
@@ -125,80 +129,39 @@ projects/{name}/
 
 ## Wave Versioning
 
-Data and output are versioned by wave (e.g. `PET_Q3Q4_2025`, `PET_Q1Q2_2026`). Templates are shared across waves.
+Data, context, and output are versioned by wave (e.g. `PET_Q3Q4_2025`, `PET_Q1Q2_2026`). Templates are shared across waves.
 
 ```
 projects/jnj_rybrevant/
   config.yaml
   templates/template.pptx              # shared across waves
-  data/
+  input/wave/
     PET_Q3Q4_2025/source_data.xlsx     # wave-versioned input
     PET_Q1Q2_2026/source_data.xlsx
+  context/
+    PET_Q3Q4_2025/                     # wave-versioned system-generated files
+      source_data.json                 #   auto-extracted from Excel
+      hypothesis_bank.md               #   analysis intermediates
+      slide_plan.md
   output/
     PET_Q3Q4_2025/                     # wave-versioned output
       deck.pptx
-      slide_data.json
       shape_registry.json
       backups/
     PET_Q1Q2_2026/deck.pptx
-  reference/
-    PET_Q3Q4_2025/asks.md              # wave-versioned asks
 ```
 
 In `config.yaml`, `{{wave}}` in paths is interpolated from `project.wave`:
 ```yaml
 project:
   wave: "PET_Q3Q4_2025"
-data_source_path: "data/{{wave}}/source_data.xlsx"
+data_source_path: "input/wave/{{wave}}/source_data.xlsx"
 template_path: "templates/template.pptx"           # no {{wave}} — shared
+context_path: "context/{{wave}}/"
 output_path: "output/{{wave}}/deck.pptx"
 ```
 
-To start a new wave: update `project.wave`, `period_current`, `period_prior` in config and place new data in `data/{new_wave}/`. Old wave output is preserved.
-
-## Data Setup
-
-Source Excel and client assets are **gitignored** (proprietary survey data).
-
-### Standard File Names
-
-| Folder | File | Purpose |
-|--------|------|---------|
-| `data/` | `source_data.xlsx` | Survey data (Excel) |
-| `data/` | `client_context.xlsx` | Market context (optional) |
-| `templates/` | `template.pptx` | Slide template |
-| `output/` | `deck.pptx` | Generated deck |
-| `reference/` | `asks.md` | Client asks (markdown) |
-| `reference/` | `asks_brief.docx` | Client asks (original doc) |
-
-### Excel Structure (J&J Rybrevant)
-
-All scripts read with `header=None` (0-indexed rows/cols):
-
-| Sheet | Key Columns |
-|-------|-------------|
-| **RYB** | col 0 = question code, col 1 = description, col 7 = Q3 Total, col 17 = Q4 Total |
-| **TAG** | col 0 = question code, col 1 = description, col 7 = Q3 Total, col 13 = Q4 Total |
-| **Additonal Analysis** | col 1 = metric, cols 2–5 = RYB/TAG Q3/Q4; rows 30–39 = message M/B/D |
-
-## J&J Rybrevant Deck Contents
-
-| # | Slide Type | Content |
-|---|------------|---------|
-| 1 | cover | Cover slide |
-| 2 | executive_summary | Executive Summary |
-| 3 | dual_bar_with_delta | RYB Message Recall & Effectiveness |
-| 4 | single_bar_with_delta | TAG Message Recall |
-| 5 | clustered_compare | Rep Performance — J&J vs AZ |
-| 6 | dual_bar_qoq | Message Believability & Composite Effectiveness |
-| 7 | clustered_compare | Call to Action — J&J vs AZ |
-| 8 | single_bar_with_delta | One J&J Vision — Follow-up Reps |
-| 9 | two_section_bar | Prescription Intent by Patient Type |
-| 10 | qoq_bar_with_delta | Share of Interaction Time by Topic |
-| 11 | clustered_compare | High Impact vs Non-High Impact Interactions |
-| 12 | single_bar_with_delta | Overall Quality Metrics |
-| 13 | clustered_compare | Mariposa 1st Discussed vs NOT |
-| 14 | stacked_order | TAG Message Recall Order |
+To start a new wave: update `project.wave`, `period_current`, `period_prior` in config and place new data in `input/wave/{new_wave}/`. Old wave output is preserved.
 
 ## Project Structure
 
@@ -206,16 +169,16 @@ All scripts read with `header=None` (0-indexed rows/cols):
 projects/                     # Project folders (one per product/brand)
   jnj_rybrevant/              # J&J Rybrevant PET Q4'25
     config.yaml                # Auto-generated YAML config
-    data/                      # Source Excel files (gitignored)
+    input/wave/                # Source files — user drop zone (gitignored)
+    context/                   # System-generated intermediates (gitignored)
     templates/                 # Template decks (gitignored)
     output/                    # Generated deliverables (gitignored)
-    reference/                 # Client briefs & asks (gitignored)
 
 slidegen/                     # SlideGen system
   pipeline/                   # Generic deck generation pipeline
     config_generator.py        # Data discovery + config scaffolding
     project_config.py          # ProjectConfig schema + YAML loader
-    data_loaders.py            # Generic data extractors (5 methods)
+    data_loaders.py            # Generic data extractors (5 methods) + JSON auto-cache
     slide_renderers.py         # 9 slide type renderers
     orchestrator.py            # Pipeline entry + per-slide regen + PPTX backup
   pptx_utils/                 # Utility package (8 modules)
@@ -247,7 +210,7 @@ docs/                         # Design docs & architecture notes
 
 | Package | Purpose |
 |---------|---------|
-| `pandas` | DataFrame operations |
+| `pandas` | DataFrame operations (Excel extraction only — first run per wave) |
 | `openpyxl` | Excel file reading |
 | `python-pptx` | PowerPoint generation |
 | `lxml` | XML manipulation for chart formatting |

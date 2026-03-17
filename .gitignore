@@ -1,9 +1,9 @@
-# ── Project data files (data, templates, output, reference per project) ──────
+# ── Project data files (input, context, templates, output per project) ───────
 # All proprietary content lives under projects/<name>/ subdirectories.
-projects/*/data/
+projects/*/input/
+projects/*/context/
 projects/*/templates/
 projects/*/output/
-projects/*/reference/
 projects/*/config_history/
 
 # ── Generated output files ───────────────────────────────────────────────────

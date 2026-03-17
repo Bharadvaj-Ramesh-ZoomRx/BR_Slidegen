@@ -14,23 +14,35 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 ├── projects/                  # Project folders (one per product/brand)
 │   └── jnj_rybrevant/         # J&J Rybrevant PET Q4'25
 │       ├── config.yaml        # YAML config — brands, sheets, extractions, asks
-│       ├── data/              # Source Excel files (gitignored)
-│       │   └── PET_Q3Q4_2025/ # Wave-versioned data subfolder
+│       ├── input/             # ★ USER DROP ZONE — all source files (gitignored)
+│       │   └── wave/                         # Update every wave
+│       │       └── PET_Q3Q4_2025/           #   One folder per wave
+│       │           ├── source_data.xlsx     #     Survey data (Excel)
+│       │           ├── call_notes.docx      #     Client call notes
+│       │           ├── hypotheses.xlsx      #     Wave hypotheses + client intel
+│       │           ├── prior_wave_es.md     #     Prior wave ES findings
+│       │           ├── pet_project_kbq.odt  #     Study design + KBQs
+│       │           ├── market_context.md    #     Curated market context
+│       │           ├── kbqs.md              #     Standing KBQs
+│       │           └── survey_context.md    #     Survey instrument + Q codes
+│       ├── context/           # ★ SYSTEM GENERATED intermediates (gitignored)
+│       │   └── PET_Q3Q4_2025/ # Wave-versioned context outputs
+│       │       ├── project_context.md        # Stage 1: /build-project-context
+│       │       ├── hypothesis_bank.md        # Stage 2: /hypotheses
+│       │       ├── slide_plan.md             # Stage 3: /slide-plan
+│       │       └── source_data.json          # Auto-extracted from Excel (JSON cache)
 │       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned output subfolder
 │       │       ├── deck.pptx          # Generated deck
-│       │       ├── slide_data.json    # JSON data cache (auto-invalidated)
 │       │       ├── shape_registry.json # Shape state with data lineage
 │       │       └── backups/           # PPTX backups before edits (max 10)
-│       ├── reference/         # Client briefs & asks (gitignored)
-│       │   └── PET_Q3Q4_2025/ # Wave-versioned reference docs
 │       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
 │   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
-│   │   ├── data_loaders.py    # 5 generic data extractors + load_all_data()
+│   │   ├── data_loaders.py    # 5 generic data extractors + JSON auto-cache
 │   │   ├── slide_renderers.py # 9 slide type renderers (RENDERERS registry)
 │   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding helpers
@@ -59,7 +71,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── generate_slide1.py # Single-slide POC generator
 │   │   └── validate_data.py   # Cross-check pkl against raw Excel
 │   ├── scripts/               # Ad-hoc exploration & discovery
-│   │   └── discover_data.py   # Explores Excel sheets, outputs column_mapping.csv
+│   │   └── discover_data.py   # Explores Excel sheets
 │   ├── explore*.py            # Early data exploration scripts
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
@@ -67,7 +79,6 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   ├── slidegen/              # ★ Primary skill (pipeline + utils + styling + references)
 │   │   └── references/        # Consolidated: function-ref, chart-patterns, brand-constants, archetypes
 │   └── pptx/                  # General PPTX read/create/edit skill (non-pipeline)
-├── column_mapping.csv
 └── .gitignore
 ```
 
@@ -95,15 +106,18 @@ python archive/scripts/discover_data.py    # Data exploration
 ```
 projects/jnj_rybrevant/config.yaml  →  ProjectConfig (dataclasses)
                                       ↓
-Excel file  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
+source_data.json (or Excel)  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
                                       ↓
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
                                       ↓
                       output/{wave}/deck.pptx
-                      output/{wave}/slide_data.json       (data cache)
                       output/{wave}/shape_registry.json   (shape state + lineage)
                       output/{wave}/backups/               (PPTX backups)
 ```
+
+### Data Loading (Auto-JSON)
+
+On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices, no question-code walking. The JSON auto-invalidates when the Excel file changes (hash check). Delete `source_data.json` to force re-extraction.
 
 ### Data Extraction Methods
 
@@ -148,7 +162,7 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 
 ## Dependencies
 
-- `pandas`, `openpyxl` (Excel reading)
+- `pandas`, `openpyxl` (Excel reading — only on first run per wave)
 - `python-pptx` (PowerPoint generation)
 - `lxml` (XML manipulation for native PPT charts)
 - `pyyaml` (YAML config loading)
@@ -217,9 +231,9 @@ Regenerate all slides
 
 When the user says **"Create slides for projects/{name}"** for a new project with data/reference/templates:
 
-1. **Verify folder structure** — Ensure `projects/{name}/data/{wave}/`, `reference/{wave}/`, `templates/` exist
+1. **Verify folder structure** — Ensure `projects/{name}/input/wave/{wave}/`, `templates/` exist
 2. **Discover data** — Run `discover_excel_structure()` on the source Excel to understand sheets, columns, question codes
-3. **Read reference docs** — Parse `reference/{wave}/asks.md` (or `.docx` via `python -m markitdown`) to understand what slides are needed
+3. **Read reference docs** — Parse reference files (`.md`, `.docx` via `python -m markitdown`) to understand what slides are needed
 4. **Read template** — Run `python -m markitdown template.pptx` to understand available layouts
 5. **Generate config scaffold** — Call `generate_config_scaffold()` for a starter YAML
 6. **Map asks to pipeline** — For each ask from the reference doc:
@@ -247,8 +261,8 @@ When the user says **"Edit slides with new wave data — {wave_id}"**:
 
 1. **Backup config** — Call `_backup_config()` to save timestamped copy
 2. **Update config** — Change `project.wave`, `period_current`, `period_prior` in config.yaml
-3. **Verify data** — Check `data/{wave_id}/source_data.xlsx` exists
-4. **Regenerate deck** — Run `generate_deck()` — output goes to `output/{wave_id}/deck.pptx`
+3. **Verify data** — Check `input/wave/{wave_id}/source_data.xlsx` exists
+4. **Regenerate deck** — Run `generate_deck()` — auto-extracts Excel → saves `source_data.json` → output goes to `output/{wave_id}/deck.pptx`
 5. **Report** — Old wave output is preserved, new wave output is in its own folder
 
 ## Workflow: Edit Slides with New Wave Data + New Asks
@@ -257,7 +271,7 @@ When the user says **"Edit slides with new wave data + new asks — {wave_id}"**
 
 1. **Backup config** — Call `_backup_config()` to save timestamped copy
 2. **Update wave** — Change `project.wave`, `period_current`, `period_prior`
-3. **Read new reference** — Parse `reference/{wave_id}/asks.md` for updated asks
+3. **Read new reference** — Parse reference docs for updated asks
 4. **Update config** — Modify extractions and asks in config.yaml to match new reference
 5. **Gap analysis** — Check if new asks need new extractors or renderers; extend if needed
 6. **Regenerate deck** — Run `generate_deck()` — output goes to `output/{wave_id}/deck.pptx`
@@ -271,14 +285,6 @@ Pipeline-generated slides assign `zrx_{slide:03d}_{shape:03d}` names to all shap
 - Per-slide regeneration without affecting other slides
 - PPTX backup before each `regenerate_slide()` call (stored in `output/{wave}/backups/`)
 
-## Data Cache
-
-The pipeline saves extracted data as JSON at `output/{wave}/slide_data.json` after each `generate_deck()`. On `regenerate_slide()`, the cache is used if:
-- Config file hasn't changed (MD5 hash check)
-- Source Excel hasn't been modified (mtime check)
-
-If either is stale, data is re-extracted from Excel and the cache is refreshed.
-
 ## Wave Versioning
 
 Each project supports wave-based folder versioning for input data and output:
@@ -287,15 +293,16 @@ Each project supports wave-based folder versioning for input data and output:
 project:
   wave: "PET_Q3Q4_2025"          # wave identifier
 
-data_source_path: "data/{{wave}}/source_data.xlsx"    # wave-versioned
+data_source_path: "input/wave/{{wave}}/source_data.xlsx"  # wave-versioned (user drop zone)
 template_path: "templates/template.pptx"              # shared (no {{wave}})
 output_path: "output/{{wave}}/deck.pptx"              # wave-versioned
+context_path: "context/{{wave}}/"                     # system-generated intermediates
 ```
 
 - `{{wave}}` in paths is interpolated from `project.wave` at config load time
 - Template stays flat — shared across waves (typically doesn't change)
-- Data and output get wave subfolders — old waves are preserved
-- To start a new wave: update `project.wave`, `period_current`, `period_prior` in config.yaml and place new data in `data/{new_wave}/`
+- Input, context, and output get wave subfolders — old waves are preserved
+- To start a new wave: update `project.wave`, `period_current`, `period_prior` in config.yaml and place new data in `input/wave/{new_wave}/`
 - If `wave` is omitted or empty, paths are used as-is (backward compatible)
 
 ## Config Versioning
@@ -303,3 +310,8 @@ output_path: "output/{{wave}}/deck.pptx"              # wave-versioned
 Before any config modification, a timestamped backup is saved:
 - Location: `projects/{name}/config_history/config_{YYYYMMDD_HHMMSS}.yaml`
 - These are gitignored by default
+
+# currentDate
+Today's date is 2026-03-16.
+
+      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.

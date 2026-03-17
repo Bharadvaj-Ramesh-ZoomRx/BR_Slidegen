@@ -12,24 +12,33 @@ project:
 # ── Paths ────────────────────────────────────────────────────────────────────
 # {{wave}} is interpolated at load time from project.wave above
 # Template stays flat (shared across waves); data/output are wave-versioned
-data_source_path: "data/{{wave}}/source_data.xlsx"
+data_source_path: "input/wave/{{wave}}/source_data.xlsx"
 template_path: "templates/template.pptx"
 section_icon_path: "templates/section_icon.png"
 output_path: "output/{{wave}}/deck.pptx"
+context_path: "context/{{wave}}/"
 
 # ── PowerPoint Sections ───────────────────────────────────────────────────────
 # Each section starts at the named ask and runs until the next section begins
 sections:
   - name: "Introduction"
     start: cover
-  - name: "Where J&J stands"
+  - name: "Messaging — Recall & Delivery"
+    start: ryb_mr_leaderboard
+  - name: "Messaging — Effectiveness"
     start: ryb_mr_me
-  - name: "Where can J&J team act?"
-    start: cta
-  - name: "Key Findings — Brand Perception & Rep Visit Impact"
+  - name: "Interactions — Setup & Tactics"
     start: share_of_time
+  - name: "Rep Performance"
+    start: rep_perf
+  - name: "Prescription Intent & Impact"
+    start: rx_intent
+  - name: "Branded Close / CTA"
+    start: cta
+  - name: "Drivers of High Impact"
+    start: hii_compare
   - name: "Appendix"
-    start: tag_recall_order
+    start: tag_mr
 
 # ── Brands ───────────────────────────────────────────────────────────────────
 brands:
@@ -293,8 +302,90 @@ extractions:
       ordinal_col: 2
       ordinals: ["1st", "2nd", "3rd", "4th"]
 
+  # ── NEW: Slide Plan Gap Extractions ────────────────────────────────────────
+
+  # Slide 4: Message Recall by Practice Setting (Q4 Academic vs Community)
+  - id: ryb_mr_ps
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q2_10Z"
+      max_rows: 20
+      columns: { acad_current: 23, comm_current: 24 }
+
+  # Slide 6: Message Recall by Visual Aid Usage (AA rows 71-80)
+  - id: va_mr_impact
+    method: row_range
+    sheet: analysis
+    params:
+      row_start: 71
+      row_end: 81
+      col_map:
+        label: 2
+        no_va: 3
+        yes_va: 4
+
+  # Slide 15: Rep Performance by Practice Setting (Q4 Academic vs Community)
+  - id: rep_perf_ps
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q1_87Z"
+      max_rows: 20
+      columns: { acad_current: 23, comm_current: 24 }
+      use_label_shortcuts: true
+
+  # Slide 17: Product Perception Change by HII (Q1_86Z, Q4 HII vs Others)
+  - id: perception_hii
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q1_86Z"
+      max_rows: 25
+      columns: { hi_current: 20, other_current: 19 }
+      label_shortcuts:
+        - keywords: ["Specific Indication"]
+          short: "Indication"
+        - keywords: ["Efficacy"]
+          short: "Efficacy"
+        - keywords: ["Safety", "side"]
+          short: "Safety / Side effects"
+        - keywords: ["Tolerability"]
+          short: "Tolerability"
+        - keywords: ["NCCN"]
+          short: "NCCN Guidelines"
+        - keywords: ["Patient types"]
+          short: "Patient types"
+        - keywords: ["Mutation"]
+          short: "Mutation testing"
+        - keywords: ["Dosing"]
+          short: "Dosing / Treatment duration"
+        - keywords: ["Route of Admin"]
+          short: "Route of Administration"
+        - keywords: ["Mechanism"]
+          short: "Mechanism of Action"
+        - keywords: ["Overall"]
+          short: "Overall perception"
+        - keywords: ["Patient support"]
+          short: "Patient support program"
+        - keywords: ["Proactive"]
+          short: "Proactive supportive care"
+
+  # Slide 21: Message Recall by HII (Q2_10Z, Q4 HII vs Others)
+  - id: hii_mr
+    method: question_code_multi_col
+    sheet: primary
+    params:
+      code: "Q2_10Z"
+      max_rows: 20
+      columns: { hi_current: 20, other_current: 19 }
+
 # ── Asks (Slides) ───────────────────────────────────────────────────────────
+# Ordered to match the Slide Plan (Q4 2025) narrative flow
 asks:
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Introduction
+  # ══════════════════════════════════════════════════════════════════════════
   - id: cover
     slide_type: cover
     headline: "{{primary.full_name}} Promotional Effectiveness\nTracking {{period_current}} Report"
@@ -313,6 +404,53 @@ asks:
     source_text: "Source: Lung SFEA SB — {{period_prior}} & {{period_current}}"
     data_key: ""
 
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Messaging — Recall & Delivery (Slide Plan 3, 4, 6)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 3 — Message Recall Leaderboard (MR only, QoQ)
+  - id: ryb_mr_leaderboard
+    slide_type: single_bar_with_delta
+    headline: "NCCN-NSCLC leads recall; OS and CNS messages declined QoQ — partially attributable to textual modifications"
+    section: "{{primary.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB Q2_10Z | Aided Message Recall | (n={{period_current}}: 100, {{period_prior}}: 103)"
+    data_key: ryb_mr
+    brand: primary
+    sort_by: current
+
+  # Slide Plan 4 — Message Recall by Practice Setting
+  - id: ryb_mr_by_setting
+    slide_type: clustered_compare
+    headline: "Community HCPs recall OS and CNS at substantially lower rates than academics"
+    section: "MESSAGE RECALL BY PRACTICE SETTING — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Lung SFEA SB Q2_10Z | Aided Message Recall | Academic (n=27), Community (n=73)"
+    data_key: ryb_mr_ps
+    sort_by: acad_current
+    extra:
+      series:
+        - { field: "acad", label: "Academic (n=27)", color: "#F75824" }
+        - { field: "comm", label: "Community (n=73)", color: "#FFC199" }
+      gap_header: "Gap (pp)"
+
+  # Slide Plan 6 — Visual Aid Usage & Impact on Recall
+  - id: va_impact
+    slide_type: clustered_compare
+    headline: "Message recall more than doubles when visual aids are used — community VA usage gap is the key action lever"
+    section: "VISUAL AID IMPACT ON MESSAGE RECALL — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Additonal Analysis | Aided Message Recall by VA Usage (Yes/No)"
+    data_key: va_mr_impact
+    sort_by: yes_va
+    extra:
+      series:
+        - { field: "yes_va", label: "VA Used (n=44)", color: "#F75824" }
+        - { field: "no_va", label: "No VA (n=56)", color: "#C0C0C0" }
+      gap_header: "Gap (pp)"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Messaging — Effectiveness (Slide Plan 7, 8)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 7 — Message Effectiveness (MR + ME Dual Bar)
   - id: ryb_mr_me
     slide_type: dual_bar_with_delta
     headline: "{{primary.name}} message recall declined broadly; new NCCN messages gained traction while effectiveness remained strong"
@@ -333,27 +471,7 @@ asks:
         label: "Effectiveness^ (IA = 74%)\n(d = 41)"
         delta_header: "Δ"
 
-  - id: tag_mr
-    slide_type: single_bar_with_delta
-    headline: "{{competitor.name}} message recall declined; new messages on risk reduction and daily dosing entered mid-range"
-    section: "{{competitor.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
-    source_text: "Source: Lung SFEA SB Q2_10Z"
-    data_key: tag_mr
-    brand: competitor
-    sort_by: current
-
-  - id: rep_perf
-    slide_type: clustered_compare
-    headline: "J&J reps outperform AZ across all 15 rep quality metrics"
-    section: "REP PERFORMANCE — J&J vs AZ — {{period_current}}"
-    source_text: "Source: Lung SFEA SB — Sales_Rep_Effectiveness_PET_RF_2 | Top 2 Box (6,7)"
-    data_key: rep_perf
-    sort_by: primary_current
-    extra:
-      series:
-        - { field: "primary", label: "J&J ({{primary.name}})" }
-        - { field: "comp", label: "AZ ({{competitor.name}})" }
-
+  # Slide Plan 8 — ME: Believability & Composite Effectiveness
   - id: mbd
     slide_type: dual_bar_qoq
     headline: "Message effectiveness driven primarily by believability; composite effectiveness remained stable QoQ"
@@ -366,6 +484,107 @@ asks:
       left: { field_prefix: "believ", label: "Believability (%)" }
       right: { field_prefix: "me", label: "Composite Effectiveness (%)" }
 
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Interactions — Setup & Tactics (Slide Plan 11)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 11 — Share of Interaction Time by Topic
+  - id: share_of_time
+    slide_type: qoq_bar_with_delta
+    headline: "Efficacy discussions surged; safety and guidelines topics saw shifts"
+    section: "SHARE OF INTERACTION TIME BY TOPIC — {{primary.name}} — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB — VQ_Share_of_Time_RYB_SFEA | % of interactions"
+    data_key: share_of_time
+    brand: primary
+    sort_by: current
+
+  # Slide Plan 22 — MARIPOSA Prioritization & Impact
+  - id: mariposa_rep_perf
+    slide_type: clustered_compare
+    headline: "MARIPOSA-first interactions show higher rep performance on compelling reason to Rx"
+    section: "REP PERFORMANCE — MARIPOSA 1st DISCUSSED vs NOT — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Additonal Analysis | Top 2 Box (6,7)"
+    data_key: mariposa_rep
+    sort_by: segment_a
+    extra:
+      series:
+        - { field: "segment_a", label: "MARIPOSA 1st (n=79)" }
+        - { field: "segment_b", label: "Not 1st (n=21)", color: "#BFBFBF" }
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Rep Performance (Slide Plan 13, 14, 15)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 13 — Rep Performance: RYB vs TAG Attribute Comparison
+  - id: rep_perf
+    slide_type: clustered_compare
+    headline: "J&J reps lead AZ across most rep quality attributes, driven by implementation guide"
+    section: "REP PERFORMANCE — J&J vs AZ — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Sales_Rep_Effectiveness_PET_RF_2 | Top 2 Box (6,7)"
+    data_key: rep_perf
+    sort_by: primary_current
+    extra:
+      series:
+        - { field: "primary", label: "J&J ({{primary.name}})" }
+        - { field: "comp", label: "AZ ({{competitor.name}})" }
+
+  # Slide Plan 14 — Rep Performance QoQ Trend
+  - id: rep_perf_qoq
+    slide_type: qoq_bar_with_delta
+    headline: "Addressing HCP questions improved meaningfully QoQ; implementation guide drives gains on preparedness"
+    section: "REP PERFORMANCE QoQ TREND — {{primary.name}} — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | Top 2 Box (6,7)"
+    data_key: ryb_quality
+    brand: primary
+    sort_by: current
+
+  # Slide Plan 15 — Rep Performance by Practice Setting
+  - id: rep_perf_by_setting
+    slide_type: clustered_compare
+    headline: "Community lags on clarity and competitor knowledge — targeted VA usage for comparative data is the recommended lever"
+    section: "REP PERFORMANCE BY PRACTICE SETTING — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | Top 2 Box (6,7) | Academic (n=27), Community (n=73)"
+    data_key: rep_perf_ps
+    sort_by: acad_current
+    extra:
+      series:
+        - { field: "acad", label: "Academic (n=27)", color: "#F75824" }
+        - { field: "comm", label: "Community (n=73)", color: "#FFC199" }
+      gap_header: "Gap (pp)"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Prescription Intent & Impact (Slide Plan 16, 17)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 16 — LTIP: RYB vs TAG QoQ
+  - id: rx_intent
+    slide_type: two_section_bar
+    headline: "{{primary.name}} intent to increase Rx rose sharply for patients w/o CNS; {{competitor.name}} chemo intent held steady"
+    section: "PRESCRIPTION INTENT (INCREASE Rx) BY PATIENT TYPE — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — C1_85DZ (RYB), C1_85D_TAG2_mNSCLCZ (TAG) | Top 2 Box (6,7)"
+    data_key: rx_combined
+    extra:
+      top: { data_key: "ryb_rx", label: "{{primary.name}} — Intent to Increase Rx", brand: "primary" }
+      bottom: { data_key: "tag_rx", label: "{{competitor.name}}+Chemo — Intent to Increase Rx", brand: "competitor" }
+
+  # Slide Plan 17 — Product Perception Change by HII
+  - id: perception_change_hii
+    slide_type: clustered_compare
+    headline: "HII interactions drive stronger perception improvement on efficacy and NCCN — validating J&J's efficacy-first strategy"
+    section: "PRODUCT PERCEPTION CHANGE POST-INTERACTION — HII vs OTHERS — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_86Z | Top 2 Box (6,7) | HII = Top Box Quality + T2B LTIP"
+    data_key: perception_hii
+    sort_by: hi_current
+    extra:
+      series:
+        - { field: "hi", label: "High Impact (n=63)", color: "#F75824" }
+        - { field: "other", label: "Non-High Impact (n=37)", color: "#C0C0C0" }
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Branded Close / CTA (Slide Plan 18)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Slide Plan 18 — Branded Closing & CTA
   - id: cta
     slide_type: clustered_compare
     headline: "{{primary.name}} reps improved on 'changed opinion'; branded closing dipped slightly vs {{period_prior}}"
@@ -388,57 +607,50 @@ asks:
     brand: primary
     sort_by: current
 
-  - id: rx_intent
-    slide_type: two_section_bar
-    headline: "{{primary.name}} intent to increase Rx rose sharply for patients w/o CNS; {{competitor.name}} chemo intent held steady"
-    section: "PRESCRIPTION INTENT (INCREASE Rx) BY PATIENT TYPE — {{period_current}}"
-    source_text: "Source: Lung SFEA SB — C1_85DZ (RYB), C1_85D_TAG2_mNSCLCZ (TAG) | Top 2 Box (6,7)"
-    data_key: rx_combined
-    extra:
-      top: { data_key: "ryb_rx", label: "{{primary.name}} — Intent to Increase Rx", brand: "primary" }
-      bottom: { data_key: "tag_rx", label: "{{competitor.name}}+Chemo — Intent to Increase Rx", brand: "competitor" }
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Drivers of High Impact (Slide Plan 20, 21)
+  # ══════════════════════════════════════════════════════════════════════════
 
-  - id: share_of_time
-    slide_type: qoq_bar_with_delta
-    headline: "Efficacy discussions surged; safety and guidelines topics saw shifts"
-    section: "SHARE OF INTERACTION TIME BY TOPIC — {{primary.name}} — {{period_current}} vs {{period_prior}}"
-    source_text: "Source: Lung SFEA SB — VQ_Share_of_Time_RYB_SFEA | % of interactions"
-    data_key: share_of_time
-    brand: primary
-    sort_by: current
-
+  # Slide Plan 20 — HII: Rep Performance Attribute Comparison
   - id: hii_compare
     slide_type: clustered_compare
     headline: "High-impact interactions drive significantly higher rep quality scores across all key metrics"
-    section: "HIGH IMPACT vs NON-HIGH IMPACT INTERACTIONS — KEY DIFFERENTIATORS — {{period_current}}"
-    source_text: "Source: Lung SFEA SB — Q1_87Z | High Impact = Top Box Overall Quality + Intent to Prescribe"
+    section: "HIGH IMPACT vs NON-HIGH IMPACT — REP PERFORMANCE — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | High Impact = Top Box Overall Quality + T2B Intent to Prescribe"
     data_key: hii_compare
     extra:
       series:
-        - { field: "hi", label: "High Impact", color: "#F75824" }
-        - { field: "other", label: "Non-High Impact", color: "#C0C0C0" }
+        - { field: "hi", label: "High Impact (n=63)", color: "#F75824" }
+        - { field: "other", label: "Non-High Impact (n=37)", color: "#C0C0C0" }
 
-  - id: quality_overview
-    slide_type: single_bar_with_delta
-    headline: "Overall quality metrics for {{primary.name}} reps remained stable to positive"
-    section: "OVERALL CALL QUALITY METRICS — {{primary.name}} — {{period_current}}"
-    source_text: "Source: Lung SFEA SB — Q1_87Z | Top 2 Box (6,7)"
-    data_key: ryb_quality
-    brand: primary
-    sort_by: current
-
-  - id: mariposa_rep_perf
+  # Slide Plan 21 — HII: Message Recall in High Impact Interactions
+  - id: hii_message_recall
     slide_type: clustered_compare
-    headline: "Mariposa-first interactions show higher rep performance on compelling reason to Rx"
-    section: "REP PERFORMANCE — MARIPOSA 1st DISCUSSED vs NOT — {{period_current}}"
-    source_text: "Source: Lung SFEA SB — Additonal Analysis | Top 2 Box (6,7) | Overlapped vs Non-overlapped"
-    data_key: mariposa_rep
-    sort_by: segment_a
+    headline: "Efficacy (OS, CNS) and NCCN messages show highest recall differential in high-impact interactions"
+    section: "HIGH IMPACT vs NON-HIGH IMPACT — MESSAGE RECALL — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q2_10Z | High Impact = Top Box Overall Quality + T2B Intent to Prescribe"
+    data_key: hii_mr
+    sort_by: hi_current
     extra:
       series:
-        - { field: "segment_a", label: "Mariposa 1st (n=58)" }
-        - { field: "segment_b", label: "Not 1st (n=42)", color: "#BFBFBF" }
+        - { field: "hi", label: "High Impact (n=63)", color: "#F75824" }
+        - { field: "other", label: "Non-High Impact (n=37)", color: "#C0C0C0" }
 
+  # ══════════════════════════════════════════════════════════════════════════
+  # SECTION: Appendix
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # TAG Message Recall
+  - id: tag_mr
+    slide_type: single_bar_with_delta
+    headline: "{{competitor.name}} message recall declined; new messages on risk reduction and daily dosing entered mid-range"
+    section: "{{competitor.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Lung SFEA SB Q2_10Z"
+    data_key: tag_mr
+    brand: competitor
+    sort_by: current
+
+  # TAG Recall Order
   - id: tag_recall_order
     slide_type: stacked_order
     headline: "TAG message recall order: NCCN and mPFS messages most frequently recalled first"
@@ -447,3 +659,13 @@ asks:
     data_key: tag_recall_order
     brand: competitor
     sort_by: total_current
+
+  # RYB Quality Overview (supplementary detail)
+  - id: quality_overview
+    slide_type: single_bar_with_delta
+    headline: "Overall quality metrics for {{primary.name}} reps remained stable to positive"
+    section: "OVERALL CALL QUALITY METRICS — {{primary.name}} — {{period_current}}"
+    source_text: "Source: Lung SFEA SB — Q1_87Z | Top 2 Box (6,7)"
+    data_key: ryb_quality
+    brand: primary
+    sort_by: current

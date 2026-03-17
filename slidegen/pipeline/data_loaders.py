@@ -3,11 +3,21 @@ data_loaders.py — Generic data extraction functions.
 
 All the repeated "find code, walk rows, extract Q3/Q4" patterns
 from generate_asks.py are consolidated here into reusable extractors.
+
+Auto-JSON mode: On first run, data is extracted from Excel and saved as
+`source_data.json` alongside the Excel file. Subsequent runs read the JSON
+directly — no pandas, no column indices, no question-code walking. Delete
+`source_data.json` to force re-extraction, or it auto-invalidates when the
+Excel file changes.
 """
 
 from __future__ import annotations
+import hashlib
+import json
 import logging
+import os
 import pandas as pd
+from datetime import datetime
 from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
@@ -311,16 +321,85 @@ def extract_nested_ordinal(
     return results
 
 
-# ── Master loader ────────────────────────────────────────────────────────────
+# ── JSON auto-cache ─────────────────────────────────────────────────────────
 
-def load_all_data(config) -> dict:
-    """Load all data extractions defined in the project config.
+def _file_hash(path: str) -> str:
+    """Fast MD5 hash of a file for staleness checks."""
+    with open(path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()[:12]
 
-    Args:
-        config: ProjectConfig instance
 
-    Returns:
-        dict mapping extraction.id → list[dict]
+def _json_path_for(config) -> str:
+    """Return path to source_data.json in the context folder."""
+    if config.context_path:
+        return os.path.join(config.context_path, "source_data.json")
+    # Fallback: next to the Excel file
+    return os.path.join(
+        os.path.dirname(config.data_source_path), "source_data.json"
+    )
+
+
+def _load_source_json(config) -> dict | None:
+    """Load source_data.json if it exists and is not stale.
+
+    Returns None if missing or if the Excel file has changed since extraction.
+    """
+    json_path = _json_path_for(config)
+    if not os.path.exists(json_path):
+        return None
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    meta = payload.get("_meta", {})
+
+    # Invalidate if Excel file changed
+    if os.path.exists(config.data_source_path):
+        current_hash = _file_hash(config.data_source_path)
+        if meta.get("excel_hash") != current_hash:
+            print("  source_data.json stale (Excel changed) — re-extracting")
+            return None
+
+    # Strip _meta, return data dict
+    data = {k: v for k, v in payload.items() if k != "_meta"}
+    print(f"  Loaded from JSON: {json_path} ({len(data) - 1} extractions)")
+    return data
+
+
+def _save_source_json(data: dict, config) -> str:
+    """Save extracted data as source_data.json next to the Excel file."""
+    json_path = _json_path_for(config)
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+
+    excel_hash = ""
+    if os.path.exists(config.data_source_path):
+        excel_hash = _file_hash(config.data_source_path)
+
+    payload = {
+        "_meta": {
+            "extracted_at": datetime.now().isoformat(),
+            "excel_file": os.path.basename(config.data_source_path),
+            "excel_hash": excel_hash,
+            "wave": config.wave,
+        },
+    }
+    payload.update(data)
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, default=str)
+
+    print(f"  Saved: {json_path}")
+    return json_path
+
+
+# ── Excel extraction (internal) ─────────────────────────────────────────────
+
+def _extract_all_from_excel(config) -> dict:
+    """Run all extraction methods against the Excel source.
+
+    This is the heavy-lift function that reads Excel via pandas and runs
+    the 5 extraction methods. Called only when source_data.json is missing
+    or stale.
     """
     # Load Excel sheets
     sheets_data = {}
@@ -424,7 +503,35 @@ def load_all_data(config) -> dict:
         if ex.id in data and isinstance(data[ex.id], list) and len(data[ex.id]) == 0:
             logger.warning("Extraction '%s' (method=%s) returned 0 rows", ex.id, ex.method)
 
-    # Store sample sizes
+    return data
+
+
+# ── Master loader ────────────────────────────────────────────────────────────
+
+def load_all_data(config) -> dict:
+    """Load all data extractions — from JSON if available, else from Excel.
+
+    Flow:
+      1. Check for source_data.json next to the Excel file
+      2. If found and Excel unchanged → load JSON (fast, no pandas)
+      3. If missing or stale → extract from Excel → save source_data.json
+
+    Args:
+        config: ProjectConfig instance
+
+    Returns:
+        dict mapping extraction.id → list[dict]
+    """
+    # Try JSON first
+    data = _load_source_json(config)
+
+    if data is None:
+        # Extract from Excel and save JSON for next time
+        print("  Extracting from Excel...")
+        data = _extract_all_from_excel(config)
+        _save_source_json(data, config)
+
+    # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes
 
     return data

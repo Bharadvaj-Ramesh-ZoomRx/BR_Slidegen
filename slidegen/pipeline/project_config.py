@@ -110,6 +110,7 @@ class ProjectConfig:
     output_path: str = ""
     template_path: str = ""
     data_source_path: str = ""
+    context_path: str = ""       # wave-versioned context folder (system-generated files)
     section_icon_path: str = ""  # small icon for section header bars
 
     @property
@@ -253,6 +254,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     data_path = _resolve_path(raw.get("data_source_path", ""))
     tmpl_path = _resolve_path(raw.get("template_path", ""))
     out_path = _resolve_path(raw.get("output_path", ""))
+    ctx_path = _resolve_path(raw.get("context_path", ""))
     icon_path = _resolve_path(raw.get("section_icon_path", ""))
 
     # Sections (optional): [{"name": "...", "start": "ask_id"}, ...]
@@ -275,5 +277,6 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         output_path=out_path,
         template_path=tmpl_path,
         data_source_path=data_path,
+        context_path=ctx_path,
         section_icon_path=icon_path,
     )
