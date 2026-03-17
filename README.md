@@ -16,11 +16,17 @@ pip install pandas openpyxl python-pptx lxml pyyaml pywin32
 
 1. Create the project folder: `projects/your_project/`
 2. Place source Excel in `projects/your_project/input/wave/{wave}/source_data.xlsx`
-3. Place reference docs (KBQs, market context, survey context) in the same wave folder
+3. Place reference docs in the same wave folder:
+   - `market_context.md` — curated market, disease, product, competitive context
+   - `kbqs.md` — standing key business questions
+   - `survey_context.md` — survey instrument, question codes, response scales
+   - `call_notes.docx` — client call notes (optional)
+   - `pet_project_kbq.odt` — study design + KBQs (optional)
+   - `prior_wave_es.md` — prior wave executive summary findings (optional)
 4. Optionally place a template deck in `projects/your_project/templates/template.pptx`
 5. In the Claude Code terminal, say: **`Create slides for projects/your_project`**
 
-Claude Code auto-discovers the Excel structure, reads the reference docs, generates `config.yaml`, and builds the deck.
+Claude Code runs a 5-stage pipeline: builds project context → generates hypotheses → creates slide plan → writes config.yaml → builds the deck.
 
 ### Run an Existing Project
 
@@ -76,25 +82,38 @@ Regenerate all slides
 
 ## Architecture
 
+### Full Create Pipeline (5 Stages)
+
 ```
-projects/{name}/
-  input/wave/{wave}/source_data.xlsx  # Input: survey data (Excel)
-  input/wave/{wave}/*.md              # Input: reference docs (KBQs, market context, etc.)
-  templates/template.pptx             # Input: slide template (optional)
+input/wave/{wave}/                       # User drop zone
+  source_data.xlsx                       #   Survey data
+  market_context.md, kbqs.md, ...        #   Reference docs
         ↓
-slidegen/pipeline/
-  project_config.py                   # Load YAML → ProjectConfig dataclasses
-  data_loaders.py                     # Extract data from Excel → JSON auto-cache
-  slide_renderers.py                  # Render slides (9 types)
-  orchestrator.py                     # Tie config + data + renderers → PPTX
+Stage 1: /build-project-context          # Synthesize → project_context.md
+Stage 2: /hypotheses                     # Generate → hypothesis_bank.md
+Stage 3: /slide-plan                     # Plan → slide_plan.md
+Stage 4: config.yaml                     # Map slides to extractions + renderers
+Stage 5: generate_deck()                 # Build → deck.pptx
         ↓
-projects/{name}/
-  config.yaml                         # Generated config (brands, sheets, extractions, asks)
-  context/{wave}/source_data.json     # Auto-extracted data (JSON cache)
-  context/{wave}/hypothesis_bank.md   # System-generated analysis intermediates
-  output/{wave}/deck.pptx             # Generated deck
-  output/{wave}/shape_registry.json   # Shape state + data lineage
-  output/{wave}/backups/              # PPTX backups before edits
+context/{wave}/                          # System-generated intermediates
+  project_context.md                     #   Stage 1 output
+  hypothesis_bank.md                     #   Stage 2 output
+  slide_plan.md                          #   Stage 3 output
+  source_data.json                       #   Auto-extracted from Excel (JSON cache)
+output/{wave}/
+  deck.pptx                             #   Generated deck
+  shape_registry.json                    #   Shape state + data lineage
+  backups/                               #   PPTX backups before edits
+```
+
+### Slide Generation Pipeline
+
+```
+projects/{name}/config.yaml  →  ProjectConfig (dataclasses)
+                                      ↓
+source_data.json (or Excel)  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
+                                      ↓
+orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)  →  deck.pptx
 ```
 
 ### Data Loading (Auto-JSON)

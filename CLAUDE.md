@@ -19,7 +19,6 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │       └── PET_Q3Q4_2025/           #   One folder per wave
 │       │           ├── source_data.xlsx     #     Survey data (Excel)
 │       │           ├── call_notes.docx      #     Client call notes
-│       │           ├── hypotheses.xlsx      #     Wave hypotheses + client intel
 │       │           ├── prior_wave_es.md     #     Prior wave ES findings
 │       │           ├── pet_project_kbq.odt  #     Study design + KBQs
 │       │           ├── market_context.md    #     Curated market context
@@ -227,22 +226,53 @@ Move Slide 10 before Slide 5
 Regenerate all slides
 ```
 
-## Workflow: Create Slides
+## Workflow: Create Slides (Full 5-Stage Pipeline)
 
-When the user says **"Create slides for projects/{name}"** for a new project with data/reference/templates:
+When the user says **"Create slides for projects/{name}"** or **"Run the full create workflow"**:
 
-1. **Verify folder structure** — Ensure `projects/{name}/input/wave/{wave}/`, `templates/` exist
-2. **Discover data** — Run `discover_excel_structure()` on the source Excel to understand sheets, columns, question codes
-3. **Read reference docs** — Parse reference files (`.md`, `.docx` via `python -m markitdown`) to understand what slides are needed
-4. **Read template** — Run `python -m markitdown template.pptx` to understand available layouts
-5. **Generate config scaffold** — Call `generate_config_scaffold()` for a starter YAML
-6. **Map asks to pipeline** — For each ask from the reference doc:
-   - Match to an existing extraction method (`question_code`, `row_range`, etc.)
-   - Match to an existing slide type (`single_bar_with_delta`, `clustered_compare`, etc.)
-   - If no existing method/type fits → add a new extractor to `data_loaders.py` or new renderer to `slide_renderers.py` (follow existing patterns, don't modify existing code)
-7. **Write config.yaml** — Complete the YAML with all extractions and asks
-8. **Generate deck** — Run `generate_deck("projects/{name}/config.yaml")`
-9. **Visual QA** — Convert to images, inspect for layout issues, fix and re-run
+**IMPORTANT: After each stage, pause and present a summary of what was generated to the user. Wait for the user to confirm before proceeding to the next stage.** This ensures the user can review and correct the output at each step before it feeds into downstream stages.
+
+### Stage 1 — Build Project Context (`/build-project-context`)
+Reads source documents from `input/wave/{wave}/` (call_notes.docx, pet_project_kbq.odt, market_context.md, kbqs.md, prior_wave_es.md) and synthesizes them into `context/{wave}/project_context.md` — a structured file covering study design, KBQs, wave-specific hypotheses, analytical priorities, methodology notes, and message reference.
+**→ Pause:** Show section headers + key content summary. Ask user to confirm before Stage 2.
+
+### Stage 2 — Generate Hypothesis Bank (`/hypotheses`)
+Reads market_context.md, project_context.md, kbqs.md, and survey_context.md from the input/context folders. Produces `context/{wave}/hypothesis_bank.md` — testable predictions organized by KBQ domain, each with rationale, "Test with:" question codes, methodology artifact flags, and action item flags. No Excel hypothesis file needed — all hypotheses are derived from context files.
+**→ Pause:** Show total hypothesis count, domain breakdown, methodology artifacts, and action items. Ask user to confirm before Stage 3.
+
+### Stage 3 — Build Slide Plan (`/slide-plan`)
+Reads the hypothesis bank, KBQs, and survey context. Clusters hypotheses into slides by shared question codes and story themes, deduplicates, sequences into narrative sections. Produces `context/{wave}/slide_plan.md` — one entry per slide with chart type, question codes, segment cuts, and narrative arc.
+**→ Pause:** Show slide count, section breakdown, and slide titles. Ask user to confirm before Stage 4.
+
+### Stage 4 — Generate config.yaml
+Maps the slide plan to YAML extractions and asks. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. Uses the 5 extraction methods and 9 slide types to match the analytical specification.
+**→ Pause:** Show extraction count, ask count, and any gaps (slides in the plan that couldn't be mapped). Ask user to confirm before Stage 5.
+
+### Stage 5 — Run `generate_deck()`
+Executes the pipeline: loads config → extracts data (or reads JSON cache) → renders all slides → saves `output/{wave}/deck.pptx`.
+**→ Pause:** Report success/failure, slide count, and output path.
+
+```
+input/wave/{wave}/*.md + *.xlsx + *.docx + *.odt
+    ↓ Stage 1: /build-project-context
+context/{wave}/project_context.md
+    ✋ User confirms
+    ↓ Stage 2: /hypotheses
+context/{wave}/hypothesis_bank.md
+    ✋ User confirms
+    ↓ Stage 3: /slide-plan
+context/{wave}/slide_plan.md
+    ✋ User confirms
+    ↓ Stage 4: config.yaml
+projects/{name}/config.yaml
+    ✋ User confirms
+    ↓ Stage 5: generate_deck()
+output/{wave}/deck.pptx
+```
+
+### Manual / Incremental Workflow
+
+For projects with an existing config, or when making targeted changes:
 
 ## Workflow: Edit Slide
 
