@@ -8,5 +8,6 @@ Usage:
 
 from slidegen.pipeline.orchestrator import generate_deck, regenerate_slide
 from slidegen.pipeline.data_loaders import index_excel
+from slidegen.pipeline.synapse_fetcher import fetch_synapse_data
 
-__all__ = ["generate_deck", "regenerate_slide", "index_excel"]
+__all__ = ["generate_deck", "regenerate_slide", "index_excel", "fetch_synapse_data"]

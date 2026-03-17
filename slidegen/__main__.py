@@ -12,14 +12,16 @@ def main():
         "Usage: python -m slidegen <command> [args]\n"
         "\n"
         "Commands:\n"
-        "  create      Create a demo slide (or import SlideBuilder for custom)\n"
-        "  edit        Interactive live editor (requires open PowerPoint)\n"
-        "  reconcile   Sync registry from live PowerPoint state\n"
+        "  create        Create a demo slide (or import SlideBuilder for custom)\n"
+        "  edit          Interactive live editor (requires open PowerPoint)\n"
+        "  reconcile     Sync registry from live PowerPoint state\n"
+        "  fetch-synapse Fetch fresh data from Synapse async API → source_data.xlsx\n"
         "\n"
         "Examples:\n"
         "  python -m slidegen create\n"
         "  python -m slidegen edit demo_slide.pptx\n"
         "  python -m slidegen reconcile demo_slide.pptx\n"
+        "  python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml --url <url>\n"
     )
 
     if len(sys.argv) < 2:
@@ -38,6 +40,9 @@ def main():
         _cli()
     elif cmd == "reconcile":
         from slidegen.reconcile import _cli
+        _cli()
+    elif cmd == "fetch-synapse":
+        from slidegen.pipeline.synapse_fetcher import _cli
         _cli()
     else:
         print(f"Unknown command: {cmd}\n")

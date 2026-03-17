@@ -112,6 +112,7 @@ class ProjectConfig:
     data_source_path: str = ""
     context_path: str = ""       # wave-versioned context folder (system-generated files)
     section_icon_path: str = ""  # small icon for section header bars
+    synapse_api_url: str = ""    # optional Synapse API base URL (for fetch-synapse CLI)
 
     @property
     def primary(self) -> BrandConfig:
@@ -279,4 +280,5 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         data_source_path=data_path,
         context_path=ctx_path,
         section_icon_path=icon_path,
+        synapse_api_url=raw.get("synapse_api_url", ""),
     )

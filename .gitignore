@@ -5,6 +5,7 @@ projects/*/context/
 projects/*/templates/
 projects/*/output/
 projects/*/config_history/
+projects/*/config.yaml
 
 # ── Generated output files ───────────────────────────────────────────────────
 output/
