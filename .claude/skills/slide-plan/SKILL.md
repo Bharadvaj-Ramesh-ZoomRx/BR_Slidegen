@@ -55,13 +55,62 @@ For each cluster:
 - Assign a **slide title** — a short, declarative label (not a question; not a finding — a topic label, e.g., "Message Recall by Practice Setting")
 - Identify the **driving question** — the single analytical question this slide must answer (e.g., "Are community HCPs recalling OS and CNS messages at the same rate as academic HCPs?")
 - List the **hypotheses tested** (e.g., H6, H11)
-- Identify the **primary chart or table type** — based on question code and data type (e.g., horizontal bar / stacked bar / line / table / scatter)
+- Assign the **slide_type** — use the exact value from the Chart Type → slide_type Mapping table below. This must be a valid renderer key, not a generic description.
 - List **question codes with text** — from Survey Context
 - List **segment cuts** needed
 - Write a **narrative arc** — one sentence: what the slide should conclude if hypotheses hold
 - Flag any **methodology artifacts** or **action items**
 
 If a hypothesis cluster is too large for one slide, split it. If two clusters tell the same story with the same chart, merge them.
+
+### Chart Type → `slide_type` Mapping
+
+Use this table to select the correct `slide_type` for each slide. Choose based on the data pattern and analytical goal — not the generic chart name.
+
+| `slide_type` | When to use | Data pattern |
+|---|---|---|
+| `cover` | Title slide | N/A |
+| `executive_summary` | Bullet-list insights / recommendations | Text only |
+| `single_bar_with_delta` | One brand, one metric, ranked list with QoQ delta | Single question code, prior + current values per row |
+| `dual_bar_with_delta` | Two metrics side-by-side (e.g., MR left + ME right) with deltas | Two question codes for the same brand, same category list |
+| `dual_bar_qoq` | Two side-by-side Q4-vs-Q3 clustered bars (e.g., MR for two brands) | Same question across two brands, each with prior + current |
+| `clustered_compare` | Two groups compared on same metric (brand vs brand, segment vs segment) with gap/delta | One question code, two brands or segments as separate series |
+| `dual_bar_compare` | Two separate brand bar charts side-by-side with shared category column | Same question, two brands, need visual separation (not overlaid) |
+| `qoq_bar_with_delta` | Single chart showing Q4 vs Q3 clustered bars + delta column | One question, one brand, prior + current as clustered pair |
+| `two_section_bar` | Two vertically stacked bar sections on one slide (e.g., RYB top + TAG bottom) | Two brands or segments shown in separate chart areas, same metric |
+| `stacked_order` | Stacked bar with ordinal breakdown (1st/2nd/3rd recall) + total column | One question with ordinal sub-rows (nested recall order) |
+| `abacus` | XY scatter abacus with prior/current dots, value columns, QoQ delta | Attribute ratings with prior + current, need precise comparison |
+| `message_mbd` | Multi-column abacus for MBD (Motivation, Believability, Differentiation) | ME question with sub-dimensions (M/B/D), plus composite effectiveness |
+
+**Selection decision tree:**
+```
+Single brand, single metric, ranked list?
+  → single_bar_with_delta
+
+Same metric, two brands or segments compared?
+  → clustered_compare (overlaid bars)
+  → dual_bar_compare (side-by-side separated charts)
+  → two_section_bar (stacked vertically)
+
+Two related metrics for same brand (e.g., MR + ME)?
+  → dual_bar_with_delta
+
+QoQ comparison (current vs prior period)?
+  → qoq_bar_with_delta (single brand)
+  → dual_bar_qoq (two brands, side-by-side)
+
+Recall order breakdown (1st/2nd/3rd)?
+  → stacked_order
+
+Attribute ratings / rep performance?
+  → abacus (with value columns and delta)
+
+Message effectiveness with M/B/D sub-dimensions?
+  → message_mbd
+
+Text-only insights?
+  → executive_summary
+```
 
 ---
 
@@ -121,7 +170,8 @@ Place methodology artifact slides adjacent to the substantive slide they affect 
 ### Slide [N] — [Slide Title]
 **Driving question:** [The single analytical question this slide must answer]
 **Hypotheses tested:** H[x], H[y], H[z]
-**Chart type:** [horizontal bar / stacked bar / line / table / scatter — be specific]
+**slide_type:** [exact value from the Chart Type → slide_type Mapping table, e.g., `single_bar_with_delta`]
+**Chart description:** [Specific layout details: sorted by what, delta column, segment splits, etc.]
 **Primary questions:**
 - [Q code] — "[Question text]"
 - [Q code] — "[Question text]"
@@ -148,7 +198,7 @@ After generating the slide plan in the conversation, write it to a file named `S
 2. **Every hypothesis must appear on at least one slide.** If a hypothesis has no cluster match, create a standalone slide for it.
 3. **Methodology artifact hypotheses stay adjacent** to the slide they affect — not hidden in appendix.
 4. **Slide titles are topic labels, not findings.** Findings go in the narrative arc.
-5. **Chart type must be specific.** "Bar chart" is not enough — say "horizontal bar, sorted by Q1 MR % descending, with QoQ delta column."
+5. **slide_type must be a valid renderer key.** Use the exact value from the Chart Type → slide_type Mapping table (e.g., `single_bar_with_delta`, not "horizontal bar"). Add specifics in the **Chart description** field (e.g., "sorted by Q1 MR % descending, with QoQ delta column").
 6. **Action items surface visibly.** Any slide derived from a client action item gets the [ACTION ITEM] flag.
 7. **No question code appears on two slides serving the same analytical purpose.** If the same question with the same cut appears on multiple slides, it must be merged. A question code may appear on multiple slides only when each use is a genuinely different analytical role (e.g., Q2.10 as a leaderboard vs. Q2.10 as a predictor of LTIP).
 8. **No context stored in this skill.** Everything comes from reading the files at runtime.
