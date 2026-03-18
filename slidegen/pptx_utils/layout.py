@@ -23,6 +23,7 @@ from .brand import (
     FONT_DISPLAY, FONT_TEXT,
 )
 from .shapes import textbox, solidrect, horiz_line
+from .lxml_helpers import _get_or_add
 
 
 # ── LAYOUTS{} dict (PRD §4.4) ───────────────────────────────────────────────
@@ -110,11 +111,13 @@ def slide_footer(slide, footer_text: str, font: Optional[str] = None) -> None:
     """Add standard footer text at bottom of slide.
 
     Starts at x=2.70 to avoid overlapping the J&J logo on the slide master
-    (logo occupies x=0.32–2.61 at y=7.02).
+    (logo occupies x=0.32–2.61 at y=7.02). Text is vertically centered
+    within the box to align parallel with the J&J Medicine mark.
     """
-    textbox(slide, footer_text,
-            2.70, 6.78, 10.20, 0.72,
-            fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
+    sh = textbox(slide, footer_text,
+                 2.70, 6.78, 10.20, 0.72,
+                 fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
+    _get_or_add(sh.text_frame._txBody, "a:bodyPr").set("anchor", "ctr")
 
 
 def chart_header_row(slide, columns: list[dict], top: float, height: float = 0.30,

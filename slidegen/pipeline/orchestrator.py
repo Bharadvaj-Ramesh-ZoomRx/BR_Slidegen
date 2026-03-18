@@ -386,13 +386,25 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
         out = os.path.join(os.path.dirname(yaml_path), "output_deck.pptx")
 
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    prs.save(out)
-    _save_shape_registry(slide_registries, os.path.dirname(out),
+    try:
+        prs.save(out)
+        saved_path = out
+    except PermissionError:
+        alt = out.replace(".pptx", "_regen.pptx")
+        prs.save(alt)
+        saved_path = alt
+        print(
+            f"\n  [!] deck.pptx is open in PowerPoint — saved to:\n"
+            f"      {alt}\n"
+            f"  Close deck.pptx in PowerPoint, then replace it with _regen.pptx\n"
+            f"  (or reopen _regen.pptx directly)\n"
+        )
+    _save_shape_registry(slide_registries, os.path.dirname(saved_path),
                          slide_to_ask=slide_to_ask)
-    print(f"\nSaved: {out}")
+    print(f"\nSaved: {saved_path}")
     print(f"Total slides: {len(prs.slides)}")
 
-    return out
+    return saved_path
 
 
 def regenerate_slide(yaml_path: str, slide_index: int,
@@ -461,9 +473,21 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     renderer(slide, config, ask, data, namer=namer)
     namer.name_remaining(slide)
 
-    prs.save(pptx_path)
-    print(f"Regenerated slide {slide_index + 1} ({ask.id}) in {pptx_path}")
-    return pptx_path
+    try:
+        prs.save(pptx_path)
+        print(f"Regenerated slide {slide_index + 1} ({ask.id}) in {pptx_path}")
+        return pptx_path
+    except PermissionError:
+        # File is open in PowerPoint — save alongside it and instruct user to replace
+        alt_path = pptx_path.replace(".pptx", "_regen.pptx")
+        prs.save(alt_path)
+        print(
+            f"\n  [!] deck.pptx is open in PowerPoint — saved to:\n"
+            f"      {alt_path}\n"
+            f"  Close deck.pptx in PowerPoint, then replace it with _regen.pptx\n"
+            f"  (or reopen _regen.pptx directly)\n"
+        )
+        return alt_path
 
 
 # ── CLI entry point ──────────────────────────────────────────────────────────

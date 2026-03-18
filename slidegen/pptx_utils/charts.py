@@ -19,8 +19,9 @@ from pptx.util import Inches, Pt
 
 from .brand import C_RYB_Q4, C_TAG, C_LTGREY, FONT_TEXT
 from .lxml_helpers import (
-    _get_or_add, set_data_label_color, set_series_color, set_series_no_border,
-    hide_axis, invert_cat_axis, set_plot_area_gap, set_overlap,
+    _get_or_add, suppress_para_bullets, suppress_cat_axis_bullets,
+    set_data_label_color, set_series_color,
+    set_series_no_border, hide_axis, invert_cat_axis, set_plot_area_gap, set_overlap,
 )
 
 
@@ -62,12 +63,14 @@ def enable_data_labels(series, color: RGBColor, fsize: float = 8,
     plot_dLbls = plot.find(qn("c:dLbls"))
     if plot_dLbls is None:
         plot_dLbls = etree.SubElement(plot, qn("c:dLbls"))
+    _get_or_add(plot_dLbls, "c:showLegendKey").set("val", "0")
     _get_or_add(plot_dLbls, "c:showVal").set("val", "1")
     _get_or_add(plot_dLbls, "c:showCatName").set("val", "0")
     _get_or_add(plot_dLbls, "c:showSerName").set("val", "0")
     _get_or_add(plot_dLbls, "c:showPercent").set("val", "0")
 
     dLbls = _get_or_add(series._element, "c:dLbls")
+    _get_or_add(dLbls, "c:showLegendKey").set("val", "0")
     _get_or_add(dLbls, "c:showVal").set("val", "1")
     _get_or_add(dLbls, "c:showCatName").set("val", "0")
     _get_or_add(dLbls, "c:showSerName").set("val", "0")
@@ -85,6 +88,7 @@ def enable_data_labels(series, color: RGBColor, fsize: float = 8,
     _get_or_add(txPr, "a:lstStyle")
     p = _get_or_add(txPr, "a:p")
     pPr = _get_or_add(p, "a:pPr")
+    _get_or_add(pPr, "a:buNone")
     defRPr = _get_or_add(pPr, "a:defRPr")
     defRPr.set("sz", str(int(fsize * 100)))
     defRPr.set("b", "1")
@@ -135,6 +139,7 @@ def add_single_bar_chart(slide, categories: list[str], values: list[float],
     ch.category_axis.has_major_gridlines = False
     ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
     ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
+    suppress_cat_axis_bullets(ch)
     invert_cat_axis(ch)
     set_plot_area_gap(ch, gap)
 
@@ -181,6 +186,7 @@ def add_clustered_bar_chart(slide, categories: list[str],
     ch.category_axis.has_major_gridlines = False
     ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
     ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
+    suppress_cat_axis_bullets(ch)
     invert_cat_axis(ch)
 
     if legend:

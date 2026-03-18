@@ -14,9 +14,15 @@ from .brand import (
     C_WHITE, C_GREY, C_FTGREY, C_GREEN, C_RED,
     C_LBGREY, C_HDRGREY, FONT_TEXT, EMU_PER_IN,
 )
+from .lxml_helpers import _get_or_add, suppress_para_bullets, cell_vcenter
 
 # ── Header row height ────────────────────────────────────────────────────────
 HEADER_ROW_HEIGHT_IN = 0.28
+
+
+def _cell_vcenter(cell) -> None:
+    """Vertically center-align text within a table cell."""
+    cell_vcenter(cell)
 
 
 # ── Shared helpers ───────────────────────────────────────────────────────────
@@ -29,12 +35,14 @@ def _render_header(tbl, header_text: str, font_name: str | None = None):
     hc.fill.fore_color.rgb = C_HDRGREY
     p = hc.text_frame.paragraphs[0]
     p.alignment = PP_ALIGN.CENTER
+    suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = header_text
     run.font.size = Pt(7)
     run.font.bold = True
     run.font.color.rgb = C_WHITE
     run.font.name = font_name or FONT_TEXT
+    _cell_vcenter(hc)
 
 
 def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
@@ -45,13 +53,16 @@ def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
     cell.fill.solid()
     cell.fill.fore_color.rgb = C_LBGREY if (row_idx - 1) % 2 == 0 else C_WHITE
     tf = cell.text_frame
-    tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-    run = tf.paragraphs[0].add_run()
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    suppress_para_bullets(p._p)
+    run = p.add_run()
     run.text = text
     run.font.size = Pt(8)
     run.font.bold = True
     run.font.color.rgb = color
     run.font.name = font_name or FONT_TEXT
+    _cell_vcenter(cell)
 
 
 def _delta_text_color(d: float | None) -> tuple[str, RGBColor]:
@@ -95,13 +106,16 @@ def add_delta_col(slide, deltas: list[float | None],
     hc = tbl.cell(0, 0)
     hc.fill.solid()
     hc.fill.fore_color.rgb = C_HDRGREY
-    hc.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-    run = hc.text_frame.paragraphs[0].add_run()
+    hdr_p = hc.text_frame.paragraphs[0]
+    hdr_p.alignment = PP_ALIGN.CENTER
+    suppress_para_bullets(hdr_p._p)
+    run = hdr_p.add_run()
     run.text = header
     run.font.size = Pt(7)
     run.font.bold = True
     run.font.color.rgb = C_WHITE
     run.font.name = FONT_TEXT
+    _cell_vcenter(hc)
 
     # Data rows
     for i, d in enumerate(deltas):
@@ -121,12 +135,15 @@ def add_delta_col(slide, deltas: list[float | None],
             text, fcolor = "0", C_GREY
 
         tf = cell.text_frame
-        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-        run = tf.paragraphs[0].add_run()
+        dp = tf.paragraphs[0]
+        dp.alignment = PP_ALIGN.CENTER
+        suppress_para_bullets(dp._p)
+        run = dp.add_run()
         run.text = text
         run.font.size = Pt(8)
         run.font.bold = True
         run.font.color.rgb = fcolor
+        _cell_vcenter(cell)
         run.font.name = FONT_TEXT
 
     tbl.columns[0].width = Inches(width)

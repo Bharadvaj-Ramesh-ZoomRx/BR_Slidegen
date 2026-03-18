@@ -392,6 +392,7 @@ extractions:
       max_rows: 20
       columns: { hi_current: 20, other_current: 19 }
 
+
 # ── Asks (Slides) ───────────────────────────────────────────────────────────
 # Ordered to match the Slide Plan (Q4 2025) narrative flow
 asks:

@@ -28,7 +28,7 @@ from .brand import (
 
 # ── lxml helpers ─────────────────────────────────────────────────────────────
 from .lxml_helpers import (
-    _get_or_add,
+    _get_or_add, suppress_para_bullets, suppress_cat_axis_bullets, cell_vcenter,
     invert_cat_axis, hide_cat_labels,
     set_datalabel_pos_outside_end, set_series_no_border,
     set_val_axis_number_format, set_plot_area_gap, set_overlap,

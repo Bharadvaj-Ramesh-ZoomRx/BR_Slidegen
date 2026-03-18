@@ -526,9 +526,15 @@ def _extract_all_from_excel(config) -> dict:
     data = {}
 
     for ex in config.extractions:
+        params = ex.params
+
+        # Mock extractions don't need Excel
+        if ex.method == "mock":
+            data[ex.id] = params.get("rows", [])
+            continue
+
         sheet_cfg = config.sheets[ex.sheet]
         df = sheets_data[ex.sheet]
-        params = ex.params
 
         # Build label function
         label_fn = None
@@ -640,6 +646,11 @@ def load_all_data(config) -> dict:
         print("  Extracting from Excel...")
         data = _extract_all_from_excel(config)
         _save_source_json(data, config)
+
+    # Always inject mock extractions (not stored in JSON)
+    for ex in config.extractions:
+        if ex.method == "mock":
+            data[ex.id] = ex.params.get("rows", [])
 
     # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes

@@ -26,6 +26,35 @@ def _get_or_add(parent: etree._Element, tag: str) -> etree._Element:
     return el
 
 
+def suppress_para_bullets(p_el: etree._Element) -> None:
+    """Add <a:buNone/> to <a:pPr> to suppress inherited paragraph bullets."""
+    pPr = _get_or_add(p_el, "a:pPr")
+    _get_or_add(pPr, "a:buNone")
+
+
+def cell_vcenter(cell) -> None:
+    """Vertically center text in a pptx table cell via <a:tcPr anchor='ctr'/>.
+
+    Table cell vertical alignment lives on <a:tcPr>, NOT on <a:bodyPr>.
+    """
+    tc = cell._tc
+    tcPr = tc.find(qn("a:tcPr"))
+    if tcPr is None:
+        tcPr = etree.SubElement(tc, qn("a:tcPr"))
+    tcPr.set("anchor", "ctr")
+
+
+def suppress_cat_axis_bullets(ch) -> None:
+    """Suppress inherited bullet markers on chart category axis tick labels."""
+    cat_ax = ch.category_axis._element
+    txPr = _get_or_add(cat_ax, "c:txPr")
+    _get_or_add(txPr, "a:bodyPr")
+    _get_or_add(txPr, "a:lstStyle")
+    p = _get_or_add(txPr, "a:p")
+    pPr = _get_or_add(p, "a:pPr")
+    _get_or_add(pPr, "a:buNone")
+
+
 def invert_cat_axis(chart) -> None:
     """Show first category at top of a horizontal bar chart (maxMin orientation).
     Call after chart creation. Without this, highest-value items appear at bottom."""

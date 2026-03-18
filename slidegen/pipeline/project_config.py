@@ -94,8 +94,8 @@ class AskConfig:
 class DataExtractionConfig:
     """How to extract one data block from the source."""
     id: str                      # maps to AskConfig.data_key
-    method: str                  # "question_code" | "row_range" | "nested_ordinal"
-    sheet: str                   # "primary" | "competitor" | "analysis"
+    method: str                  # "question_code" | "row_range" | "nested_ordinal" | "mock"
+    sheet: str = ""              # "primary" | "competitor" | "analysis" (optional for mock)
     params: dict = field(default_factory=dict)  # method-specific params
 
 
@@ -169,12 +169,17 @@ def _validate_ask(ask: dict, idx: int, yaml_path: str):
 
 def _validate_extraction(ex: dict, idx: int, yaml_path: str):
     """Validate required fields in an extraction entry."""
-    for field_name in ("id", "method", "sheet"):
+    for field_name in ("id", "method"):
         if field_name not in ex:
             raise ValueError(
                 f"Missing required field '{field_name}' in extractions[{idx}] "
                 f"(id={ex.get('id', '?')}) in {yaml_path}"
             )
+    if ex.get("method") != "mock" and "sheet" not in ex:
+        raise ValueError(
+            f"Missing required field 'sheet' in extractions[{idx}] "
+            f"(id={ex.get('id', '?')}) in {yaml_path}"
+        )
 
 
 def load_project_config(yaml_path: str) -> ProjectConfig:
@@ -233,7 +238,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         extractions.append(DataExtractionConfig(
             id=ex["id"],
             method=ex["method"],
-            sheet=ex["sheet"],
+            sheet=ex.get("sheet", ""),
             params=ex.get("params", {}),
         ))
 
