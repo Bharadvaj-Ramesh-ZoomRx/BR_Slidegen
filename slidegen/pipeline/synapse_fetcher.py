@@ -1,23 +1,23 @@
 """
-synapse_fetcher.py — Fetch survey data from the Synapse async API.
+synapse_fetcher.py — Download banner plan data from the Synapse API.
 
-Submits a job to the Synapse portal API, polls for completion, downloads the
-resulting Excel from S3, backs up any existing source_data.xlsx, saves the new
-file in its place, and invalidates the JSON cache so the next pipeline run
-re-extracts from the fresh data.
+Submits a banner plan generation request to the Synapse server, polls for
+completion, downloads the resulting Excel file, backs up any existing
+source_data.xlsx, saves the new file in its place, and invalidates the JSON
+cache so the next pipeline run re-extracts from the fresh data.
 
 Usage (CLI):
-    python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml \\
-        --url https://api.synapse.example.com/v1
+    python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml
 
 Usage (Python):
     from slidegen.pipeline import fetch_synapse_data
     from slidegen.pipeline.project_config import load_project_config
     config = load_project_config("projects/jnj_rybrevant/config.yaml")
-    fetch_synapse_data(config, synapse_url="https://api.synapse.example.com/v1")
+    fetch_synapse_data(config)
 
 Authentication:
     Set env var SYNAPSE_API_KEY or pass api_key= directly.
+    The key is used as a Bearer token (Azure AD access token).
     Never store the key in config.yaml.
 """
 
@@ -37,7 +37,7 @@ except ImportError:
     import urllib.error as _urllib_err
     _USE_REQUESTS = False
 
-from slidegen.pipeline.project_config import ProjectConfig, load_project_config
+from slidegen.pipeline.project_config import ProjectConfig, SynapseConfig, load_project_config
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -46,9 +46,9 @@ _DEFAULT_POLL_INTERVAL = 10   # seconds between status checks
 _DEFAULT_MAX_WAIT = 300       # 5-minute hard timeout
 _ENV_KEY_NAME = "SYNAPSE_API_KEY"
 
-# Terminal status sets — handle variant spellings from different API versions
-_STATUS_DONE_SET   = {"done", "complete", "completed", "success"}
-_STATUS_FAILED_SET = {"failed", "error", "cancelled", "canceled"}
+# Banner plan history statuses (mirrors BannerPlanHistoryStatus enum)
+_STATUS_DONE = "processed"
+_STATUS_FAILED = "failed"
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -60,22 +60,22 @@ def fetch_synapse_data(
     poll_interval: int = _DEFAULT_POLL_INTERVAL,
     max_wait: int = _DEFAULT_MAX_WAIT,
 ) -> str:
-    """Fetch fresh survey data from the Synapse async API.
+    """Fetch fresh banner plan data from the Synapse API.
 
     Steps:
       1. Resolve API key (param → SYNAPSE_API_KEY env var)
-      2. Resolve API base URL (param → config.synapse_api_url)
-      3. POST to {url}/jobs to submit the job; get back a job_id
-      4. Poll {url}/jobs/{job_id} until done or timeout
-      5. Download Excel from the S3 pre-signed URL in the response
+      2. Resolve API base URL (param → config.synapse.api_url → config.synapse_api_url)
+      3. POST /banner-plans/generate to submit the job; get back history_id
+      4. Poll GET /banner-plans/histories/{id}/status until done or timeout
+      5. Download Excel from GET /banner-plans/histories/{id}/download
       6. Backup existing source_data.xlsx (timestamped rename, same dir)
       7. Atomically replace source_data.xlsx with the new file
       8. Invalidate source_data.json cache so next run re-extracts
 
     Args:
-        config:         Loaded ProjectConfig instance.
+        config:         Loaded ProjectConfig instance (must have synapse section).
         api_key:        Bearer token. Falls back to SYNAPSE_API_KEY env var.
-        synapse_url:    API base URL. Falls back to config.synapse_api_url.
+        synapse_url:    API base URL override. Falls back to config.synapse.api_url.
         poll_interval:  Seconds between status polls. Default 10.
         max_wait:       Maximum total seconds to wait. Default 300.
 
@@ -83,50 +83,39 @@ def fetch_synapse_data(
         Absolute path to the saved source_data.xlsx.
 
     Raises:
-        ValueError:    Missing API key, URL, or unexpected API response format.
+        ValueError:    Missing config, API key, or URL.
         TimeoutError:  Job not complete within max_wait seconds.
-        RuntimeError:  Job failed or API returned an error status.
+        RuntimeError:  Job failed or API returned an error.
         OSError:       File I/O errors during backup or save.
     """
-    # 1. Resolve credentials and URL
+    # 1. Validate synapse config
+    synapse = config.synapse
+    if not synapse:
+        raise ValueError(
+            "No 'synapse' section in config.yaml. "
+            "Add synapse.api_url, synapse.project_id, etc. to enable banner plan download."
+        )
+
+    # 2. Resolve credentials and URL
     resolved_key = _resolve_api_key(api_key)
-    resolved_url = (synapse_url or getattr(config, "synapse_api_url", "")).rstrip("/")
+    resolved_url = (synapse_url or synapse.api_url or getattr(config, "synapse_api_url", "")).rstrip("/")
     if not resolved_url:
         raise ValueError(
-            "synapse_url not provided and config has no synapse_api_url field. "
-            "Pass --url on the CLI or add synapse_api_url to config.yaml."
+            "synapse_url not provided and config has no synapse.api_url field. "
+            "Pass --url on the CLI or add synapse.api_url to config.yaml."
         )
 
     headers = _build_headers(resolved_key)
-    payload = _build_job_payload(config)
 
-    # 2. Submit job
-    print(f"Submitting Synapse job for '{config.name}' / wave='{config.wave}'...")
-    job_response = _post_job(resolved_url, payload, headers)
-    job_id = job_response.get("job_id")
-    if not job_id:
-        raise ValueError(
-            f"Synapse API response missing 'job_id'. Got: {job_response}"
-        )
-    print(f"  Job submitted: {job_id}")
-
-    # 3. Determine status URL (API may return an explicit URL or we construct it)
-    status_url = job_response.get("status_url") or f"{resolved_url}/jobs"
+    # 3. Submit banner plan generation
+    print(f"Submitting banner plan generation for project_id={synapse.project_id}...")
+    history_id = _trigger_generation(resolved_url, synapse, headers)
+    print(f"  Generation queued: history_id={history_id}")
 
     # 4. Poll for completion
     print(f"Polling for completion (max {max_wait}s, interval {poll_interval}s)...")
-    result = _poll_status(status_url, headers, job_id, poll_interval, max_wait)
-
-    s3_url = (
-        result.get("result_url")
-        or result.get("download_url")
-        or result.get("url")
-    )
-    if not s3_url:
-        raise ValueError(
-            f"Completed job response missing download URL. Got: {result}"
-        )
-    print("  Job complete. Download URL received.")
+    _poll_until_done(resolved_url, headers, history_id, poll_interval, max_wait)
+    print("  Banner plan generation complete.")
 
     # 5. Ensure destination directory exists
     excel_dest = config.data_source_path
@@ -135,11 +124,11 @@ def fetch_synapse_data(
     # 6. Backup existing Excel
     _backup_existing_excel(excel_dest)
 
-    # 7. Download to .tmp then rename atomically (never leaves a partial file)
+    # 7. Download to .tmp then rename atomically
     tmp_path = excel_dest + ".tmp"
     try:
         print(f"  Downloading Excel → {os.path.basename(excel_dest)}...")
-        _download_excel(s3_url, tmp_path)
+        _download_banner_plan(resolved_url, headers, history_id, tmp_path)
         if os.path.exists(excel_dest):
             os.remove(excel_dest)
         os.rename(tmp_path, excel_dest)
@@ -176,73 +165,119 @@ def _build_headers(api_key: str) -> dict:
     }
 
 
-def _build_job_payload(config: ProjectConfig) -> dict:
-    return {
-        "project": config.name,
-        "wave": config.wave,
-        "period_current": config.period_current,
-        "period_prior": config.period_prior,
-        "client": config.client,
+def _trigger_generation(base_url: str, synapse: SynapseConfig, headers: dict) -> int:
+    """POST /banner-plans/generate and return the history_id."""
+    url = f"{base_url}/banner-plans/generate"
+    payload = {
+        "project_id": synapse.project_id,
+        "survey_ids": synapse.survey_ids,
+        "deliverable_ids": synapse.deliverable_ids,
+        "segment_ids": synapse.segment_ids,
+        "multi_question_analysis_ids": synapse.multi_question_analysis_ids,
+        "virtual_question_analysis_ids": synapse.virtual_question_analysis_ids,
     }
-
-
-def _post_job(base_url: str, payload: dict, headers: dict) -> dict:
-    """POST to {base_url}/jobs and return parsed JSON response."""
-    url = f"{base_url}/jobs"
     body = json.dumps(payload).encode("utf-8")
 
     if _USE_REQUESTS:
         resp = _requests.post(url, data=body, headers=headers, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
+        if not resp.ok:
+            detail = resp.text
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                pass
+            raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
+        data = resp.json()
     else:
         req = _urllib_req.Request(url, data=body, headers=headers, method="POST")
         try:
             with _urllib_req.urlopen(req, timeout=30) as r:
-                return json.loads(r.read().decode("utf-8"))
+                data = json.loads(r.read().decode("utf-8"))
         except _urllib_err.HTTPError as e:
             raise RuntimeError(f"Synapse API error {e.code}: {e.reason}") from e
 
+    history_id = data.get("history_id")
+    if not history_id:
+        raise ValueError(f"Generate response missing 'history_id'. Got: {data}")
+    return history_id
 
-def _poll_status(
-    status_url: str,
+
+def _poll_until_done(
+    base_url: str,
     headers: dict,
-    job_id: str,
+    history_id: int,
     poll_interval: int,
     max_wait: int,
-) -> dict:
-    """Poll {status_url}/{job_id} until the job is done or timeout."""
+) -> None:
+    """Poll GET /banner-plans/histories/{id}/status until done or timeout."""
+    url = f"{base_url}/banner-plans/histories/{history_id}/status"
     elapsed = 0
     last_status = "unknown"
 
     while elapsed < max_wait:
-        response = _get_json(f"{status_url}/{job_id}", headers)
+        response = _get_json(url, headers)
         last_status = response.get("status", "").lower()
 
-        if last_status in _STATUS_DONE_SET:
-            return response
-        elif last_status in _STATUS_FAILED_SET:
-            msg = response.get("message") or response.get("error") or last_status
-            raise RuntimeError(f"Synapse job '{job_id}' failed: {msg}")
+        if last_status == _STATUS_DONE:
+            return
+        elif last_status == _STATUS_FAILED:
+            raise RuntimeError(
+                f"Banner plan generation failed (history_id={history_id})"
+            )
         else:
-            # Includes pending, running, queued, processing, and unknown statuses.
-            # Unknown statuses are treated as "still running" — safe default if
-            # the API introduces new transient status strings in the future.
             print(f"  [{elapsed}s] status={last_status!r} — waiting {poll_interval}s...")
             time.sleep(poll_interval)
             elapsed += poll_interval
 
     raise TimeoutError(
-        f"Synapse job '{job_id}' not complete after {max_wait}s "
-        f"(last status: {last_status!r})"
+        f"Banner plan generation not complete after {max_wait}s "
+        f"(history_id={history_id}, last status: {last_status!r})"
     )
+
+
+def _download_banner_plan(
+    base_url: str, headers: dict, history_id: int, dest_path: str
+) -> None:
+    """Stream GET /banner-plans/histories/{id}/download into dest_path."""
+    url = f"{base_url}/banner-plans/histories/{history_id}/download"
+
+    if _USE_REQUESTS:
+        resp = _requests.get(url, headers=headers, stream=True, timeout=120)
+        if not resp.ok:
+            detail = resp.text
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                pass
+            raise RuntimeError(f"Download error {resp.status_code}: {detail}")
+        with open(dest_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=131072):  # 128 KB chunks
+                f.write(chunk)
+    else:
+        req = _urllib_req.Request(url, headers=headers)
+        try:
+            with _urllib_req.urlopen(req, timeout=120) as r:
+                with open(dest_path, "wb") as f:
+                    while True:
+                        chunk = r.read(131072)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+        except _urllib_err.HTTPError as e:
+            raise RuntimeError(f"Download error {e.code}: {e.reason}") from e
 
 
 def _get_json(url: str, headers: dict) -> dict:
     """GET a URL and return parsed JSON."""
     if _USE_REQUESTS:
         resp = _requests.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
+        if not resp.ok:
+            detail = resp.text
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                pass
+            raise RuntimeError(f"Status check error {resp.status_code}: {detail}")
         return resp.json()
     else:
         req = _urllib_req.Request(url, headers=headers)
@@ -251,18 +286,6 @@ def _get_json(url: str, headers: dict) -> dict:
                 return json.loads(r.read().decode("utf-8"))
         except _urllib_err.HTTPError as e:
             raise RuntimeError(f"Status check error {e.code}: {e.reason}") from e
-
-
-def _download_excel(s3_url: str, dest_path: str) -> None:
-    """Stream-download from a pre-signed S3 URL into dest_path."""
-    if _USE_REQUESTS:
-        resp = _requests.get(s3_url, stream=True, timeout=120)
-        resp.raise_for_status()
-        with open(dest_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=131072):  # 128 KB chunks
-                f.write(chunk)
-    else:
-        _urllib_req.urlretrieve(s3_url, dest_path)
 
 
 def _backup_existing_excel(excel_path: str) -> Optional[str]:
@@ -282,7 +305,6 @@ def _backup_existing_excel(excel_path: str) -> Optional[str]:
 
 def _invalidate_json_cache(config: ProjectConfig) -> None:
     """Delete source_data.json so the next pipeline run re-extracts from Excel."""
-    # Mirror the fallback logic in data_loaders._json_path_for()
     if config.context_path:
         json_path = os.path.join(config.context_path, "source_data.json")
     else:
@@ -303,7 +325,7 @@ def _cli() -> None:
 
     parser = argparse.ArgumentParser(
         prog="python -m slidegen fetch-synapse",
-        description="Fetch fresh survey data from the Synapse async API.",
+        description="Download banner plan data from the Synapse API.",
     )
     parser.add_argument("yaml_path", help="Path to project config YAML")
     parser.add_argument(
@@ -317,7 +339,7 @@ def _cli() -> None:
         default=None,
         dest="synapse_url",
         metavar="URL",
-        help="Synapse API base URL (default: config.synapse_api_url)",
+        help="Synapse API base URL override (default: config.synapse.api_url)",
     )
     parser.add_argument(
         "--poll-interval",

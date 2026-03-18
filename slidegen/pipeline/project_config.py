@@ -63,6 +63,18 @@ class LabelShortcut:
 
 
 @dataclass
+class SynapseConfig:
+    """Synapse API connection parameters for banner plan download."""
+    api_url: str                              # e.g. "https://synapse.zoomrx.com/api"
+    project_id: int
+    survey_ids: list[int]
+    deliverable_ids: list[int]
+    segment_ids: list[int]
+    multi_question_analysis_ids: list[int] = field(default_factory=list)
+    virtual_question_analysis_ids: list[int] = field(default_factory=list)
+
+
+@dataclass
 class AskConfig:
     """One ask = one slide (or slide group) to generate."""
     id: str                      # unique key ("ryb_mr_me", "rep_perf", ...)
@@ -112,7 +124,8 @@ class ProjectConfig:
     data_source_path: str = ""
     context_path: str = ""       # wave-versioned context folder (system-generated files)
     section_icon_path: str = ""  # small icon for section header bars
-    synapse_api_url: str = ""    # optional Synapse API base URL (for fetch-synapse CLI)
+    synapse_api_url: str = ""    # deprecated — use synapse.api_url instead
+    synapse: Optional[SynapseConfig] = None  # Synapse API config for banner plan download
 
     @property
     def primary(self) -> BrandConfig:
@@ -261,6 +274,20 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     # Sections (optional): [{"name": "...", "start": "ask_id"}, ...]
     sections = raw.get("sections", [])
 
+    # Synapse config (optional)
+    synapse_cfg = None
+    synapse_raw = raw.get("synapse")
+    if synapse_raw and isinstance(synapse_raw, dict):
+        synapse_cfg = SynapseConfig(
+            api_url=synapse_raw["api_url"],
+            project_id=synapse_raw["project_id"],
+            survey_ids=synapse_raw["survey_ids"],
+            deliverable_ids=synapse_raw["deliverable_ids"],
+            segment_ids=synapse_raw["segment_ids"],
+            multi_question_analysis_ids=synapse_raw.get("multi_question_analysis_ids", []),
+            virtual_question_analysis_ids=synapse_raw.get("virtual_question_analysis_ids", []),
+        )
+
     return ProjectConfig(
         name=project["name"],
         client=project["client"],
@@ -281,4 +308,5 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         context_path=ctx_path,
         section_icon_path=icon_path,
         synapse_api_url=raw.get("synapse_api_url", ""),
+        synapse=synapse_cfg,
     )

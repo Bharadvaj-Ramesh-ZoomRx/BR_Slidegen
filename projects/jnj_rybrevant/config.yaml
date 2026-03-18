@@ -9,6 +9,18 @@ project:
   period_current: "Q4'25"
   period_prior: "Q3'25"
 
+# ── Synapse Integration (optional) ───────────────────────────────────────────
+# Used by `python -m slidegen fetch-synapse` to download banner plan data.
+# Set SYNAPSE_API_KEY env var with an Azure AD bearer token before running.
+# synapse:
+#   api_url: "https://synapse.zoomrx.com/api"
+#   project_id: 0          # ← fill in from Synapse portal
+#   survey_ids: []          # ← fill in from Synapse portal
+#   deliverable_ids: []     # ← fill in from Synapse portal
+#   segment_ids: []         # ← fill in from Synapse portal
+#   multi_question_analysis_ids: []
+#   virtual_question_analysis_ids: []
+
 # ── Paths ────────────────────────────────────────────────────────────────────
 # {{wave}} is interpolated at load time from project.wave above
 # Template stays flat (shared across waves); data/output are wave-versioned
