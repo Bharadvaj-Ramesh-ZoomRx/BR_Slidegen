@@ -17,7 +17,7 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
-from .brand import C_RYB_Q4, C_TAG, C_LTGREY, FONT_TEXT
+from .brand import C_RYB_Q4, C_TAG, C_LTGREY, C_WHITE, FONT_TEXT
 from .lxml_helpers import (
     _get_or_add, suppress_para_bullets, suppress_cat_axis_bullets,
     set_data_label_color, set_series_color,
@@ -133,7 +133,7 @@ def add_single_bar_chart(slide, categories: list[str], values: list[float],
     s = ch.series[0]
     set_series_color(s, fill_color)
     set_series_no_border(s)
-    enable_data_labels(s, fill_color, font_name=font_name)
+    enable_data_labels(s, C_WHITE, pos="inEnd", font_name=font_name)
 
     hide_axis(ch, "val")
     ch.category_axis.has_major_gridlines = False

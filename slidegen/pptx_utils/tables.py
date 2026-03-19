@@ -46,12 +46,15 @@ def _render_header(tbl, header_text: str, font_name: str | None = None):
 
 
 def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
-                     row_height_in: float, font_name: str | None = None):
+                     row_height_in: float, font_name: str | None = None,
+                     data_idx: int | None = None):
     """Style a single data row: alternating bg, centered colored bold text."""
     tbl.rows[row_idx].height = Inches(row_height_in)
     cell = tbl.cell(row_idx, 0)
     cell.fill.solid()
-    cell.fill.fore_color.rgb = C_LBGREY if (row_idx - 1) % 2 == 0 else C_WHITE
+    # Use data_idx for alternating if provided, otherwise infer from row_idx
+    alt = data_idx if data_idx is not None else (row_idx - 1)
+    cell.fill.fore_color.rgb = C_LBGREY if alt % 2 == 0 else C_WHITE
     tf = cell.text_frame
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.CENTER
@@ -184,7 +187,8 @@ def add_delta_table(slide, deltas: list[float | None],
 
     for i, d in enumerate(deltas):
         text, color = _delta_text_color(d)
-        _render_data_row(tbl, i + data_offset, text, color, row_height, font_name)
+        _render_data_row(tbl, i + data_offset, text, color, row_height, font_name,
+                         data_idx=i)
 
     tbl.columns[0].width = Inches(width)
     return tbl_shape
@@ -211,7 +215,7 @@ def add_value_table(slide, values: list[float | None],
     vc = value_color or C_GREY
     for i, v in enumerate(values):
         text = f"{v:.0f}%" if v is not None else "N/A"
-        _render_data_row(tbl, i + 1, text, vc, row_height, font_name)
+        _render_data_row(tbl, i + 1, text, vc, row_height, font_name, data_idx=i)
 
     tbl.columns[0].width = Inches(width)
     return tbl_shape

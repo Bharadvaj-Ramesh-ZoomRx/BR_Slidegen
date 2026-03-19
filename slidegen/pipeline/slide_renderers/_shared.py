@@ -171,6 +171,26 @@ DUAL_BC_R_DELTA_L   = 10.651  # right brand delta table left
 DUAL_BC_R_DELTA_W   = 0.529   # right brand delta table width
 
 
+# ── Dynamic label width ──────────────────────────────────────────────────────
+
+def _auto_label_width(labels: list[str], fsize: float = 7.5,
+                      min_w: float = 2.50, max_w: float = 5.50,
+                      max_line_chars: int = 45) -> float:
+    """Calculate optimal label table width based on longest label text.
+
+    At ~7.5pt Calibri, ~13 chars per inch. Labels longer than max_line_chars
+    are assumed to wrap to 2 lines — width is based on half the length.
+    """
+    if not labels:
+        return min_w
+    max_len = max(len(l) for l in labels)
+    cpi = 13.0 * (7.5 / max(fsize, 5.0))
+    # If text would wrap to 2 lines, use half the length for width calc
+    line_len = (max_len + 1) // 2 if max_len > max_line_chars else max_len
+    width = line_len / cpi + 0.25  # add cell margin padding
+    return max(min_w, min(max_w, round(width, 2)))
+
+
 # ── Template resolution ───────────────────────────────────────────────────────
 
 def _resolve_template(text: str, config: ProjectConfig) -> str:

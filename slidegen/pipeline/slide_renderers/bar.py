@@ -18,15 +18,17 @@ from ._shared import (
     LABEL_MAX_SINGLE, LABEL_MAX_DUAL,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _cap_chart_h,
+    _cap_chart_h, _auto_label_width,
     # pptx_utils
-    C_GREEN, C_GREY, C_RED,
+    C_GREEN, C_GREY, C_LBGREY, C_HDRGREY, C_WHITE, C_RED,
+    FOOTER_TOP, PP_ALIGN,
     textbox,
-    hide_axis, set_series_color, set_plot_area_gap, set_overlap,
+    hide_axis, hide_cat_labels, set_series_color, set_plot_area_gap, set_overlap,
     set_series_no_border, invert_cat_axis, suppress_cat_axis_bullets,
     set_chart_plot_area,
     enable_data_labels,
     add_single_bar_chart, add_delta_table,
+    _pptx_table, _style_tbl_cell,
     # data_loaders
     delta,
     # project_config types
@@ -35,7 +37,7 @@ from ._shared import (
 
 
 def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
-    """Single horizontal bar chart with a QoQ delta column."""
+    """Single horizontal bar chart with label table and QoQ delta column."""
     _slide_chrome(slide, config, ask)
 
     rows = data.get(ask.data_key, [])
@@ -47,46 +49,71 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
 
-    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_SINGLE] for r in rows]
+    labels = [r.get("short") or r.get("desc", "") for r in rows]
     current_vals = [r.get("current") or 0 for r in rows]
     prior_vals = [r.get("prior") for r in rows]
 
     n = len(labels)
-    chart_top = CHART_TOP_STD
-    chart_h = max(MIN_CHART_HEIGHT, min(MAX_CHART_HEIGHT, n * 0.40))
-    row_h = chart_h / max(n, 1)
 
-    # Center the chart + delta block
-    block_w = SINGLE_BAR_WIDTH + CHART_DELTA_GAP + DELTA_COL_WIDTH
-    chart_left = (SLIDE_W - block_w) / 2
-    delta_left = chart_left + SINGLE_BAR_WIDTH + CHART_DELTA_GAP
+    # Layout: [Label table] [Bar chart (no cat labels)] [Delta col]
+    delta_w = DELTA_COL_WIDTH
+    gap = 0.08
+    label_w = _auto_label_width(labels)
+    chart_w = SLIDE_W - 0.60 - label_w - delta_w - gap * 2  # fill remaining
+    hdr_h = 0.30
+    chart_top = CHART_TOP_STD + 0.05
+    max_body_h = FOOTER_TOP - chart_top - 0.55
+    row_h = min(0.42, max(0.28, max_body_h / max(n, 1)))
+    body_h = n * row_h
 
-    # Bar chart
-    add_single_bar_chart(
-        slide, labels, current_vals,
-        left=chart_left, top=chart_top, width=SINGLE_BAR_WIDTH, height=chart_h,
+    # Center
+    block_w = label_w + gap + chart_w + gap + delta_w
+    origin = (SLIDE_W - block_w) / 2
+    label_l = origin
+    chart_l = label_l + label_w + gap
+    delta_l = chart_l + chart_w + gap
+
+    # 1. Label table
+    _, ltbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n,
+                           label_l, chart_top)
+    _style_tbl_cell(ltbl.cell(0, 0), "Message", bg=C_HDRGREY, fg=C_WHITE,
+                    fsize=8, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
+    for i, label in enumerate(labels):
+        cell = ltbl.cell(i + 1, 0)
+        _style_tbl_cell(cell, label,
+                        bg=C_LBGREY if i % 2 == 0 else C_WHITE,
+                        fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
+                        ml=0.08, mr=0.05)
+        cell.text_frame.word_wrap = True
+
+    # 2. Bar chart (no category labels)
+    cf, ch = add_single_bar_chart(
+        slide, [f"R{i}" for i in range(n)], current_vals,
+        left=chart_l, top=chart_top + hdr_h, width=chart_w, height=body_h,
         fill_color=color_current, font_name=font,
     )
+    hide_cat_labels(ch)
+    set_chart_plot_area(ch, x=0.0, y=0.0, w=1.0, h=1.0)
 
-    # Delta table
+    # 3. Delta table
     deltas = [delta(c, p) if p is not None else None
               for c, p in zip(current_vals, prior_vals)]
     add_delta_table(
         slide, deltas,
-        left=delta_left, top=chart_top, width=DELTA_COL_WIDTH,
-        row_height=row_h * ROW_SCALE_FACTOR,
+        left=delta_l, top=chart_top, width=delta_w,
+        row_height=row_h,
         header_text="QoQ Δ", font_name=font,
     )
 
-    # Legend
-    ly = chart_top + chart_h + LEGEND_GAP
+    # 4. Legend
+    ly = chart_top + hdr_h + body_h + LEGEND_GAP
     sample = config.sample_sizes.get(ask.brand or "primary")
     n_label = f" (n={sample.current})" if sample else ""
     _make_legend(slide, [
         (color_current, f"{config.period_current}{n_label}"),
         (C_GREEN, "Positive Δ"),
         (C_RED, "Negative Δ"),
-    ], 0, ly, font, center_over=(chart_left, block_w))
+    ], 0, ly, font, center_over=(label_l, block_w))
 
 
 def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):

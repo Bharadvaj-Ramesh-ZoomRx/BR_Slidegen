@@ -20,7 +20,7 @@ from datetime import datetime
 from pptx import Presentation
 from pptx.util import Emu
 
-from slidegen.pipeline.project_config import load_project_config, ProjectConfig
+from slidegen.pipeline.project_config import load_project_config, ProjectConfig, AskConfig, DataExtractionConfig
 from slidegen.pipeline.data_loaders import load_all_data
 from slidegen.pipeline.slide_renderers import RENDERERS
 
@@ -93,6 +93,116 @@ def _save_shape_registry(registries: dict, output_dir: str,
         payload["slide_to_ask"] = slide_to_ask
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
+
+
+# ── Speaker notes ─────────────────────────────────────────────────────────────
+
+def _build_speaker_notes(ask: AskConfig, config: ProjectConfig, data: dict) -> str:
+    """Build speaker notes text with question codes and descriptions for a slide.
+
+    Collects all data_keys referenced by the ask (primary + any in extra),
+    finds the matching extraction configs, and formats the question codes
+    and question text used to create the slide.
+    """
+    # Collect all data keys this ask references
+    data_keys = []
+    if ask.data_key:
+        data_keys.append(ask.data_key)
+
+    extra = ask.extra or {}
+    # Dual-bar / compare slides store extra data keys in nested dicts
+    for nested_key in ("left", "right"):
+        nested = extra.get(nested_key, {})
+        if isinstance(nested, dict) and nested.get("data_key"):
+            data_keys.append(nested["data_key"])
+    # Clustered compare uses primary_key / comp_key
+    for ek in ("primary_key", "comp_key"):
+        if extra.get(ek):
+            data_keys.append(extra[ek])
+
+    # Build extraction lookup: id → DataExtractionConfig
+    ext_map: dict[str, DataExtractionConfig] = {
+        ex.id: ex for ex in config.extractions
+    }
+
+    # Build _sheets lookup for question text: code → desc
+    sheets_lookup: dict[str, str] = {}
+    sheets_index = data.get("_sheets", {})
+    for sheet_name, rows in sheets_index.items():
+        if isinstance(rows, list):
+            for row in rows:
+                code = row.get("code", "")
+                desc = row.get("desc", "")
+                if code and desc and code not in sheets_lookup:
+                    sheets_lookup[code] = desc
+
+    lines = []
+    seen_codes = set()
+
+    for dk in data_keys:
+        ex = ext_map.get(dk)
+        if not ex:
+            continue
+
+        params = ex.params or {}
+        codes_for_ex = []
+
+        if ex.method == "question_code":
+            code = params.get("code", "")
+            if code:
+                codes_for_ex.append(code)
+
+        elif ex.method == "multi_question_code":
+            for entry in params.get("codes", []):
+                code = entry.get("code", "")
+                if code:
+                    codes_for_ex.append(code)
+
+        elif ex.method == "question_code_multi_col":
+            code = params.get("code", "")
+            if code:
+                codes_for_ex.append(code)
+
+        elif ex.method == "row_range":
+            sheet_name = ex.sheet
+            row_start = params.get("row_start", 0)
+            row_end = params.get("row_end", 0)
+            lines.append(f"[{dk}] sheet={sheet_name}, rows {row_start}-{row_end}")
+            continue
+
+        elif ex.method == "nested_ordinal":
+            row_start = params.get("row_start", 0)
+            row_end = params.get("row_end", 0)
+            lines.append(f"[{dk}] nested_ordinal, rows {row_start}-{row_end}")
+            continue
+
+        elif ex.method == "mock":
+            lines.append(f"[{dk}] mock data")
+            continue
+
+        # Format codes with their question text
+        for code in codes_for_ex:
+            if code in seen_codes:
+                continue
+            seen_codes.add(code)
+            desc = sheets_lookup.get(code, "")
+            if desc:
+                lines.append(f"{code}: {desc}")
+            else:
+                lines.append(f"{code}")
+
+    if not lines:
+        return ""
+
+    return "Question codes used:\n" + "\n".join(lines)
+
+
+def _add_speaker_notes(slide, notes_text: str):
+    """Set speaker notes on a slide."""
+    if not notes_text:
+        return
+    notes_slide = slide.notes_slide
+    notes_slide.notes_text_frame.text = notes_text
 
 
 # ── Config backup ────────────────────────────────────────────────────────────
@@ -370,6 +480,9 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             renderer(slide, config, ask, data, namer=namer)
             namer.name_remaining(slide)
             slide_registries[str(slide_num)] = namer.slide_metadata
+            # Add speaker notes with question codes and descriptions
+            notes_text = _build_speaker_notes(ask, config, data)
+            _add_speaker_notes(slide, notes_text)
             print(f"  [{slide_num}] {ask.id} ({ask.slide_type})")
         except Exception as e:
             print(f"  [{slide_num}] ERROR on {ask.id}: {e}")
@@ -472,6 +585,9 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     )
     renderer(slide, config, ask, data, namer=namer)
     namer.name_remaining(slide)
+    # Add speaker notes with question codes and descriptions
+    notes_text = _build_speaker_notes(ask, config, data)
+    _add_speaker_notes(slide, notes_text)
 
     try:
         prs.save(pptx_path)

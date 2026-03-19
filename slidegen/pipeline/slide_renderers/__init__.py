@@ -26,8 +26,8 @@ from .bar import (
     render_two_section_bar,
 )
 from .bar_dual import render_dual_bar_with_delta, render_dual_bar_qoq
-from .compare import render_clustered_compare, render_stacked_order, render_dual_bar_compare
-from .dot import render_lollipop, render_abacus, render_message_mbd
+from .compare import render_clustered_compare, render_stacked_order, render_dual_bar_compare, render_hii_scorecard, render_dual_doughnut
+from .dot import render_lollipop, render_abacus, render_dual_abacus, render_followup_rep, render_message_mbd
 
 # REGISTRY — maps slide_type string → renderer function
 RENDERERS = {
@@ -45,6 +45,10 @@ RENDERERS = {
     "lollipop": render_lollipop,
     "abacus": render_abacus,
     "message_mbd": render_message_mbd,
+    "dual_abacus": render_dual_abacus,
+    "followup_rep": render_followup_rep,
+    "hii_scorecard": render_hii_scorecard,
+    "dual_doughnut": render_dual_doughnut,
 }
 
 __all__ = [
@@ -62,4 +66,7 @@ __all__ = [
     "render_lollipop",
     "render_abacus",
     "render_message_mbd",
+    "render_dual_abacus",
+    "render_hii_scorecard",
+    "render_dual_doughnut",
 ]

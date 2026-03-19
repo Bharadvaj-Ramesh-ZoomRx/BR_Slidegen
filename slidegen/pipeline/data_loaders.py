@@ -107,12 +107,18 @@ def extract_by_question_code(
                 row_code = sheet.iloc[j, code_col] if pd.notna(sheet.iloc[j, code_col]) else ""
 
                 if desc and not desc.startswith("Base") and pd.notna(q_current):
+                    prior_val = converter(q_prior) if pd.notna(q_prior) else None
+                    current_val = converter(q_current) if pd.notna(q_current) else None
+                    # Skip stale rows where both prior and current are 0
+                    if (prior_val is None or prior_val == 0) and (current_val is None or current_val == 0):
+                        j += 1
+                        continue
                     label = label_fn(desc) if label_fn else desc
                     results.append({
                         "desc": label,
                         "code": str(row_code),
-                        "prior": converter(q_prior) if pd.notna(q_prior) else None,
-                        "current": converter(q_current) if pd.notna(q_current) else None,
+                        "prior": prior_val,
+                        "current": current_val,
                     })
                 j += 1
                 if j - i > max_rows:
@@ -255,8 +261,11 @@ def extract_question_code_multi_col(
                         data_vals = [v for k, v in row.items() if k != "desc"]
                         if len(data_vals) >= 2:
                             row["diff"] = round(data_vals[0] - data_vals[1], 1)
+                    # Skip stale rows where all data values are 0
                     if all_valid:
-                        results.append(row)
+                        data_vals = [v for k, v in row.items() if k not in ("desc", "diff")]
+                        if not all(v == 0 for v in data_vals):
+                            results.append(row)
                 j += 1
                 if j - i > max_rows:
                     break
@@ -307,7 +316,7 @@ def extract_nested_ordinal(
             continue
 
         if code not in groups:
-            label = label_fn(desc) if label_fn else desc[:40]
+            label = label_fn(desc) if label_fn else desc
             entry = {"code": code, "desc": label}
             for o in ordinals:
                 entry[f"{o}_current"] = 0
@@ -337,6 +346,18 @@ def extract_nested_ordinal(
 
 
 # ── Excel → JSON indexing (Stage 0) ─────────────────────────────────────────
+
+def _is_zero(v) -> bool:
+    """Check if a cell value is effectively zero (0, 0.0, '0', '0%', etc.)."""
+    try:
+        return float(v) == 0.0
+    except (ValueError, TypeError):
+        s = str(v).strip().rstrip("%")
+        try:
+            return float(s) == 0.0
+        except (ValueError, TypeError):
+            return False
+
 
 def index_excel(excel_path: str, json_path: str) -> dict:
     """Convert Excel to JSON index — runs as Stage 0 before any analysis.
@@ -376,13 +397,21 @@ def index_excel(excel_path: str, json_path: str) -> dict:
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         rows = []
+        skipped = 0
         for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
             code = str(row[0]).strip() if row[0] is not None else ""
             desc = str(row[1]).strip()[:120] if len(row) > 1 and row[1] is not None else ""
             if code or desc:
+                # Skip stale rows: all data columns (beyond code/desc) are 0 or empty
+                data_cols = row[2:] if len(row) > 2 else ()
+                data_vals = [v for v in data_cols if v is not None and str(v).strip() != ""]
+                if data_vals and all(_is_zero(v) for v in data_vals):
+                    skipped += 1
+                    continue
                 rows.append({"row": row_idx, "code": code, "desc": desc})
         sheets_index[sheet_name] = rows
-        print(f"    {sheet_name}: {len(rows)} rows")
+        skipped_msg = f" ({skipped} stale removed)" if skipped else ""
+        print(f"    {sheet_name}: {len(rows)} rows{skipped_msg}")
     wb.close()
 
     # Build or update payload

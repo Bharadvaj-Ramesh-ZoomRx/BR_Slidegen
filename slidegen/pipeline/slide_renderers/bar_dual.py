@@ -31,7 +31,7 @@ from ._shared import (
     _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h,
     # pptx_utils
-    C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_RED,
+    C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_RED,
     PP_ALIGN,
     textbox, dashed_separator, callout_box,
     hide_axis, set_series_color, set_plot_area_gap, set_overlap,
@@ -72,7 +72,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     callouts = extra.get("callouts", [])
     narrow = bool(callouts)
 
-    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
+    labels = [r.get("short") or r.get("desc", "") for r in rows]
     n = len(labels)
     chart_top = DUAL_CHART_TOP
     has_ax = bool(extra.get("left", {}).get("axis_label") or extra.get("right", {}).get("axis_label"))
@@ -125,11 +125,11 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
                         align=PP_ALIGN.CENTER, font=font)
         for i, label in enumerate(labels):
             cell = cat_tbl.cell(i + 1, 0)
-            _style_tbl_cell(cell, label, bg=None, fg=C_GREY,
-                            fsize=7.5, align=PP_ALIGN.RIGHT, font=font,
+            _style_tbl_cell(cell, label,
+                            bg=C_LBGREY if i % 2 == 0 else C_WHITE,
+                            fg=C_GREY, fsize=7.5, align=PP_ALIGN.RIGHT, font=font,
                             ml=0.04, mr=0.06)
-            if i < n - 1:
-                _cell_bottom_border(cell, "D9D9D9")
+            cell.text_frame.word_wrap = True
 
         # 2. Main header table (Recall | Effectiveness columns)
         _, main_tbl = _pptx_table(
@@ -180,7 +180,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         s2 = ch2.series[0]
         set_series_color(s2, color_current)
         set_series_no_border(s2)
-        enable_data_labels(s2, color_current, font_name=font)
+        enable_data_labels(s2, C_WHITE, pos="inEnd", font_name=font)
         hide_axis(ch2, "val")
         hide_cat_labels(ch2)
         invert_cat_axis(ch2)
@@ -285,7 +285,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         s2 = ch2.series[0]
         set_series_color(s2, color_current)
         set_series_no_border(s2)
-        enable_data_labels(s2, color_current, font_name=font)
+        enable_data_labels(s2, C_WHITE, pos="inEnd", font_name=font)
         hide_axis(ch2, "val")
         hide_cat_labels(ch2)
         invert_cat_axis(ch2)
@@ -339,7 +339,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     left_prefix = left_cfg.get("field_prefix", "believ")
     right_prefix = right_cfg.get("field_prefix", "me")
 
-    labels = [r.get("short", r.get("desc", ""))[:LABEL_MAX_DUAL] for r in rows]
+    labels = [r.get("short") or r.get("desc", "") for r in rows]
     n = len(labels)
     chart_top = CHART_TOP_DUAL
     chart_h = max(MIN_CHART_HEIGHT, min(MAX_DUAL_CHART_HEIGHT, n * 0.42))

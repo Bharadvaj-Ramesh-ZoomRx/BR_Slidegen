@@ -12,7 +12,7 @@ from pptx.util import Inches, Pt
 
 from ._shared import (
     # constants
-    CHART_TOP_STD, LEGEND_GAP, SLIDE_W, CHART_DELTA_GAP,
+    CHART_TOP_STD, FOOTER_TOP, LEGEND_GAP, SLIDE_W, CHART_DELTA_GAP,
     CLUSTERED_BAR_WIDTH, DELTA_COL_WIDTH,
     MAX_CHART_HEIGHT, MAX_CLUSTERED_HEIGHT, MIN_CHART_HEIGHT,
     ROW_SCALE_FACTOR,
@@ -26,11 +26,11 @@ from ._shared import (
     DUAL_BC_R_CHART_L, DUAL_BC_R_CHART_W, DUAL_BC_R_DELTA_L, DUAL_BC_R_DELTA_W,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h,
+    _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h, _auto_label_width,
     # pptx_utils
-    C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_RED,
+    C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_RED,
     PP_ALIGN,
-    textbox, solidrect, dashed_separator,
+    textbox, solidrect, dashed_separator, callout_box,
     hide_axis, set_series_color, set_plot_area_gap, set_overlap,
     set_series_no_border, invert_cat_axis, hide_cat_labels,
     suppress_cat_axis_bullets,
@@ -100,7 +100,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         s1_label, s2_label = config.primary.name, config.competitor.name
         s1_color, s2_color = config.primary.color_current, config.competitor.color_current
 
-    labels = [r.get("desc", "")[:LABEL_MAX_CLUSTERED] for r in rows]
+    labels = [r.get("desc", "") for r in rows]
 
     # Extract values — support both flat (hi_current, other_current) and
     # prefixed (primary_current, comp_current) naming
@@ -115,34 +115,55 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         s2_prior.append(r.get(f"{s2_field}_prior"))
 
     n = len(labels)
-    chart_top = CHART_TOP_STD
-    chart_h = _cap_chart_h(min(MAX_CLUSTERED_HEIGHT, n * 0.42), chart_top)
-    row_h = chart_h / max(n, 1)
+
+    # Layout: [Label table] [Clustered bar (no cat labels)] [Delta col(s)]
+    gap = 0.08
+    hdr_h = 0.30
+    chart_top = CHART_TOP_STD + 0.05
+    max_body_h = FOOTER_TOP - chart_top - 0.55
+    row_h = min(0.42, max(0.28, max_body_h / max(n, 1)))
+    body_h = n * row_h
 
     # Delta columns
     has_prior_1 = any(p is not None for p in s1_prior)
     has_prior_2 = any(p is not None for p in s2_prior)
+    n_delta_cols = 2 if (has_prior_1 and has_prior_2) else 1
+    delta_total_w = n_delta_cols * DELTA_COL_WIDTH + (n_delta_cols - 1) * gap
 
-    # Center the chart + delta block(s)
-    if has_prior_1 and has_prior_2:
-        # Two delta columns
-        block_w = CLUSTERED_BAR_WIDTH + CHART_DELTA_GAP + DELTA_COL_WIDTH + CHART_DELTA_GAP + DELTA_COL_WIDTH
-    else:
-        # Single gap/delta column
-        block_w = CLUSTERED_BAR_WIDTH + CHART_DELTA_GAP + DELTA_COL_WIDTH
-    chart_left = (SLIDE_W - block_w) / 2
-    delta1_left = chart_left + CLUSTERED_BAR_WIDTH + CHART_DELTA_GAP
-    delta2_left = delta1_left + DELTA_COL_WIDTH + CHART_DELTA_GAP
+    # Dynamic label width + chart fills remaining
+    label_w = _auto_label_width(labels)
+    chart_w = SLIDE_W - 0.60 - label_w - delta_total_w - gap * 2
 
-    # Clustered bar
+    # Center
+    block_w = label_w + gap + chart_w + gap + delta_total_w
+    origin = (SLIDE_W - block_w) / 2
+    label_l = origin
+    chart_l = label_l + label_w + gap
+    delta1_l = chart_l + chart_w + gap
+    delta2_l = delta1_l + DELTA_COL_WIDTH + gap
+
+    # 1. Label table
+    _, ltbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n,
+                           label_l, chart_top)
+    _style_tbl_cell(ltbl.cell(0, 0), "Attribute", bg=C_HDRGREY, fg=C_WHITE,
+                    fsize=8, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
+    for i, label in enumerate(labels):
+        cell = ltbl.cell(i + 1, 0)
+        _style_tbl_cell(cell, label,
+                        bg=C_LBGREY if i % 2 == 0 else C_WHITE,
+                        fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
+                        ml=0.08, mr=0.05)
+        cell.text_frame.word_wrap = True
+
+    # 2. Clustered bar (no category labels)
     cd = CategoryChartData()
-    cd.categories = labels
+    cd.categories = [f"R{i}" for i in range(n)]
     cd.add_series(s1_label, s1_current)
     cd.add_series(s2_label, s2_current)
 
     cf = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(chart_left), Inches(chart_top), Inches(CLUSTERED_BAR_WIDTH), Inches(chart_h), cd)
+        Inches(chart_l), Inches(chart_top + hdr_h), Inches(chart_w), Inches(body_h), cd)
     ch = cf.chart
     ch.has_legend = False
 
@@ -155,45 +176,46 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
     enable_data_labels(ch.series[1], s2_color, fsize=7, font_name=font)
 
     hide_axis(ch, "val")
-    ch.category_axis.tick_labels.font.size = Pt(6.5)
-    ch.category_axis.tick_labels.font.name = font
-    suppress_cat_axis_bullets(ch)
+    hide_cat_labels(ch)
     invert_cat_axis(ch)
     set_plot_area_gap(ch, CLUSTERED_GAP)
     set_overlap(ch, -15)
     set_chart_plot_area(ch, x=0.0, y=0.0, w=1.0, h=1.0)
 
-    # Delta columns
+    # 3. Delta columns
     if has_prior_1 and has_prior_2:
-        # Two delta columns (QoQ for each series)
         d1 = [delta(c, p) if p is not None else None for c, p in zip(s1_current, s1_prior)]
         d2 = [delta(c, p) if p is not None else None for c, p in zip(s2_current, s2_prior)]
-        add_delta_table(slide, d1, left=delta1_left, top=chart_top, width=DELTA_COL_WIDTH,
-                        row_height=row_h * ROW_SCALE_FACTOR,
+        add_delta_table(slide, d1, left=delta1_l, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h,
                         header_text=s1_label.split("(")[0].strip() + " Δ",
                         font_name=font)
-        add_delta_table(slide, d2, left=delta2_left, top=chart_top, width=DELTA_COL_WIDTH,
-                        row_height=row_h * ROW_SCALE_FACTOR,
+        add_delta_table(slide, d2, left=delta2_l, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h,
                         header_text=s2_label.split("(")[0].strip() + " Δ",
                         font_name=font)
     else:
-        # Gap column (difference between series)
         gaps = [round((c1 or 0) - (c2 or 0), 1) for c1, c2 in zip(s1_current, s2_current)]
         header = extra.get("gap_header", "Gap (pp)")
-        add_delta_table(slide, gaps, left=delta1_left, top=chart_top, width=DELTA_COL_WIDTH,
-                        row_height=row_h * ROW_SCALE_FACTOR, header_text=header,
+        add_delta_table(slide, gaps, left=delta1_l, top=chart_top, width=DELTA_COL_WIDTH,
+                        row_height=row_h, header_text=header,
                         font_name=font)
 
-    # Manual legend below chart
+    # 4. Legend
+    ly = chart_top + hdr_h + body_h + LEGEND_GAP
     _make_legend(slide, [
         (s1_color, s1_label),
         (s2_color, s2_label),
-    ], 0, chart_top + chart_h + LEGEND_GAP, font,
-        center_over=(chart_left, block_w))
+    ], 0, ly, font,
+        center_over=(label_l, block_w))
 
 
 def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
-    """Stacked bar with ordinal breakdown (1st/2nd/3rd/4th recalled)."""
+    """Stacked bar with ordinal breakdown (1st/2nd/3rd/4th recalled).
+
+    Layout: [Label table] [Stacked bar chart (no cat labels)] [Total col] [Delta col]
+    Label table shows full message text with proper font sizing.
+    """
     _slide_chrome(slide, config, ask)
 
     rows = data.get(ask.data_key, [])
@@ -204,34 +226,58 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
 
     color_current, _ = _get_brand_colors(config, ask)
     font = config.font_body
+    extra = ask.extra or {}
 
     # Take top 10
     order_top = rows[:min(10, len(rows))]
-
-    labels = [r.get("desc", "")[:LABEL_MAX_STACKED] for r in order_top]
+    labels = [r.get("desc", "") for r in order_top]
 
     # Determine ordinals from data keys
-    ordinals = ask.extra.get("ordinals", ["1st", "2nd", "3rd", "4th"])
+    ordinals = extra.get("ordinals", ["1st", "2nd", "3rd", "4th"])
     ordinal_vals = []
     for o in ordinals:
         ordinal_vals.append([r.get(f"{o}_current", 0) for r in order_top])
     total_vals = [r.get("total_current", 0) for r in order_top]
 
     n = len(labels)
-    chart_top = CHART_TOP_STD
-    chart_h = max(MIN_CHART_HEIGHT, min(MAX_CHART_HEIGHT, n * 0.42))
-    row_h = chart_h / max(n, 1)
 
-    # Center the chart + value col + delta col block
-    value_col_w = 0.70
-    block_w = CLUSTERED_BAR_WIDTH + CHART_DELTA_GAP + value_col_w + CHART_DELTA_GAP + DELTA_COL_WIDTH
-    chart_left = (SLIDE_W - block_w) / 2
-    value_left = chart_left + CLUSTERED_BAR_WIDTH + CHART_DELTA_GAP
-    delta_left = value_left + value_col_w + CHART_DELTA_GAP
+    # Layout constants — table-based approach
+    total_w = 0.65           # total % column
+    delta_w = 0.60           # QoQ delta column
+    gap = 0.08               # gap between elements
+    label_w = _auto_label_width(labels)
+    chart_w = SLIDE_W - 0.60 - label_w - total_w - delta_w - gap * 3  # fill remaining
+    hdr_h = 0.30             # header row height
+    chart_top = CHART_TOP_STD + 0.05
+    max_body_h = FOOTER_TOP - chart_top - 0.60  # leave room for legend + footer
+    row_h = min(0.42, max(0.30, max_body_h / max(n, 1)))
+    body_h = n * row_h
 
-    # Build stacked bar chart
+    # Center the full block
+    total_block_w = label_w + gap + chart_w + gap + total_w + gap + delta_w
+    origin = (SLIDE_W - total_block_w) / 2
+    label_l = origin
+    chart_l = label_l + label_w + gap
+    total_l = chart_l + chart_w + gap
+    delta_l = total_l + total_w + gap
+
+    # 1. Label table — full message text, 9pt, left-aligned
+    _, ltbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n,
+                           label_l, chart_top)
+    # Header
+    _style_tbl_cell(ltbl.cell(0, 0), "Message", bg=C_HDRGREY, fg=C_WHITE,
+                    fsize=8, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
+    for i, label in enumerate(labels):
+        cell = ltbl.cell(i + 1, 0)
+        _style_tbl_cell(cell, label,
+                        bg=C_LBGREY if i % 2 == 0 else C_WHITE,
+                        fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
+                        ml=0.08, mr=0.05)
+        cell.text_frame.word_wrap = True
+
+    # 2. Stacked bar chart — no category labels (table provides them)
     cd = CategoryChartData()
-    cd.categories = labels
+    cd.categories = [f"R{i}" for i in range(n)]  # dummy labels (hidden)
     ordinal_labels = [f"{o} Recalled" for o in ordinals]
     if len(ordinal_labels) == 4:
         ordinal_labels[3] = f"{ordinals[3]}+ Recalled"
@@ -240,9 +286,11 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
 
     cf = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_STACKED,
-        Inches(chart_left), Inches(chart_top), Inches(CLUSTERED_BAR_WIDTH), Inches(chart_h), cd)
+        Inches(chart_l), Inches(chart_top + hdr_h),
+        Inches(chart_w), Inches(body_h), cd)
     ch = cf.chart
     ch.has_legend = False
+    ch.has_title = False
 
     # Color scheme: gradient from dark to light based on brand color
     r, g, b = color_current[0], color_current[1], color_current[2]
@@ -260,7 +308,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
             set_series_color(series, stack_colors[idx])
         set_series_no_border(series)
         enable_data_labels(series, label_colors[idx] if idx < len(label_colors) else C_GREY,
-                          fsize=6, pos="ctr", font_name=font)
+                          fsize=7, pos="ctr", font_name=font)
         # Hide labels on small segments
         if idx < len(ordinal_vals):
             for pt_idx, val in enumerate(ordinal_vals[idx]):
@@ -268,37 +316,33 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
                     delete_data_label(series, pt_idx)
 
     hide_axis(ch, "val")
-    ch.category_axis.tick_labels.font.size = Pt(7)
-    ch.category_axis.tick_labels.font.name = font
-    suppress_cat_axis_bullets(ch)
+    hide_cat_labels(ch)
     invert_cat_axis(ch)
-    set_plot_area_gap(ch, BAR_GAP_STD)
+    set_plot_area_gap(ch, 60)
     set_chart_plot_area(ch, x=0.0, y=0.0, w=1.0, h=1.0)
 
-    # Total column
+    # 3. Total column
     add_value_table(
         slide, total_vals,
-        left=value_left, top=chart_top, width=value_col_w, row_height=row_h * ROW_SCALE_FACTOR,
+        left=total_l, top=chart_top, width=total_w, row_height=row_h,
         header_text="Total %", value_color=color_current, font_name=font,
     )
 
-    # QoQ delta column
+    # 4. QoQ delta column
     total_prior = [r.get("total_prior", 0) for r in order_top]
     qoq_deltas = [delta(c, p) for c, p in zip(total_vals, total_prior)]
     add_delta_table(
         slide, qoq_deltas,
-        left=delta_left, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
+        left=delta_l, top=chart_top, width=delta_w, row_height=row_h,
         header_text="QoQ Δ", font_name=font,
     )
 
-    # Manual legend below chart
-    ordinal_labels = [f"{o} Recalled" for o in ordinals]
-    if len(ordinal_labels) == 4:
-        ordinal_labels[3] = f"{ordinals[3]}+ Recalled"
+    # 5. Manual legend below
+    ly = chart_top + hdr_h + body_h + LEGEND_GAP
     _make_legend(slide,
                  [(stack_colors[i], ordinal_labels[i]) for i in range(len(ordinal_labels))],
-                 0, chart_top + chart_h + LEGEND_GAP, font,
-                 center_over=(chart_left, block_w))
+                 0, ly, font,
+                 center_over=(label_l, total_block_w))
 
 
 def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
@@ -337,9 +381,9 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
         textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
         return
 
-    # Use full desc for matching; truncate only for chart display
+    # Use full desc for matching and display
     left_descs = [r.get("desc", "") for r in left_rows]
-    labels = [d[:LABEL_MAX_DUAL] for d in left_descs]
+    labels = left_descs
     n = len(labels)
 
     # Colors — explicit hex override takes priority, then brand, then defaults
@@ -363,7 +407,11 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
     right_deltas = [delta(c, p) if p is not None else None for c, p in zip(right_current, right_prior)]
 
     # Row height: use template value for ≤4 rows, scale down for more
-    row_h    = min(DUAL_BC_ROW_H, 4.0 / max(n, 1))
+    # Budget for elements below chart: axis(0.20+0.24) + legend(0.20+0.10) + callout(0.45+0.10) = 1.29
+    has_insight = bool(extra.get("insight_text"))
+    below_budget = 0.44 + (0.65 if has_insight else 0)  # axis+legend + optional callout
+    max_chart_h = FOOTER_TOP - DUAL_BC_TOP - below_budget
+    row_h    = min(DUAL_BC_ROW_H, max_chart_h / max(n, 1))
     chart_h  = n * row_h
     chart_top = DUAL_BC_TOP
     label_top = chart_top - 0.44   # brand header labels just above chart area
@@ -488,14 +536,386 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
 
     # 11. Legend — use configured labels (not brand name) for generality
     ly = ax_y + (0.24 if axis_label else LEGEND_GAP)
-    _make_legend(slide, [
+    legend_items = [
         (left_color,  left_label),
         (right_color, right_label),
         (C_GREEN, "Positive Δ"),
         (C_RED,   "Negative Δ"),
-    ], 0, ly, font,
+    ]
+    _make_legend(slide, legend_items, 0, ly, font,
         center_over=(DUAL_BC_CAT_LEFT, right_delta_l + DUAL_BC_R_DELTA_W - DUAL_BC_CAT_LEFT))
+
+    # 12. Insight callout box (optional — dashed border box below the legend)
+    insight_text = extra.get("insight_text", "")
+    if insight_text:
+        insight_y = ly + 0.30
+        insight_text = _resolve_template(insight_text, config)
+        box_w = right_delta_l + DUAL_BC_R_DELTA_W - DUAL_BC_CAT_LEFT
+        callout_box(slide, DUAL_BC_CAT_LEFT, insight_y, box_w, 0.45,
+                    text=insight_text, border_color=C_GREY, dashed=True,
+                    fsize=9, text_color=C_GREY)
 
 
 # Backward-compat alias
 render_dual_brand_compare = render_dual_bar_compare
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HII Scorecard — multi-section clustered column chart (template slide 24)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SC_TOP       = 1.88    # chart area top
+_SC_CHART_TOP = 3.28    # chart starts below section headers
+_SC_CHART_H   = 2.58    # chart height
+_SC_TBL_TOP   = 5.56    # label table top (below chart)
+_SC_TBL_H     = 0.66    # label table height
+_SC_LEFT      = 0.45    # left edge
+_SC_RIGHT     = 12.85   # right edge
+_SC_SEC_HDR_H = 0.70    # section header block height
+_SC_SEC_HDR_TOP = 2.50  # section header Y
+
+
+def render_hii_scorecard(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
+    """HII Drivers Scorecard — multi-section clustered column chart.
+
+    Mirrors template slide 24: sections separated by vertical lines, each with
+    a header group, clustered columns (HII vs Other), a label table below, and
+    an optional insight callout.
+
+    Config (ask.extra):
+        sections: list of section defs, each with:
+            label: section header text (e.g. "Visual Aid Types")
+            subtitle: optional subtitle (e.g. "(% of Interactions)")
+            summary: optional summary text shown in header box (e.g. "Avg: 3.7 | 3.1")
+            items: list of category names to include from the data
+        series: [
+            { field: "hi", label: "High Impact (n=63)", color: "#F75824" },
+            { field: "other", label: "Other (n=37)", color: "#C0C0C0" },
+        ]
+        insight_text: optional callout below chart
+    """
+    _slide_chrome(slide, config, ask)
+
+    extra = ask.extra or {}
+    font  = config.font_body
+    sections = extra.get("sections", [])
+    series_cfg = extra.get("series", [])
+
+    rows = data.get(ask.data_key, [])
+    if not rows:
+        textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+        return
+
+    # Build lookup: desc → row
+    row_map = {r.get("desc", ""): r for r in rows}
+
+    # Flatten sections into ordered categories
+    all_cats = []
+    section_ranges = []  # (start_idx, end_idx, section_cfg)
+    for sec in sections:
+        start = len(all_cats)
+        for item in sec.get("items", []):
+            all_cats.append(item)
+        section_ranges.append((start, len(all_cats), sec))
+
+    n_cats = len(all_cats)
+    if n_cats == 0:
+        textbox(slide, "No categories defined", 2, 3, 8, 1, fsize=14, color=C_RED)
+        return
+
+    # Extract series values
+    series_data = []
+    for s in series_cfg:
+        field = s.get("field", "current")
+        vals = []
+        for cat in all_cats:
+            r = row_map.get(cat, {})
+            vals.append(r.get(f"{field}_current") or r.get(field) or 0)
+        color = parse_color(s["color"]) if "color" in s else config.primary.color_current
+        series_data.append({"label": s.get("label", field), "vals": vals, "color": color})
+
+    # Chart dimensions — full width
+    chart_w = _SC_RIGHT - _SC_LEFT
+    chart_left = _SC_LEFT
+
+    # Section divider positions
+    cat_width = chart_w / n_cats
+    sec_x_positions = []
+    for start, end, sec in section_ranges:
+        x_start = chart_left + start * cat_width
+        x_end = chart_left + end * cat_width
+        sec_x_positions.append((x_start, x_end, sec))
+
+    # 1. Section header boxes and labels
+    for x_start, x_end, sec in sec_x_positions:
+        sec_w = x_end - x_start
+        label = sec.get("label", "")
+        subtitle = sec.get("subtitle", "")
+        summary = sec.get("summary", "")
+
+        # Header text
+        header_text = label
+        if subtitle:
+            header_text += f"\n{subtitle}"
+
+        textbox(slide, header_text,
+                x_start + 0.05, _SC_SEC_HDR_TOP, sec_w - 0.10, _SC_SEC_HDR_H,
+                fsize=7, color=C_GREY, align=PP_ALIGN.CENTER, font=font)
+
+        # Summary box (if provided) — above the section header text
+        if summary:
+            summary = _resolve_template(summary, config)
+            box_h = 0.48
+            box_w = min(1.5, sec_w - 0.10)
+            box_l = x_start + (sec_w - box_w) / 2
+            box_top = _SC_SEC_HDR_TOP - box_h - 0.06  # above header text with gap
+            callout_box(slide, box_l, box_top, box_w, box_h,
+                        text=summary, border_color=C_FTGREY, dashed=True,
+                        fsize=7, text_color=C_GREY)
+
+    # 2. Vertical section dividers
+    for i, (x_start, x_end, sec) in enumerate(sec_x_positions):
+        if i > 0:
+            dashed_separator(slide, x_start, _SC_TOP, _SC_TBL_TOP + _SC_TBL_H - _SC_TOP,
+                             color=C_FTGREY, width_pt=0.75, vertical=True)
+
+    # 3. Clustered column chart
+    cd = CategoryChartData()
+    cd.categories = [c[:20] for c in all_cats]
+    for sd in series_data:
+        # Values as decimals (0-1) for percentage display
+        cd.add_series(sd["label"], [v / 100.0 for v in sd["vals"]])
+
+    cf = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        Inches(chart_left), Inches(_SC_CHART_TOP),
+        Inches(chart_w), Inches(_SC_CHART_H), cd)
+    ch = cf.chart
+    ch.has_legend = False
+    ch.has_title = False
+
+    # Style series + data labels
+    for i, sd in enumerate(series_data):
+        s = ch.series[i]
+        set_series_color(s, sd["color"])
+        set_series_no_border(s)
+        enable_data_labels(s, C_GREY, pos="outEnd", font_name=font, num_fmt='0%', fsize=7)
+
+    # Axis styling
+    hide_cat_labels(ch)
+    val_ax = ch.value_axis
+    val_ax.maximum_scale = 0.80
+    val_ax.minimum_scale = 0.0
+    val_ax.has_title = False
+    val_ax.format.line.fill.background()
+    val_ax.major_gridlines.format.line.color.rgb = C_LBGREY
+    val_ax.major_gridlines.format.line.width = Pt(0.5)
+    # Number format as percentage
+    val_ax.tick_labels.number_format = '0%'
+    val_ax.tick_labels.font.size = Pt(7)
+    val_ax.tick_labels.font.color.rgb = C_FTGREY
+
+    set_plot_area_gap(ch, 80)
+    set_overlap(ch, 0)
+    set_chart_plot_area(ch, x=0.02, y=0.0, w=0.96, h=0.95)
+
+    # 4. Category label table below chart
+    n_cols = n_cats
+    col_w = chart_w / n_cols
+    _, tbl = _pptx_table(slide, [col_w] * n_cols, [_SC_TBL_H],
+                          chart_left, _SC_TBL_TOP)
+    for ci, cat in enumerate(all_cats):
+        short = cat[:25].replace(" - ", "\n").replace(" / ", "\n")
+        cell = tbl.cell(0, ci)
+        _style_tbl_cell(cell, short, bg=C_LBGREY, fg=C_GREY,
+                        fsize=6.5, align=PP_ALIGN.CENTER, font=font)
+
+    # 5. Legend
+    ly = _SC_TBL_TOP + _SC_TBL_H + 0.08
+    legend_items = [(sd["color"], _resolve_template(sd["label"], config)) for sd in series_data]
+    _make_legend(slide, legend_items, 0, ly, font,
+                 center_over=(chart_left, chart_w))
+
+    # 6. Insight callout (optional)
+    insight_text = extra.get("insight_text", "")
+    if insight_text:
+        insight_y = ly + 0.24
+        insight_text = _resolve_template(insight_text, config)
+        callout_box(slide, chart_left, insight_y, chart_w, 0.40,
+                    text=insight_text, border_color=C_GREY, dashed=True,
+                    fsize=8, text_color=C_GREY)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Dual Doughnut — side-by-side doughnut pairs (template slide 50)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_dual_doughnut(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
+    """Dual doughnut comparison: two patient segments, each with two brand doughnuts.
+
+    Layout: [Left section: Brand1 donut + Brand2 donut] | [Right section: Brand1 donut + Brand2 donut]
+
+    Config (ask.extra):
+        left:
+            label: section header (e.g. "With CNS Metastasis")
+            items: list of 2 dicts, each with:
+                data_key, brand_label, current, prior (field names or values)
+        right:
+            (same as left)
+        legend_current / legend_prior: legend labels
+    """
+    from pptx.chart.data import ChartData
+    from lxml import etree as _etree
+    from pptx.oxml.ns import qn as _qn
+
+    _slide_chrome(slide, config, ask)
+
+    extra = ask.extra or {}
+    font  = config.font_body
+
+    left_cfg  = extra.get("left", {})
+    right_cfg = extra.get("right", {})
+
+    # Doughnut dimensions
+    donut_size = 2.20
+    donut_gap  = 0.20  # gap between two donuts in a section
+    section_gap = 0.50  # gap between left and right sections
+    section_top = 3.10
+    label_h = 0.28
+
+    # Calculate total width and center
+    section_w = donut_size * 2 + donut_gap
+    total_w = section_w * 2 + section_gap
+    origin = (13.33 - total_w) / 2
+
+    l_x1 = origin
+    l_x2 = l_x1 + donut_size + donut_gap
+    sep_x = origin + section_w + section_gap / 2
+    r_x1 = origin + section_w + section_gap
+    r_x2 = r_x1 + donut_size + donut_gap
+
+    # Section headers
+    hdr_top = 1.82
+    hdr_h = 0.45
+    l_label = _resolve_template(left_cfg.get("label", "Left"), config)
+    r_label = _resolve_template(right_cfg.get("label", "Right"), config)
+    textbox(slide, l_label, l_x1, hdr_top, section_w, hdr_h,
+            fsize=9, bold=True, color=C_GREY, font=font)
+    textbox(slide, r_label, r_x1, hdr_top, section_w, hdr_h,
+            fsize=9, bold=True, color=C_GREY, font=font)
+
+    # Vertical separator
+    dashed_separator(slide, sep_x, 2.77, 2.62, color=C_FTGREY, width_pt=0.75, vertical=True)
+
+    def _add_doughnut(x, y, items_cfg, section_data):
+        """Add a single doughnut chart at (x, y)."""
+        current_val = section_data.get("current", 0)
+        prior_val = section_data.get("prior")
+        brand_label = _resolve_template(section_data.get("brand_label", ""), config)
+        brand_color = parse_color(section_data["color"]) if "color" in section_data else config.primary.color_current
+        prior_color = parse_color(section_data["color_prior"]) if "color_prior" in section_data else config.primary.color_prior
+
+        # Brand label above donut
+        textbox(slide, brand_label, x, y - 0.02, donut_size, label_h,
+                fsize=8, bold=True, color=brand_color, align=PP_ALIGN.CENTER, font=font)
+
+        # Build doughnut data: outer ring = prior, inner ring = current
+        cd = ChartData()
+        cd.categories = [brand_label, "Other"]
+
+        if prior_val is not None:
+            cd.add_series("Prior", (prior_val / 100.0, 1.0 - prior_val / 100.0))
+        cd.add_series("Current", (current_val / 100.0, 1.0 - current_val / 100.0))
+
+        cf = slide.shapes.add_chart(
+            XL_CHART_TYPE.DOUGHNUT,
+            Inches(x), Inches(y + label_h),
+            Inches(donut_size), Inches(donut_size), cd)
+        ch = cf.chart
+        ch.has_legend = False
+        ch.has_title = False
+
+        # Color the series
+        for i, ser in enumerate(ch.series):
+            has_two = prior_val is not None
+            if has_two and i == 0:
+                # Prior (outer) — lighter color
+                c = prior_color
+            else:
+                # Current (inner or only) — brand color
+                c = brand_color
+
+            # Color first point (value), make second point (remainder) light grey
+            for pi in range(2):
+                pt = ser.points[pi]
+                pt.format.fill.solid()
+                pt.format.fill.fore_color.rgb = c if pi == 0 else C_LBGREY
+                pt.format.line.fill.background()
+
+        # Center label showing current %
+        center_y = y + label_h + donut_size / 2 - 0.15
+        textbox(slide, f"{current_val:.0f}%", x, center_y, donut_size, 0.30,
+                fsize=16, bold=True, color=brand_color, align=PP_ALIGN.CENTER, font=font)
+
+    # Load data for each section
+    def _get_section_items(cfg):
+        items = cfg.get("items", [])
+        result = []
+        for item in items:
+            dk = item.get("data_key", ask.data_key)
+            desc_match = item.get("desc", "")
+            rows = data.get(dk, [])
+            row = next((r for r in rows if r.get("desc", "").startswith(desc_match)), {})
+            result.append({
+                "current": row.get("current") or item.get("current", 0),
+                "prior": row.get("prior") if row.get("prior") is not None else item.get("prior"),
+                "brand_label": item.get("brand_label", ""),
+                "color": item.get("color", "#F75824"),
+                "color_prior": item.get("color_prior", "#FFC199"),
+                "sample_current": item.get("sample_current"),
+                "sample_prior": item.get("sample_prior"),
+            })
+        return result
+
+    l_items = _get_section_items(left_cfg)
+    r_items = _get_section_items(right_cfg)
+
+    # Draw donuts
+    if len(l_items) >= 1:
+        _add_doughnut(l_x1, section_top, left_cfg, l_items[0])
+    if len(l_items) >= 2:
+        _add_doughnut(l_x2, section_top, left_cfg, l_items[1])
+    if len(r_items) >= 1:
+        _add_doughnut(r_x1, section_top, right_cfg, r_items[0])
+    if len(r_items) >= 2:
+        _add_doughnut(r_x2, section_top, right_cfg, r_items[1])
+
+    # Legend — show current and prior for each brand
+    ly = section_top + label_h + donut_size + 0.25
+    legend_current = extra.get("legend_current", config.period_current)
+    legend_prior = extra.get("legend_prior", config.period_prior)
+
+    # Collect unique brands from left items (RYB first, then TAG)
+    all_items = l_items + (r_items if r_items != l_items else [])
+    # Deduplicate by brand_label
+    seen = set()
+    unique_brands = []
+    for item in all_items:
+        bl = item.get("brand_label", "")
+        if bl not in seen:
+            seen.add(bl)
+            unique_brands.append(item)
+
+    legend_items = []
+    for item in unique_brands:
+        bl = _resolve_template(item.get("brand_label", ""), config)
+        c_cur = parse_color(item["color"])
+        c_pri = parse_color(item["color_prior"])
+        s_cur = item.get("sample_current")
+        s_pri = item.get("sample_prior")
+        cur_suffix = f" (s={s_cur})" if s_cur is not None else ""
+        pri_suffix = f" (s={s_pri})" if s_pri is not None else ""
+        legend_items.append((c_cur, f"{bl} {legend_current}{cur_suffix}"))
+        legend_items.append((c_pri, f"{bl} {legend_prior}{pri_suffix}"))
+
+    _make_legend(slide, legend_items, 0, ly, font, center_over=(0, 13.33))
