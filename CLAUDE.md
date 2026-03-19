@@ -42,7 +42,14 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
 │   │   ├── data_loaders.py    # 5 generic data extractors + JSON auto-cache
-│   │   ├── slide_renderers.py # 9 slide type renderers (RENDERERS registry)
+│   │   ├── slide_renderers/   # 16 slide type renderers (RENDERERS registry)
+│   │   │   ├── __init__.py   #   Registry + exports
+│   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width
+│   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
+│   │   │   ├── bar_dual.py   #   dual_bar_with_delta, dual_bar_qoq
+│   │   │   ├── compare.py    #   clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
+│   │   │   ├── dot.py        #   lollipop, abacus, dual_abacus, followup_rep, message_mbd
+│   │   │   └── narrative.py  #   cover, executive_summary
 │   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding helpers
 │   ├── pptx_utils/            # ★ Utility package (PRD §4.2)
@@ -134,13 +141,21 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 |------|---------|
 | `cover` | Title slide |
 | `executive_summary` | Bullet-list insights |
-| `single_bar_with_delta` | Horizontal bar + QoQ delta column |
-| `dual_bar_with_delta` | Two side-by-side bars + deltas |
+| `single_bar_with_delta` | Table-based horizontal bar + QoQ delta column |
+| `dual_bar_with_delta` | Two side-by-side bars + deltas (alternate row backgrounds) |
 | `dual_bar_qoq` | Two side-by-side Q4-vs-Q3 clustered bars + deltas |
-| `clustered_compare` | Clustered bar comparing two groups + gap/delta columns |
+| `clustered_compare` | Table-based clustered bar comparing two groups + gap/delta columns |
+| `dual_bar_compare` | Side-by-side dual brand bar comparison + insight callout |
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered + delta |
 | `two_section_bar` | Two vertically stacked bar sections |
-| `stacked_order` | Stacked bar with ordinal breakdown + total column |
+| `stacked_order` | Table-based stacked bar with ordinal breakdown + total column |
+| `lollipop` | Lollipop dot chart (current + prior dots on horizontal stems) |
+| `abacus` | XY scatter abacus with label/value tables + delta column |
+| `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
+| `followup_rep` | Template slide 51-style follow-up rep abacus with dual delta columns |
+| `hii_scorecard` | Multi-section clustered column chart with section headers + callouts |
+| `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand |
+| `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation breakdown |
 
 ## Data Source Layout
 
@@ -158,6 +173,11 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 - **Brand colors**: Defined per-project in YAML. J&J: RYB orange (`#F75824` current, `#FFC199` prior), TAG violet (`#7030A0` current, `#AD88C8` prior). Delta colors: green positive, red negative.
 - **Data format**: All extractors return standardized dicts with `desc`, `prior`, `current` keys (generic — not `q3`/`q4`).
 - **Template strings**: Headlines/sections support `{{primary.name}}`, `{{period_current}}`, `{{client}}` etc.
+- **Speaker notes**: Every slide automatically gets speaker notes with question codes and question text used to create it.
+- **Table-based layouts**: Bar chart renderers (`single_bar_with_delta`, `clustered_compare`, `stacked_order`) use a separate label table + chart (hidden cat labels) + delta column. Label table width is dynamic via `_auto_label_width()` based on longest label text. Labels wrap to 2 lines if needed.
+- **Data labels**: Bar charts use `inEnd` position with white text to prevent overflow. Abacus scatter charts show per-point percentage labels above dots with dynamic y-offset based on row count.
+- **Abacus extra options**: `hide_val_cols: true` removes value columns (when data labels show values), `current_field`/`prior_field` remap data fields, `color_current`/`color_prior` override brand colors, `legend_current`/`legend_prior` for custom legend text.
+- **Alternating row backgrounds**: Label tables and delta/value tables use consistent grey/white alternating rows (grey first).
 
 ## Dependencies
 

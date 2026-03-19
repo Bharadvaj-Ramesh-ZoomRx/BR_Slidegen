@@ -79,7 +79,12 @@ Use this table to select the correct `slide_type` for each slide. Choose based o
 | `qoq_bar_with_delta` | Single chart showing Q4 vs Q3 clustered bars + delta column | One question, one brand, prior + current as clustered pair |
 | `two_section_bar` | Two vertically stacked bar sections on one slide (e.g., RYB top + TAG bottom) | Two brands or segments shown in separate chart areas, same metric |
 | `stacked_order` | Stacked bar with ordinal breakdown (1st/2nd/3rd recall) + total column | One question with ordinal sub-rows (nested recall order) |
+| `lollipop` | Lollipop dot chart with prior + current dots on horizontal stems | Same as abacus but with connecting stems for visual emphasis |
 | `abacus` | XY scatter abacus with prior/current dots, value columns, QoQ delta | Attribute ratings with prior + current, need precise comparison |
+| `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) | Same attributes, two brands, each with two segments |
+| `followup_rep` | Follow-up rep abacus with dual brand dots + per-brand QoQ delta columns | Two brands on same axis with separate delta columns |
+| `hii_scorecard` | Multi-section clustered column chart with section headers + callout boxes | Multiple metrics grouped into sections (e.g. HII drivers) |
+| `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand | Two segments, each with two brand doughnuts showing QoQ rings |
 | `message_mbd` | Multi-column abacus for MBD (Motivation, Believability, Differentiation) | ME question with sub-dimensions (M/B/D), plus composite effectiveness |
 
 **Selection decision tree:**

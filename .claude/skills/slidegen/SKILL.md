@@ -152,13 +152,21 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 |------|---------|
 | `cover` | Title slide |
 | `executive_summary` | Bullet-list insights |
-| `single_bar_with_delta` | Horizontal bar + QoQ delta column |
-| `dual_bar_with_delta` | Two side-by-side bars + deltas |
+| `single_bar_with_delta` | Table-based horizontal bar + QoQ delta column |
+| `dual_bar_with_delta` | Two side-by-side bars + deltas (alternate row backgrounds) |
 | `dual_bar_qoq` | Two side-by-side Q4-vs-Q3 clustered bars + deltas |
-| `clustered_compare` | Clustered bar comparing two groups + gap/delta columns |
+| `clustered_compare` | Table-based clustered bar comparing two groups + gap/delta columns |
+| `dual_bar_compare` | Side-by-side dual brand bar comparison + insight callout |
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered + delta |
 | `two_section_bar` | Two vertically stacked bar sections |
-| `stacked_order` | Stacked bar with ordinal breakdown + total column |
+| `stacked_order` | Table-based stacked bar with ordinal breakdown + total column |
+| `lollipop` | Lollipop dot chart (current + prior dots on horizontal stems) |
+| `abacus` | XY scatter abacus with label/value tables + delta column |
+| `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
+| `followup_rep` | Template slide 51-style follow-up rep abacus with dual delta columns |
+| `hii_scorecard` | Multi-section clustered column chart with section headers + callouts |
+| `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand |
+| `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation |
 
 ### slide_type → extra Fields
 
@@ -168,13 +176,20 @@ Each `slide_type` expects specific `extra` fields in the ask config:
 |------------|-------------|-------------|
 | `cover` | `subtitle`, `date`, `client` | Cover slide metadata |
 | `executive_summary` | `insights: [str, ...]` | List of bullet-point insights |
-| `single_bar_with_delta` | _(none required)_ | Uses `data_key` directly |
-| `dual_bar_with_delta` | `left: {field_prefix, label, delta_header}`, `right: {field_prefix, label, delta_header}` | Two side-by-side charts |
+| `single_bar_with_delta` | _(none required)_ | Uses `data_key` directly; table-based layout with dynamic label width |
+| `dual_bar_with_delta` | `left: {field_prefix, label, delta_header}`, `right: {field_prefix, label, delta_header}`, `callouts: [{text, color}]` | Two side-by-side charts with optional callout boxes |
 | `dual_bar_qoq` | `left: {field_prefix, label, delta_header}`, `right: {field_prefix, label, delta_header}` | Two clustered Q4-vs-Q3 charts |
-| `clustered_compare` | `series: [{field, label, color}, ...]` or `primary_key` + `comp_key` for auto-merge | Two-brand comparison |
+| `clustered_compare` | `series: [{field, label, color}, ...]`, `gap_header` | Table-based two-group comparison with dynamic label width |
+| `dual_bar_compare` | `left/right: {data_key, brand, label, delta_header}`, `insight_text`, `highlight_rows` | Side-by-side brand bars with callout |
 | `qoq_bar_with_delta` | _(none required)_ | Uses `data_key` directly |
 | `two_section_bar` | `top: {data_key, label, brand}`, `bottom: {data_key, label, brand}` | Stacked sections |
-| `stacked_order` | `ordinals: ["1st", "2nd", "3rd", "4th"]` | Ordinal labels (defaults to 4) |
+| `stacked_order` | `ordinals: ["1st", "2nd", "3rd", "4th"]` | Table-based ordinal breakdown with dynamic label width |
+| `abacus` | `scale_min/max`, `scale_ticks`, `current_field/prior_field`, `color_current/prior`, `legend_current/prior`, `hide_val_cols`, `show_data_labels` | XY scatter with customizable fields, colors, and legend |
+| `dual_abacus` | `left/right: {data_key, current_field, prior_field, color_current/prior, label}`, `hide_val_cols` | Two side-by-side abacus panels |
+| `followup_rep` | `current_field/prior_field`, `delta_current_field/delta_prior_field`, `color_current/prior`, `legend_current/prior` | Template-matched follow-up rep layout (slide 51) |
+| `hii_scorecard` | `sections: [{label, subtitle, summary, items}]`, `series: [{field, label, color}]`, `insight_text` | Multi-section clustered column scorecard |
+| `dual_doughnut` | `left/right: {label, items: [{brand_label, current, prior, color, color_prior, sample_current/prior}]}` | QoQ doughnut rings per brand per segment |
+| `message_mbd` | `series: [{field, label, color}]`, `ce_field`, `ce_prior_field`, `ce_header`, `scale_label` | MBD dot chart with composite effectiveness |
 
 ---
 
@@ -206,6 +221,24 @@ Every data slide includes:
 1. `slide_header(slide, headline)` — accent line + headline + badge + separator
 2. `section_header_bar(slide, label, top=1.40)` — gray strip with chart title
 3. `slide_footer(slide, footer_text)` — source footnote at bottom
+4. **Speaker notes** — auto-generated with question codes and question text used to create the slide
+
+## Table-Based Layout Features
+
+Bar chart renderers (`single_bar_with_delta`, `clustered_compare`, `stacked_order`) use a table+chart layout:
+- **Label table** (left): Full message text at 7.5pt with word wrap and alternating grey/white rows
+- **Bar chart** (center): Hidden category labels, `inEnd` white data labels
+- **Delta column** (right): Consistent alternating rows matching the label table (grey first)
+- **Dynamic label width**: `_auto_label_width(labels)` computes optimal width (2.50"–5.50") based on longest label; chart width fills remaining space
+- **Insight callout**: `dual_bar_compare` and `hii_scorecard` support `insight_text` displayed in a dashed-border callout box below the legend
+
+## Abacus/Scatter Features
+
+- **Data labels**: Both prior and current series show percentage labels above dots
+- **Dynamic y-offset**: Labels scale with row count to avoid overlapping previous row gridlines
+- **hide_val_cols**: Set `true` to remove value columns when data labels show the values; chart widens to fill freed space
+- **Custom field mapping**: `current_field`/`prior_field` remap data fields (e.g. `primary_current`/`comp_current` for brand comparison)
+- **Custom colors/legend**: Override brand colors and legend labels via `extra` config
 
 ---
 
