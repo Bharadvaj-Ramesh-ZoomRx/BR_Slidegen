@@ -48,7 +48,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
 │   │   │   ├── bar_dual.py   #   dual_bar_with_delta, dual_bar_qoq
 │   │   │   ├── compare.py    #   clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
-│   │   │   ├── dot.py        #   lollipop, abacus, dual_abacus, followup_rep, message_mbd
+│   │   │   ├── dot.py        #   abacus, dual_abacus, followup_rep, message_mbd
 │   │   │   └── narrative.py  #   cover, executive_summary
 │   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding helpers
@@ -149,7 +149,6 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered + delta |
 | `two_section_bar` | Two vertically stacked bar sections |
 | `stacked_order` | Table-based stacked bar with ordinal breakdown + total column |
-| `lollipop` | Lollipop dot chart (current + prior dots on horizontal stems) |
 | `abacus` | XY scatter abacus with label/value tables + delta column |
 | `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
 | `followup_rep` | Template slide 51-style follow-up rep abacus with dual delta columns |

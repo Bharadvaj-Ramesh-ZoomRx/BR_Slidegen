@@ -160,7 +160,6 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered + delta |
 | `two_section_bar` | Two vertically stacked bar sections |
 | `stacked_order` | Table-based stacked bar with ordinal breakdown + total column |
-| `lollipop` | Lollipop dot chart (current + prior dots on horizontal stems) |
 | `abacus` | XY scatter abacus with label/value tables + delta column |
 | `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
 | `followup_rep` | Template slide 51-style follow-up rep abacus with dual delta columns |
