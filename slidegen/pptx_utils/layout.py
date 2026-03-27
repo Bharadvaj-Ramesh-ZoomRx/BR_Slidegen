@@ -86,25 +86,25 @@ def slide_header(slide, headline: str, module_label: str = "Personal Promotion M
     f_display = font or FONT_DISPLAY
     f_text = font or FONT_TEXT
 
-    # Module label (small grey text above badge)
-    textbox(slide, module_label,
-            5.5, 0.05, 7.70, 0.22,
-            fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_text)
+    # Module label + badge (skip if module_label is empty)
+    if module_label:
+        textbox(slide, module_label,
+                5.5, 0.05, 7.70, 0.22,
+                fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_text)
+
+        badge_w = 2.20
+        badge_h = 0.36
+        badge_l = SLIDE_W_IN - badge_w - 0.10
+        badge_t = 0.91
+        solidrect(slide, badge_l, badge_t, badge_w, badge_h, C_RED)
+        textbox(slide, module_label.upper(),
+                badge_l, badge_t, badge_w, badge_h,
+                fsize=7, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_text)
 
     # Headline
     textbox(slide, headline,
             0.20, 0.16, 10.55, 0.66,
             fsize=22, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=f_display)
-
-    # Module badge (compact single-line pill, top-right)
-    badge_w = 2.20
-    badge_h = 0.36
-    badge_l = SLIDE_W_IN - badge_w - 0.10
-    badge_t = 0.91
-    solidrect(slide, badge_l, badge_t, badge_w, badge_h, C_RED)
-    textbox(slide, module_label.upper(),
-            badge_l, badge_t, badge_w, badge_h,
-            fsize=7, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_text)
 
 
 def slide_footer(slide, footer_text: str, font: Optional[str] = None) -> None:

@@ -10,9 +10,9 @@ Use this to choose the right chart type given the data and communication goal.
 What am I showing?
 
 Ranking / comparison of items at one point in time?
-  |-- Are items compared between two brands (J&J vs AZ)?
+  |-- Are items compared between two brands/groups?
   |     YES --> Clustered horizontal bar (BAR_CLUSTERED)
-  |             Two bars per row: Q4 orange + Q3 pale orange
+  |             Two bars per row: current + prior period
   |             With delta column right of chart
   |
   |-- Is it attribute RATINGS (0-100 scale, not % recall)?
@@ -24,21 +24,24 @@ Ranking / comparison of items at one point in time?
                  Labels inside each segment: set_stacked_label_pos(series, "ctr")
 
 Change over time (monthly, quarterly)?
-  |-- Multiple messages / attributes tracked over months?
-  |     YES --> Multi-line chart (LINE)
-  |             One line per message, smooth curves optional
-  |             Dots at key endpoints, value labels right-of-line
+  |-- Multiple series tracked over periods (scorecard)?
+  |     YES --> trended_scorecard: mini line chart grid
+  |             Or trended_activity: side-by-side line + stacked column panels
   |
   |-- Single metric trend (one line)?
         YES --> Line chart (LINE) or simple bar (COLUMN)
 
 Two-dimensional positioning (importance vs performance)?
-  --> Scatter chart (XY_SCATTER) with quadrant fills
-      scatter_quadrant_fills() BEFORE add_chart
+  --> quadrant_scatter: scatter chart with quadrant fills
+      Quadrant fills drawn BEFORE add_chart
 
 Composition / share breakdown (pie-like)?
   --> Donut chart (DOUGHNUT) with hole size 60-70%
       set_pie_slice_colors() to override slice fills
+
+Multi-dimensional matrix with values per cell?
+  --> heatmap_table: table with gradient fills + delta columns
+      No chart — uses pptx tables with per-cell color interpolation
 
 Single large statistic?
   --> stat_callout() -- not a chart, just styled textboxes
@@ -48,15 +51,17 @@ Single large statistic?
 
 ## Chart Type Reference
 
-| Chart type | python-pptx enum | Typical use in ZoomRx decks |
+| Chart type | python-pptx enum | Typical use |
 |---|---|---|
-| Clustered horizontal bar | `XL_CHART_TYPE.BAR_CLUSTERED` | MR/ME message recall and effect (core deliverable) |
+| Clustered horizontal bar | `XL_CHART_TYPE.BAR_CLUSTERED` | Message recall, effectiveness (core deliverable) |
 | Stacked horizontal bar | `XL_CHART_TYPE.BAR_STACKED` | Category composition (reach by channel, SOV) |
 | 100% stacked horizontal bar | `XL_CHART_TYPE.BAR_STACKED_100` | Share breakdown where total = 100% |
 | Dot-plot (line, markers only) | `XL_CHART_TYPE.LINE` | Attribute ratings, rep performance abacus |
-| Scatter | `XL_CHART_TYPE.XY_SCATTER` | Importance vs performance quadrant maps; also used for reference lines |
-| Line chart | `XL_CHART_TYPE.LINE` | Time trends (R3M reach, frequency, SOV) |
+| Scatter | `XL_CHART_TYPE.XY_SCATTER` | Importance vs performance quadrant maps |
+| Line chart | `XL_CHART_TYPE.LINE` | Time trends (reach, frequency, SOV) |
+| Stacked column | `XL_CHART_TYPE.COLUMN_STACKED` | Share of voice vertical bars |
 | Donut | `XL_CHART_TYPE.DOUGHNUT` | Share of interactions, interaction mix |
+| Heatmap table | N/A (pptx table with gradient fills) | Message recall by channel, cross-tabulations |
 
 ---
 
@@ -64,13 +69,13 @@ Single large statistic?
 
 Apply in this priority order:
 
-1. **J&J / primary brand** -- `C_RYB_Q4` (#F75824 deep orange) for Q4; `C_RYB_Q3` (#FFC199 pale) for Q3
-2. **AstraZeneca / TAGRISSO** -- `C_TAG` (#7030A0 purple)
-3. **Industry average / benchmark** -- `C_GREY` (#505050) with diamond marker or dashed line
-4. **Positive signal** -- `C_GREEN` (#00B050) for NPP module or positive callouts
-5. **TAGRISSO + Chemo combo** -- use a distinct blue or teal if needed (define ad-hoc)
+1. **Primary brand** — `config.primary.color_current` for current period; `config.primary.color_prior` for prior
+2. **Competitor brand** — `config.competitor.color_current`
+3. **Benchmark / average** — `C_GREY` with diamond marker or dashed line
+4. **Positive signal** — `C_GREEN` for positive callouts
+5. **Additional series** — define ad-hoc colors in ask.extra
 
-Always use `set_series_color(series, color)` -- never hardcode colors in chart XML directly.
+Always use `set_series_color(series, color)` — never hardcode colors in chart XML directly. Colors should come from the project's YAML config `brands:` section.
 
 ---
 
@@ -78,12 +83,12 @@ Always use `set_series_color(series, color)` -- never hardcode colors in chart X
 
 | Axis | Rule |
 |---|---|
-| Category (Y) axis on MR chart | Show labels (left chart in two-chart layout) |
-| Category (Y) axis on ME chart | Suppress with `hide_cat_labels(chart)` |
-| Category (Y) axis on dot-plot right panel | Suppress with `hide_cat_labels(chart)` |
-| Value (X) axis | Usually hidden: `hide_axis(chart, "val")` on dot-plots |
-| Value (X) axis on bar charts | Keep visible; set number format `"0"` for integers, `"0%"` for percentages |
-| Gridlines | Off by default; enabled only on specific slides: `set_gridlines(chart, major=True)` |
+| Category (Y) axis on left chart | Show labels |
+| Category (Y) axis on right chart | Suppress with `hide_cat_labels(chart)` |
+| Value (X) axis on dot-plots | Usually hidden: `hide_axis(chart, "val")` |
+| Value (X) axis on bar charts | Keep visible; set number format `"0"` or `"0%"` |
+| Both axes on line charts | Usually hidden: `hide_axes=True` in `add_line_chart()` |
+| Gridlines | Off by default; enable selectively: `set_gridlines(chart, major=True)` |
 
 ---
 
@@ -94,26 +99,25 @@ Always use `set_series_color(series, color)` -- never hardcode colors in chart X
 | Horizontal bar | Outside-end: `set_datalabel_pos_outside_end(series)` |
 | Stacked bar | Inside-center: `set_stacked_label_pos(series, "ctr")` |
 | Dot-plot (abacus) | Right of marker: `set_marker_data_label_pos(series, "r")` |
-| Line chart | Right of endpoint: `set_marker_data_label_pos(series, "r")` |
-| Donut/pie | Outside or none -- suppress if crowded |
+| Line chart | First series above, rest below: `label_positions=["t", "b"]` |
+| Stacked column | Center: `pos="ctr"` with white text |
+| Donut/pie | Outside or none — suppress if crowded |
 
 Color data labels to match series:
-- J&J data labels: `set_data_label_color(series, C_RYB_Q4)`
-- AZ data labels: `set_data_label_color(series, C_TAG)`
+- `set_data_label_color(series, series_color)`
 
 ---
 
 ## Reference Lines
 
 Use `add_val_axis_reference_line(chart, x_value, ...)` for:
-- Industry average benchmark (gray dashed, labeled "Industry Avg")
-- Threshold lines (e.g. "35% target" or "Adequate recall threshold")
-- Pre/post comparison markers
+- Benchmark lines (gray dashed)
+- Threshold lines (e.g. "35% target")
 
 ```python
 add_val_axis_reference_line(chart, x_value=35,
-                             label="Industry Avg",
+                             label="Benchmark",
                              color=C_GREY, dash="dash", width_pt=1.0)
 ```
 
-Note: This injects a supplementary scatter series into the chart's plot area. It appears as a clean vertical dashed line on horizontal bar charts.
+Note: This injects a supplementary scatter series into the chart's plot area.

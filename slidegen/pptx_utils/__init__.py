@@ -61,6 +61,7 @@ from .charts import (
     CHART_PATTERNS,
     enable_data_labels, delete_data_label,
     add_single_bar_chart, add_clustered_bar_chart,
+    add_line_chart, add_stacked_column_chart, add_scatter_chart,
 )
 
 # ── Table builders ───────────────────────────────────────────────────────────

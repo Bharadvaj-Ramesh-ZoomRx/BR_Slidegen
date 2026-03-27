@@ -139,7 +139,7 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 
 ### Slide Types
 
-9 reusable slide types, each driven by YAML config:
+20 reusable slide types, each driven by YAML config:
 
 | Slide Type | Description |
 |------------|-------------|
@@ -149,9 +149,20 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 | `dual_bar_with_delta` | Two side-by-side bars + deltas (e.g. MR + ME) |
 | `dual_bar_qoq` | Two side-by-side Q4-vs-Q3 clustered bars + deltas |
 | `clustered_compare` | Clustered bar comparing two groups + delta/gap columns |
+| `dual_bar_compare` | Side-by-side dual brand bar comparison + insight callout |
 | `qoq_bar_with_delta` | Q4 vs Q3 clustered bar + delta column |
 | `two_section_bar` | Two vertically stacked bar sections (e.g. RYB Rx + TAG Rx) |
 | `stacked_order` | Stacked bar with ordinal breakdown + total column |
+| `abacus` | XY scatter abacus with label/value tables + delta column |
+| `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
+| `followup_rep` | Follow-up rep abacus with dual delta columns |
+| `hii_scorecard` | Multi-section clustered column chart with section headers |
+| `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments |
+| `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation |
+| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) |
+| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
+| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
+| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
 
 ## Wave Versioning
 
@@ -205,7 +216,7 @@ slidegen/                     # SlideGen system
     config_generator.py        # Data discovery + config scaffolding
     project_config.py          # ProjectConfig schema + YAML loader
     data_loaders.py            # Generic data extractors (5 methods) + JSON auto-cache
-    slide_renderers.py         # 9 slide type renderers
+    slide_renderers/           # 20 slide type renderers (package)
     orchestrator.py            # Pipeline entry + per-slide regen + PPTX backup
   pptx_utils/                 # Utility package (8 modules)
     brand.py                   # BRAND{} dict, colors, fonts, constants

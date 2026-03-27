@@ -28,6 +28,9 @@ from .bar import (
 from .bar_dual import render_dual_bar_with_delta, render_dual_bar_qoq
 from .compare import render_clustered_compare, render_stacked_order, render_dual_bar_compare, render_hii_scorecard, render_dual_doughnut
 from .dot import render_abacus, render_dual_abacus, render_followup_rep, render_message_mbd
+from .line import render_trended_scorecard, render_trended_activity
+from .quadrant import render_quadrant_scatter
+from .heatmap import render_heatmap_table
 
 # REGISTRY — maps slide_type string → renderer function
 RENDERERS = {
@@ -48,6 +51,10 @@ RENDERERS = {
     "followup_rep": render_followup_rep,
     "hii_scorecard": render_hii_scorecard,
     "dual_doughnut": render_dual_doughnut,
+    "trended_scorecard": render_trended_scorecard,
+    "trended_activity": render_trended_activity,
+    "quadrant_scatter": render_quadrant_scatter,
+    "heatmap_table": render_heatmap_table,
 }
 
 __all__ = [
@@ -67,4 +74,8 @@ __all__ = [
     "render_dual_abacus",
     "render_hii_scorecard",
     "render_dual_doughnut",
+    "render_trended_scorecard",
+    "render_trended_activity",
+    "render_quadrant_scatter",
+    "render_heatmap_table",
 ]

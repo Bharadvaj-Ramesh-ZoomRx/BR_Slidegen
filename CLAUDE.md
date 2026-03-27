@@ -42,13 +42,16 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
 │   │   ├── data_loaders.py    # 5 generic data extractors + JSON auto-cache
-│   │   ├── slide_renderers/   # 16 slide type renderers (RENDERERS registry)
+│   │   ├── slide_renderers/   # 20 slide type renderers (RENDERERS registry)
 │   │   │   ├── __init__.py   #   Registry + exports
 │   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width
 │   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
 │   │   │   ├── bar_dual.py   #   dual_bar_with_delta, dual_bar_qoq
 │   │   │   ├── compare.py    #   clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
 │   │   │   ├── dot.py        #   abacus, dual_abacus, followup_rep, message_mbd
+│   │   │   ├── line.py       #   trended_scorecard, trended_activity
+│   │   │   ├── quadrant.py   #   quadrant_scatter
+│   │   │   ├── heatmap.py    #   heatmap_table
 │   │   │   └── narrative.py  #   cover, executive_summary
 │   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding helpers
@@ -155,6 +158,10 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 | `hii_scorecard` | Multi-section clustered column chart with section headers + callouts |
 | `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand |
 | `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation breakdown |
+| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) |
+| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
+| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
+| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
 
 ## Data Source Layout
 

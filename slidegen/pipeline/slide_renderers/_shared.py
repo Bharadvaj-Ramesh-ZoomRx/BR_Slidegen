@@ -27,6 +27,7 @@ from slidegen.pptx_utils import (
     _get_or_add, suppress_para_bullets, suppress_cat_axis_bullets, cell_vcenter,
     enable_data_labels, delete_data_label,
     add_single_bar_chart, add_clustered_bar_chart,
+    add_line_chart, add_stacked_column_chart, add_scatter_chart,
     add_delta_table, add_value_table,
     cover_slide,
 )
