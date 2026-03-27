@@ -19,13 +19,16 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │       └── PET_Q3Q4_2025/           #   One folder per wave
 │       │           ├── source_data.xlsx     #     Survey data (Excel)
 │       │           ├── call_notes.docx      #     Client call notes
-│       │           ├── prior_wave_es.md     #     Prior wave ES findings
+│       │           ├── prior_wave_es.md     #     Prior wave ES findings (text)
+│       │           ├── [wave_report].pptx   #     Prior wave deck — read by /build-project-context
 │       │           ├── pet_project_kbq.odt  #     Study design + KBQs
-│       │           ├── market_context.md    #     Curated market context
 │       │           ├── kbqs.md              #     Standing KBQs
 │       │           └── survey_context.md    #     Survey instrument + Q codes
 │       ├── context/           # ★ SYSTEM GENERATED intermediates (gitignored)
+│       │   ├── market_context.md             # /market-context — product-level, NOT wave-versioned
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned context outputs
+│       │       ├── prior_wave_context.md     # Stage 0.5a: /prior-wave-context (if prior files exist)
+│       │       ├── survey_context.md         # Stage 0.5b: /survey-context (if survey draft exists)
 │       │       ├── project_context.md        # Stage 1: /build-project-context
 │       │       ├── hypothesis_bank.md        # Stage 2: /hypotheses
 │       │       ├── slide_plan.md             # Stage 3: /slide-plan
@@ -256,51 +259,144 @@ Regenerate all slides
 
 When the user says **"Create slides for projects/{name}"** or **"Run the full create workflow"**:
 
-**IMPORTANT: After Stages 1, 2, and 3, pause and present a summary to the user. Wait for confirmation before proceeding.** Stage 0 runs automatically first. Stages 4-5 are internal — proceed directly from Stage 3 confirmation through to deck output without pausing.
+**Gate structure: Stages 0 through 0.5c run automatically without individual gates — each sub-skill asks only one lightweight file-list confirmation before extracting. The single user validation gate is at the end of Stage 1: the user reviews ALL generated context files before Stage 2 begins. Stages 5–6 are internal — no gate.**
 
-### Stage 0 — Index Excel → JSON (automatic)
-Converts `source_data.xlsx` into `context/{wave}/source_data.json` with a `_sheets` key indexing every row's question code and description across all sheets. Runs automatically before Stage 1. All downstream stages can search `_sheets` for question codes without touching Excel again. Uses `index_excel()` from `slidegen.pipeline`.
+### Stage 0 — Index Excel → JSON (automatic, always)
+Converts `source_data.xlsx` into `context/{wave}/source_data.json`. Runs first, no prompt.
 ```python
 from slidegen.pipeline import index_excel
 index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
             "projects/{name}/context/{wave}/source_data.json")
 ```
 
+### Stage 0.5a — Market Context (`/market-context`) — auto if context/market_context.md missing
+Checks if `context/market_context.md` already exists. If yes, uses it as-is (no re-run). If missing, auto-generates from Claude's clinical/competitive knowledge (+ any enrichment files in the project folder), runs the 3-round adversarial fact-check, and writes `context/market_context.md`. To force regeneration, user must explicitly say "regenerate market context."
+**No gate** — runs silently. Fact-check summary shown inline; user only pauses if flagged claims need review.
+
+### Stage 0.5b — Prior Wave Context (`/prior-wave-context`) — auto if prior wave files detected
+Scans `input/wave/{wave}/` for prior wave files (`.pptx` reports, `prior_wave_es.md`, readout `.docx`). If found: shows the user one file-list confirmation, extracts all confirmed files, writes `context/{wave}/prior_wave_context.md`. If not found: skipped. Files already consumed here are **excluded** from Stage 1 scanning.
+**One lightweight prompt** — file list only. No content gate.
+
+### Stage 0.5c — Survey Context (`/survey-context`) — auto if survey draft detected
+Scans `input/wave/{wave}/` for survey draft files (`survey`, `questionnaire`, `draft`, `instrument` in name; any format). If found: one file-list confirmation, extracts + parses question codes + message lists, writes `context/{wave}/survey_context.md`. If not found: uses hand-written `survey_context.md` from input folder if present, otherwise flags as missing. Files consumed here are **excluded** from Stage 1. Survey context does **not** feed Stage 1 — it feeds Stage 2 directly.
+**One lightweight prompt** — file list + code/message count. No content gate.
+
 ### Stage 1 — Build Project Context (`/build-project-context`)
-Reads source documents from `input/wave/{wave}/` (call_notes.docx, pet_project_kbq.odt, market_context.md, kbqs.md, prior_wave_es.md) and synthesizes them into `context/{wave}/project_context.md` — a structured file covering study design, KBQs, wave-specific hypotheses, analytical priorities, methodology notes, and message reference.
-**→ Pause:** Show section headers + key content summary. Ask user to confirm before Stage 2.
+Reads the **remaining** input files not already consumed by Stages 0.5b/c (call notes, methodology `.odt`, KBQs, any misc docs) **plus** the context files already generated: `context/market_context.md` and `context/{wave}/prior_wave_context.md`. Does NOT re-read prior wave reports or survey drafts — those are handled upstream. Synthesizes `context/{wave}/project_context.md` covering: study design, KBQs, wave hypotheses (from call notes + prior wave context), analytical priorities, methodology notes, message reference.
+
+**⚠ KBQs dependency:** `KBQs.md` must exist in `input/wave/{wave}/` — it is hand-written by the research team and has no auto-generation path. If missing, flag and ask user to provide it before Stage 2.
+
+**→ SINGLE VALIDATION GATE after Stage 1:** Present all generated context files for user review:
+- `context/market_context.md` — product-level competitive/clinical context
+- `context/{wave}/prior_wave_context.md` — prior wave findings (if generated)
+- `context/{wave}/survey_context.md` — question codes + message list (if generated)
+- `context/{wave}/project_context.md` — study design + field intel + wave hypotheses
+
+Show a summary table with file name, section count, and key stats per file. Ask user to review and confirm or edit before Stage 2. This is the only content gate before hypotheses.
 
 ### Stage 2 — Generate Hypothesis Bank (`/hypotheses`)
-Reads market_context.md, project_context.md, kbqs.md, and survey_context.md from the input/context folders. Can reference `source_data.json` → `_sheets` to verify question codes exist in the data. Produces `context/{wave}/hypothesis_bank.md` — testable predictions organized by KBQ domain, each with rationale, "Test with:" question codes, methodology artifact flags, and action item flags.
-**→ Pause:** Show total hypothesis count, domain breakdown, methodology artifacts, and action items. Ask user to confirm before Stage 3.
+Reads five context files. Required: `market_context.md`, `project_context.md`, `KBQs.md`. Strongly recommended: `prior_wave_context.md`, `survey_context.md`.
 
-### Stage 3 — Build Slide Plan (`/slide-plan`)
-Reads the hypothesis bank, KBQs, and survey context. Can reference `source_data.json` → `_sheets` to verify chart feasibility (e.g., does Q2_20Z exist in RYB?). Clusters hypotheses into slides, deduplicates, sequences into narrative sections. Produces `context/{wave}/slide_plan.md`.
-**→ Pause:** Show slide count, section breakdown, and slide titles. Ask user to confirm before Stage 4.
+| File | Provides | If missing |
+|------|---------|-----------|
+| `context/market_context.md` | Competitive/clinical landscape | Stop |
+| `context/{wave}/project_context.md` | Study design + field intel + wave expectations | Stop |
+| `input/wave/{wave}/KBQs.md` | Organising structure — all KBQ domains | Stop |
+| `context/{wave}/prior_wave_context.md` | Domain-level metrics, recs, gaps from prior delivered report | Proceed, reduced coverage |
+| `context/{wave}/survey_context.md` | Question codes + message list ("Test with:" lines) | Proceed, no codes |
 
-### Stage 4 — Generate config.yaml (internal — no user gate)
-Maps the slide plan to YAML extractions and asks. **Must search `source_data.json` → `_sheets` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 5.
+`prior_wave_context.md` drives a mandatory hypothesis type: **PRIOR WAVE VALIDATION** — for every domain finding, every carried-forward recommendation, and every unanswered question from the prior report. These close the loop between what was advised and what is being measured.
 
-### Stage 5 — Run `generate_deck()`
+Produces `context/{wave}/hypothesis_bank.md`.
+**→ Pause:** Show hypothesis count by type (new, prior wave validation, action item, methodology artifact), domain breakdown. Confirm before Stage 3.
+
+### Stage 3 — Validate Data + Write Insights & ES (`/sfea-insight-writer`)
+Reads `hypothesis_bank.md`, `project_context.md`, and `source_data.json`. Runs in four sub-phases:
+- **Phase 0 (auto):** Validates every hypothesis against actual survey data — extracts prior/current/delta per question code, produces `context/{wave}/validated_analysis.md`
+- **Phase 1:** Writes data-grounded talking headlines per domain → `context/{wave}/slide_headlines.md` ✋ User confirms
+- **Phase 2:** Writes Executive Summary in selected format → `context/{wave}/exec_summary.md` ✋ User confirms
+- **Phase 3:** Writes numbered Recommendations → appended to exec_summary.md
+
+### Stage 4 — Build Slide Plan (`/slide-plan`)
+Reads `validated_analysis.md`, `slide_headlines.md`, `exec_summary.md`, `hypothesis_bank.md`, `kbqs.md`, and `survey_context.md`. Clusters hypotheses into slides with chart specs, synthesized per-slide insights (drawn from validated analysis), and matched headlines. Always includes Cover (Slide 1), ES (Slide 2), and Recs (Slide 3) before data slides. Produces `context/{wave}/slide_plan.md`.
+**→ Pause:** Show slide count, section breakdown, slide titles, and ES/Recs placement. Ask user to confirm before Stage 5.
+
+### Stage 5 — Generate config.yaml (internal — no user gate)
+Maps the slide plan to YAML extractions and asks. **Must search `source_data.json` → `_sheets` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 6.
+
+### Stage 6 — Run `generate_deck()`
 Executes the pipeline: loads config → extracts data (or reads JSON cache) → renders all slides → saves `output/{wave}/deck.pptx`. If `source_data.json` has only the index (from Stage 0), automatically extracts from Excel and saves the full JSON.
 **→ Report:** Show success/failure, slide count, output path, and any gaps.
 
 ```
-input/wave/{wave}/source_data.xlsx
-    ↓ Stage 0: index_excel()          ← automatic, no gate
-context/{wave}/source_data.json (_sheets index)
-input/wave/{wave}/*.md + *.docx + *.odt
-    ↓ Stage 1: /build-project-context
-context/{wave}/project_context.md
+INPUT FOLDER: input/wave/{wave}/
+  source_data.xlsx          → Stage 0 only (auto)
+  *prior wave files*        → Stage 0.5b only
+  *survey draft*            → Stage 0.5c only
+  KBQs.md                   → Stage 1 + Stage 2 (hand-written, no auto-gen)
+  call_notes, odt, misc     → Stage 1 only
+
+─────────────────────────────────────────────────── no gates ──
+Stage 0    index_excel()          →  context/{wave}/source_data.json
+
+Stage 0.5a /market-context        →  context/market_context.md
+           (skip if already exists;   NOT wave-versioned)
+           (one prompt: flagged claims only)
+
+Stage 0.5b /prior-wave-context    →  context/{wave}/prior_wave_context.md
+           (skip if no prior files;   one prompt: file list)
+
+Stage 0.5c /survey-context        →  context/{wave}/survey_context.md
+           (skip if no survey draft;  one prompt: file list + code count)
+─────────────────────────────────────────────────── no gates ──
+
+Stage 1    /build-project-context
+           reads: call_notes + odt + KBQs.md + misc input files
+                + context/market_context.md
+                + context/{wave}/prior_wave_context.md
+           does NOT read: prior wave pptx, survey draft, source_data
+           writes: context/{wave}/project_context.md
+
+✋ SINGLE VALIDATION GATE — user reviews all 4 context files:
+     context/market_context.md          (competitive/clinical)
+     context/{wave}/prior_wave_context.md  (prior wave findings)
+     context/{wave}/survey_context.md   (question codes + messages)
+     context/{wave}/project_context.md  (study design + field intel)
+
+Stage 2    /hypotheses
+           reads: market_context.md        (required)
+                + project_context.md       (required)
+                + KBQs.md                  (required, hand-written)
+                + prior_wave_context.md     (strongly recommended)
+                + survey_context.md        (strongly recommended)
+           hypothesis types generated:
+                New · PRIOR WAVE VALIDATION · [ACTION ITEM] · METHODOLOGY ARTIFACT
+           writes: context/{wave}/hypothesis_bank.md
+    ✋ User confirms count by type + domain coverage
+
+Stage 3    /sfea-insight-writer   →  validated_analysis.md
+                                  →  slide_headlines.md      ✋
+                                  →  exec_summary.md         ✋
+
+Stage 4    /slide-plan            →  context/{wave}/slide_plan.md
+    ✋ User confirms slide count + section breakdown
+
+Stage 5    config.yaml            ← internal, no gate
+Stage 6    generate_deck()        →  output/{wave}/deck.pptx
+```
     ✋ User confirms
-    ↓ Stage 2: /hypotheses             (can reference _sheets)
-context/{wave}/hypothesis_bank.md
+    ↓ Stage 3: /sfea-insight-writer
+        Phase 0 (auto): validate vs source_data.json
+context/{wave}/validated_analysis.md
+        Phase 1: headlines        ✋ User confirms
+context/{wave}/slide_headlines.md
+        Phase 2–3: ES + Recs      ✋ User confirms
+context/{wave}/exec_summary.md
+    ↓ Stage 4: /slide-plan
+context/{wave}/slide_plan.md      (includes per-slide insights + ES/Recs slides)
     ✋ User confirms
-    ↓ Stage 3: /slide-plan             (can reference _sheets)
-context/{wave}/slide_plan.md
-    ✋ User confirms
-    ↓ Stage 4: config.yaml             ← internal, searches _sheets
-    ↓ Stage 5: generate_deck()
+    ↓ Stage 5: config.yaml                    ← internal, searches _sheets
+    ↓ Stage 6: generate_deck()
 output/{wave}/deck.pptx
 ```
 
