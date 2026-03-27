@@ -124,6 +124,7 @@ class ProjectConfig:
     data_source_path: str = ""
     context_path: str = ""       # wave-versioned context folder (system-generated files)
     section_icon_path: str = ""  # small icon for section header bars
+    raw_data_source_path: str = ""  # respondent-level raw data Excel (source_raw_data.xlsx)
     synapse_api_url: str = ""    # deprecated — use synapse.api_url instead
     synapse: Optional[SynapseConfig] = None  # Synapse API config for banner plan download
 
@@ -275,6 +276,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     out_path = _resolve_path(raw.get("output_path", ""))
     ctx_path = _resolve_path(raw.get("context_path", ""))
     icon_path = _resolve_path(raw.get("section_icon_path", ""))
+    raw_data_path = _resolve_path(raw.get("raw_data_source_path", ""))
 
     # Sections (optional): [{"name": "...", "start": "ask_id"}, ...]
     sections = raw.get("sections", [])
@@ -312,6 +314,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         data_source_path=data_path,
         context_path=ctx_path,
         section_icon_path=icon_path,
+        raw_data_source_path=raw_data_path,
         synapse_api_url=raw.get("synapse_api_url", ""),
         synapse=synapse_cfg,
     )

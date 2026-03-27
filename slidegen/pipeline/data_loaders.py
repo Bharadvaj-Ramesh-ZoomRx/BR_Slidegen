@@ -638,6 +638,10 @@ def _extract_all_from_excel(config) -> dict:
                 converter=converter,
             )
 
+        elif ex.method == "raw_aggregate":
+            # Deferred — handled after main extraction loop (needs raw_data)
+            pass
+
         else:
             print(f"  [WARN] Unknown extraction method: {ex.method} for {ex.id}")
 
@@ -680,6 +684,85 @@ def load_all_data(config) -> dict:
     for ex in config.extractions:
         if ex.method == "mock":
             data[ex.id] = ex.params.get("rows", [])
+
+    # ── Raw data aggregation (respondent-level) ──
+    raw_extractions = [ex for ex in config.extractions if ex.method == "raw_aggregate"]
+    if raw_extractions:
+        from slidegen.pipeline.raw_data_loader import (
+            load_raw_data, aggregate_raw, aggregate_raw_multi_code,
+            aggregate_raw_cross_brand, aggregate_raw_by_segment,
+            validate_raw_extractions,
+        )
+
+        raw_data = load_raw_data(config)
+        if raw_data is None:
+            logger.warning("raw_data_source_path not set or file missing — skipping raw_aggregate extractions")
+        else:
+            # Validate all raw extractions upfront
+            warnings = validate_raw_extractions(config, raw_data)
+            for w in warnings:
+                print(f"  [WARN] {w}")
+            # Build global label shortener
+            global_shortener = None
+            if config.label_shortcuts:
+                shortcuts = [{"keywords": ls.keywords, "short": ls.short} for ls in config.label_shortcuts]
+                global_shortener = make_label_shortener(shortcuts)
+
+            for ex in raw_extractions:
+                params = ex.params
+                label_fn = None
+                if params.get("use_label_shortcuts") and global_shortener:
+                    label_fn = global_shortener
+                elif "label_shortcuts" in params:
+                    label_fn = make_label_shortener(params["label_shortcuts"])
+
+                sheet_key = params.get("raw_sheet", ex.sheet)
+                raw_mode = params.get("mode", "single")
+
+                if raw_mode == "multi_code":
+                    result = aggregate_raw_multi_code(
+                        raw_data, sheet_key=sheet_key,
+                        codes=params["codes"],
+                        agg=params.get("agg", "top2box"),
+                        quarter_current=params.get("quarter_current", config.period_current),
+                        quarter_prior=params.get("quarter_prior", config.period_prior),
+                    )
+
+                elif raw_mode == "cross_brand":
+                    result = aggregate_raw_cross_brand(
+                        raw_data,
+                        primary_sheet=params.get("primary_sheet", "primary"),
+                        comp_sheet=params.get("comp_sheet", "competitor"),
+                        code=params["code"],
+                        agg=params.get("agg", "top2box"),
+                        quarter_current=params.get("quarter_current", config.period_current),
+                        quarter_prior=params.get("quarter_prior", config.period_prior),
+                        label_fn=label_fn,
+                    )
+
+                elif raw_mode == "by_segment":
+                    result = aggregate_raw_by_segment(
+                        raw_data, sheet_key=sheet_key,
+                        code=params["code"],
+                        segment_code=params["segment_code"],
+                        segment_values=params["segment_values"],
+                        agg=params.get("agg", "top2box"),
+                        quarter=params.get("quarter_current", config.period_current),
+                        label_fn=label_fn,
+                    )
+
+                else:  # single (default)
+                    result = aggregate_raw(
+                        raw_data, sheet_key=sheet_key,
+                        code=params["code"],
+                        agg=params.get("agg", "top2box"),
+                        quarter_current=params.get("quarter_current", config.period_current),
+                        quarter_prior=params.get("quarter_prior", config.period_prior),
+                        label_fn=label_fn,
+                    )
+
+                data[ex.id] = result
+                print(f"  {ex.id}: {len(result)} rows (raw_aggregate/{raw_mode})")
 
     # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes
