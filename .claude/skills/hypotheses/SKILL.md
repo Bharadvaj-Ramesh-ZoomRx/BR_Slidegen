@@ -1,6 +1,6 @@
 ---
 name: hypotheses
-description: "Use when generating a hypothesis bank from context files. Trigger when: user says 'generate hypotheses', 'build hypothesis bank', or needs testable predictions organized by KBQs for a PET study wave. Reads Market Context, Project Context, KBQs, and optionally Survey Context files at runtime — no hardcoded project knowledge."
+description: "Use when generating a hypothesis bank from context files. Trigger when: user says 'generate hypotheses', 'build hypothesis bank', or needs testable predictions organized by KBQs for a PET study wave. Reads 5 context files: Market Context, Project Context, Prior Wave Context, KBQs, and Survey Context. Prior wave findings are fed directly to generate validation hypotheses — testing whether prior wave findings persist, reverse, or improve in the current wave."
 ---
 
 # Hypotheses Generator v2 — Storyboard-Integrated
@@ -9,25 +9,51 @@ You are a senior market research analyst. Your job is to generate a comprehensiv
 
 ---
 
-## STEP 1 — Get context file paths
+## STEP 1 — Resolve context file paths
 
-Ask the user:
-1. Path to the **Market Context file** — market, disease, product, competitive context
-2. Path to the **Project Context file** — study design, field intelligence, methodology changes, open action items, prior wave ES
-3. Path to the **KBQs file** — business questions organized by domain
-4. Path to the **Survey Context file** *(optional but strongly recommended)* — question codes, message list, response scales, segment definitions
+Ask the user for the **project folder** and **wave name** only. Derive all paths:
 
-Accept absolute paths. If files 1-3 don't exist, tell the user which is missing and stop. If file 4 is not provided, proceed but flag: all "Test with:" lines will be analytical descriptions only, not question-code references.
+| File | Path | Required? |
+|------|------|-----------|
+| **Market Context** | `{project}/context/market_context.md` | Required |
+| **Project Context** | `{project}/context/{wave}/project_context.md` | Required |
+| **Prior Wave Context** | `{project}/context/{wave}/prior_wave_context.md` | Required if exists |
+| **KBQs** | `{project}/input/Wave/{wave}/KBQs.md` | Required |
+| **Survey Context** | `{project}/context/{wave}/survey_context.md` | Strongly recommended |
+
+Check which files exist:
+```bash
+find "{project}/context" -name "*.md" | sort
+find "{project}/input" -name "KBQs.md" | sort
+```
+
+Report status before reading:
+```
+Context files:
+  ✓ market_context.md          (competitive/clinical landscape)
+  ✓ project_context.md         (study design + field intel + wave hypotheses)
+  ✓ prior_wave_context.md      (prior wave findings — domain metrics + recs)
+  ✓ KBQs.md                   (organising structure)
+  ✓ survey_context.md          (question codes + message list)
+```
+
+If `prior_wave_context.md` is missing: proceed but flag — all prior-wave validation hypotheses will be based on narrative summaries in `project_context.md` only (less specific).
+
+If `survey_context.md` is missing: proceed but flag — "Test with:" lines will be analytical descriptions, not question-code references.
+
+If either required file (`market_context.md`, `project_context.md`, `KBQs.md`) is missing: stop and tell the user which is absent.
 
 ---
 
 ## STEP 2 — Read all files in full
 
-Use the Read tool to read all provided files completely before generating anything. Do not proceed until all are read.
+Read every available file completely before generating anything. Do not proceed until all are read.
 
-- **Market Context** provides: clinical evidence, competitive dynamics, physician mindset, product knowledge, market landscape
-- **Project Context** provides: study design (TP1/TP2), field intelligence (client-shared), open action items, wave-specific methodology changes, active messages, prior wave ES findings
-- **KBQs** provides: the organizing structure — all business questions by domain
+- **Market Context** — clinical evidence, competitive dynamics, physician mindset, product knowledge, pipeline threats
+- **Project Context** — study design (TP1/TP2), field intelligence (client-shared), methodology changes, open action items, wave-specific expectations
+- **Prior Wave Context** — structured domain-by-domain findings from the prior delivered report: headlines, specific metrics, segment splits (Academic vs Community), open action items, verbatim recommendations carried forward
+- **KBQs** — the organising structure; all business questions by domain
+- **Survey Context** — question codes, question text, response scales, tracked message list, segment operationalization
 - **Survey Context** provides: question codes, question text, response scales, tracked message labels, segment operationalization — used exclusively to write precise "Test with:" lines
 
 ---
@@ -78,10 +104,32 @@ Each item here MUST generate at least one hypothesis in STEP 4.
 
 ---
 
-### D. Prior Wave Anomalies
+### D. Prior Wave Findings — Validation Baseline
 
-List any prior wave metrics flagged as unexpected, declining, or concerning.
-Each item here MUST generate at least one hypothesis explaining the likely cause.
+This section is populated **primarily from `prior_wave_context.md`** — the structured extract of the prior delivered report. If `prior_wave_context.md` exists, use it as the authoritative source for prior wave data; supplement with `project_context.md` Section 3 only where the structured file has gaps.
+
+Extract three layers:
+
+**D1 — Metrics to validate (continuation/reversal hypotheses)**
+For every domain in `prior_wave_context.md`, list:
+- The headline finding (verbatim from the prior report)
+- The specific metric value if available (from the Metrics Snapshot table)
+- The trend direction stated (↑/↓/→)
+- The segment split if reported (Academic vs Community)
+
+Each finding generates at least one directional hypothesis: will this finding **persist**, **strengthen**, **reverse**, or **diverge further by segment** in the current wave? The rationale must explain the mechanism — what in the field, market, or client response would drive continuity or change.
+
+**D2 — Recommendations to test (action-validation hypotheses)**
+For every recommendation in `prior_wave_context.md` Section 5 (Recommendations Carried Forward):
+- State the recommendation verbatim
+- Generate a hypothesis about whether it was acted on and what the measurable effect would be
+- Format: "If reps acted on the recommendation to [X], then [metric Y] will show [direction] vs prior wave, because [mechanism]"
+- These hypotheses are inherently ACTION ITEM flagged
+
+**D3 — Anomalies and open questions**
+List any prior wave metrics flagged as unexpected, declining, or not yet explained.
+From `prior_wave_context.md` Section 6 (Unanswered Questions / Gaps).
+Each item MUST generate at least one hypothesis explaining the likely cause or expected resolution.
 
 ---
 
@@ -118,8 +166,10 @@ For every context item — wave change, prior wave finding, client action item, 
 ### Coverage requirements (non-negotiable)
 
 - Every methodology change — at least one hypothesis about the metric it affects. Flag: `METHODOLOGY ARTIFACT`
-- Every open action item from Project Context — at least one hypothesis
-- Every prior wave anomaly from the ES — at least one directional hypothesis for this wave
+- Every open action item from Project Context or Prior Wave Context — at least one hypothesis. Flag: `[ACTION ITEM]`
+- **Every domain finding in Prior Wave Context** — at least one validation hypothesis (persist / strengthen / reverse / diverge). Flag: `PRIOR WAVE VALIDATION`
+- **Every recommendation in Prior Wave Context Section 5** — at least one action-validation hypothesis testing whether it was acted on. Flag: `[ACTION ITEM]` + `PRIOR WAVE VALIDATION`
+- **Every unanswered question in Prior Wave Context Section 6** — at least one hypothesis proposing a resolution
 - Every wave change (new message, new formulation, VA redesign, survey change) — at least one hypothesis
 - Every KBQ domain — at least one hypothesis
 
@@ -155,10 +205,12 @@ Draw from all 4 files:
 **KBQ:** [Full KBQ text]
 
 **H[N] — [What will happen to which metric — stated as a specific prediction]**
-[2-3 sentences of rationale. Name the specific causal mechanism. Reference real specifics: message labels (e.g., NCCN-NSCLC, Efficacy-OS), question codes with their text (e.g., Q2.10 — "Which of these messages do you specifically recall hearing?", Q1.85b — "How likely are you to increase your prescribing?"), prior wave outcomes from the ES, clinical data points, competitive moves. Write as continuous prose — no bullet points inside rationale.]
+[2-3 sentences of rationale. Name the specific causal mechanism. Reference real specifics: message labels (e.g., NCCN-NSCLC, Efficacy-OS), question codes with their text (e.g., Q2.10 — "Which of these messages do you specifically recall hearing?", Q1.85b — "How likely are you to increase your prescribing?"), prior wave metrics from prior_wave_context.md (e.g., "recall was 45% in Q4"), clinical data points, competitive moves. Write as continuous prose — no bullet points inside rationale.]
+Prior wave baseline: [value or finding from prior_wave_context.md this hypothesis validates — omit line if no prior wave data available for this metric]
 Test with: [question code — "abbreviated question text"] split by [segment or cut, if applicable]
-METHODOLOGY ARTIFACT — verify before client presentation [add this line only if the hypothesis is about a methodology change creating a false signal]
-[ACTION ITEM] [add this line only if the hypothesis directly addresses a client open action item]
+METHODOLOGY ARTIFACT — verify before client presentation [add only if hypothesis is about a methodology change creating a false signal]
+PRIOR WAVE VALIDATION — [persist / strengthen / reverse / diverge] [add only if hypothesis directly tests a prior wave finding or recommendation]
+[ACTION ITEM] [add only if hypothesis directly addresses a client open action item or recommendation carried forward]
 
 ```
 
@@ -191,5 +243,9 @@ Repeat H[N] blocks continuously across all domains. Number does not restart per 
 11. **Every empirical claim in a rationale must be traceable to a named source.** If the rationale states a specific number, trend, or prior wave finding (e.g., "~40% of interactions did not lead with 1L", "academic HCPs recalled 3+ messages"), that claim must come from one of the four input files — prior wave ES in Project Context, field intelligence, client action item, or Market Context. Do not invent specificity to make a hypothesis appear grounded. If a plausible structural pattern exists (e.g., academic vs community engagement differences) but no prior wave data supports a specific claim, state the direction only — do not fabricate a number. Hypotheses built on general pharma knowledge with no project-specific signal are disqualified under Rule 3, regardless of how specific they appear.
 
 12. **Do not compare across respondent pools.** This study uses separate survey arms for each brand (TP1/TP2 per brand). RYB respondents and TAG respondents are different HCPs in different call contexts. A hypothesis that compares a RYB metric for RYB respondents against the same metric for TAG respondents (e.g., "HCPs who recall the RYB OS message will rate it higher than HCPs who recall the TAG OS message") is not a within-subject comparison — it is a cross-population comparison confounded by respondent differences, brand exposure, and call context. Only compare across brands when the study design explicitly provides a shared benchmark or cross-brand rating question. Otherwise, test each brand's metrics in absolute terms or vs prior wave.
+
+14. **Prior wave validation hypotheses require a baseline.** A `PRIOR WAVE VALIDATION` hypothesis must cite a specific prior wave finding as its baseline — either a metric value from the Metrics Snapshot table in `prior_wave_context.md`, or a verbatim headline finding. Do not write a validation hypothesis that says "X may have changed" without stating what X was in the prior wave.
+
+15. **Recommendation-validation hypotheses must name the recommendation.** When generating a hypothesis from a carried-forward recommendation (D2), quote or closely paraphrase the recommendation so the client can see their own guidance being tested. These are the most client-valued hypotheses — they close the loop between what was advised and what was measured.
 
 13. **Do not conflate different survey constructs.** Message Effectiveness (ME — motivation/believability rating of a recalled message) and message association (which brand an HCP connects a claim to) measure different things and cannot be used interchangeably to validate the same hypothesis. If a hypothesis requires two different constructs to both be true, split it into two separate hypotheses — one per construct — each with its own clean "Test with:" line.
