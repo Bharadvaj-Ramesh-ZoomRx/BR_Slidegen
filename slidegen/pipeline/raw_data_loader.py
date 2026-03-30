@@ -4,6 +4,10 @@ raw_data_loader.py — Respondent-level raw data loader and aggregator.
 Reads source_raw_data.xlsx (one row per HCP response) and computes
 aggregated metrics (top-2-box %, yes %, recall %, mean) on the fly.
 
+Caching: Parsed data is cached as ``source_raw_data.pkl`` (pickle) for fast
+reloading and native Python type preservation. The pkl auto-invalidates when
+the source Excel changes (hash check). Delete the pkl to force re-parsing.
+
 Excel layout (per sheet):
     Row 3: Column headers (Id, User Id, Quarter, ...)
     Row 5: Question codes (Q1_87Z, C1_81Z, Q2_10Z, ...)
@@ -20,6 +24,7 @@ import hashlib
 import json
 import logging
 import os
+import pickle
 from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Callable
@@ -194,6 +199,126 @@ def _parse_raw_sheet(wb, sheet_name: str) -> dict:
     }
 
 
+# ── DataFrame → raw_data conversion ─────────────────────────────────────
+
+def dataframes_to_raw_data(
+    dataframes: dict,
+    header_metadata: dict | None = None,
+    sheet_map: dict | None = None,
+) -> dict:
+    """Convert Synapse JSON-sourced DataFrames to the dict format used by aggregators.
+
+    The DataFrame columns match the Synapse download-responses layout: 32 static
+    metadata columns followed by N dynamic question response columns.  The header
+    metadata (from NDJSON header objects) provides question codes and type strings.
+
+    Args:
+        dataframes: {sheet_name: pd.DataFrame} from synapse_raw_fetcher.
+        header_metadata: {sheet_name: header_rows list} from pkl ``_header_metadata``.
+        sheet_map: Optional mapping of sheet_name → sheet_key.  If omitted, sheet
+            names are normalised to lowercase keys.
+
+    Returns:
+        dict in the same shape as ``load_raw_data()`` — ``{sheet_key: {...}}``.
+    """
+    if not dataframes:
+        return {}
+
+    raw_data = {}
+    header_metadata = header_metadata or {}
+
+    for sheet_name, df in dataframes.items():
+        if sheet_map:
+            sheet_key = sheet_map.get(sheet_name, sheet_name.lower().replace(" ", "_"))
+        else:
+            sheet_key = sheet_name.lower().replace(" ", "_")
+
+        col_names = list(df.columns)
+        h_rows = header_metadata.get(sheet_name, [])
+
+        # Try to extract question codes from header rows.
+        # Synapse header_rows layout (8 rows): SGQA, QIDs, titles, text, option_groups, sub_q_text, abstract
+        # The row at index _ROW_CODES (4) contains question codes.
+        codes_row = h_rows[_ROW_CODES] if len(h_rows) > _ROW_CODES else []
+        qtypes_row = h_rows[_ROW_QTYPES] if len(h_rows) > _ROW_QTYPES else []
+        qtext_row = h_rows[_ROW_QTEXT] if len(h_rows) > _ROW_QTEXT else []
+
+        columns = {}
+        code_map = defaultdict(list)
+
+        for ci in range(_COL_META_END, len(col_names)):
+            code = codes_row[ci] if ci < len(codes_row) else ""
+            if not code:
+                # Fallback: use column name as code
+                code = str(col_names[ci]).strip() if ci < len(col_names) else ""
+            code = str(code).strip()
+            if not code:
+                continue
+
+            type_str = str(qtypes_row[ci]) if ci < len(qtypes_row) and qtypes_row[ci] else ""
+            parts = type_str.split("-", 3)
+            if len(parts) >= 4 and parts[0].strip() == code:
+                q_type = parts[1].strip()
+                attribute = parts[3].strip()
+            elif len(parts) >= 3 and any(t in parts[1] for t in ("Input", "choice", "Radio", "Array", "Text", "Yes")):
+                q_type = parts[1].strip()
+                attribute = ""
+            else:
+                q_type = ""
+                attribute = type_str.strip()
+
+            q_text = str(qtext_row[ci])[:200] if ci < len(qtext_row) and qtext_row[ci] else ""
+
+            ci_str = str(ci)
+            columns[ci_str] = {
+                "code": code,
+                "text": q_text,
+                "type": q_type,
+                "attribute": attribute,
+            }
+            code_map[code].append(ci_str)
+
+        # Build respondent list from DataFrame rows
+        respondents = []
+        id_col_idx = _COL_ID
+        quarter_col_idx = _COL_QUARTER
+
+        for _, row in df.iterrows():
+            resp_id = row.iloc[id_col_idx] if id_col_idx < len(row) else None
+            if resp_id is None:
+                continue
+            quarter = row.iloc[quarter_col_idx] if quarter_col_idx < len(row) else None
+
+            resp_values = {}
+            for ci_str in columns:
+                ci = int(ci_str)
+                if ci < len(row):
+                    val = row.iloc[ci]
+                    if val is not None and str(val) != "" and str(val) != "nan":
+                        try:
+                            resp_values[ci_str] = float(val) if isinstance(val, (int, float)) else val
+                        except (ValueError, TypeError):
+                            resp_values[ci_str] = val
+
+            respondents.append({
+                "id": resp_id,
+                "quarter": quarter,
+                "values": resp_values,
+            })
+
+        raw_data[sheet_key] = {
+            "columns": columns,
+            "code_map": dict(code_map),
+            "respondents": respondents,
+        }
+
+        n_resp = len(respondents)
+        n_codes = len(code_map)
+        print(f"    {sheet_name} → {sheet_key}: {n_resp} respondents, {n_codes} question codes")
+
+    return raw_data
+
+
 # ── Caching ─────────────────────────────────────────────────────────────
 
 def _file_hash(path: str) -> str:
@@ -202,18 +327,21 @@ def _file_hash(path: str) -> str:
         return hashlib.md5(f.read()).hexdigest()[:12]
 
 
-def _raw_json_path(config) -> str:
-    """Path to source_raw_data.json cache."""
+def _raw_pkl_path(config) -> str:
+    """Path to source_raw_data.pkl cache."""
     if config.context_path:
-        return os.path.join(config.context_path, "source_raw_data.json")
+        return os.path.join(config.context_path, "source_raw_data.pkl")
     return os.path.join(
         os.path.dirname(getattr(config, "raw_data_source_path", "")),
-        "source_raw_data.json",
+        "source_raw_data.pkl",
     )
 
 
 def load_raw_data(config) -> dict | None:
     """Load and cache parsed raw data from source_raw_data.xlsx.
+
+    Caching uses pickle (.pkl) for fast serialisation and native Python type
+    preservation. The pkl auto-invalidates when the source Excel changes.
 
     Returns dict mapping sheet_key → parsed sheet data, or None if no raw data file.
     """
@@ -221,17 +349,25 @@ def load_raw_data(config) -> dict | None:
     if not raw_path or not os.path.exists(raw_path):
         return None
 
-    json_path = _raw_json_path(config)
+    pkl_path = _raw_pkl_path(config)
 
-    # Check cache
-    if os.path.exists(json_path):
-        with open(json_path, "r", encoding="utf-8") as f:
-            cached = json.load(f)
-        meta = cached.get("_meta", {})
-        if meta.get("raw_hash") == _file_hash(raw_path):
-            n_sheets = sum(1 for k in cached if not k.startswith("_"))
-            print(f"  Raw data loaded from cache: {json_path} ({n_sheets} sheets)")
-            return cached
+    # Check pkl cache
+    if os.path.exists(pkl_path):
+        try:
+            with open(pkl_path, "rb") as f:
+                cached = pickle.load(f)
+            meta = cached.get("_meta", {})
+            if meta.get("raw_hash") == _file_hash(raw_path):
+                n_sheets = sum(1 for k in cached if not k.startswith("_"))
+                print(f"  Raw data loaded from pkl cache: {pkl_path} ({n_sheets} sheets)")
+                return cached
+            else:
+                print("  Raw data pkl stale (Excel changed) — re-parsing")
+        except (pickle.UnpicklingError, EOFError, Exception) as e:
+            logger.warning("Failed to load pkl cache: %s — re-parsing", e)
+
+    # Remove legacy JSON cache if present
+    _remove_legacy_json_cache(config)
 
     # Parse from Excel
     print(f"  Parsing raw data: {os.path.basename(raw_path)}")
@@ -261,19 +397,34 @@ def load_raw_data(config) -> dict | None:
 
     wb.close()
 
-    # Save cache
+    # Save pkl cache
     raw_data["_meta"] = {
         "parsed_at": datetime.now().isoformat(),
         "raw_file": os.path.basename(raw_path),
         "raw_hash": _file_hash(raw_path),
     }
 
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(raw_data, f, indent=2, default=str)
-    print(f"  Saved raw data cache: {json_path}")
+    os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
+    with open(pkl_path, "wb") as f:
+        pickle.dump(raw_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(pkl_path) / (1024 * 1024)
+    print(f"  Saved raw data pkl cache: {pkl_path} ({size_mb:.1f} MB)")
 
     return raw_data
+
+
+def _remove_legacy_json_cache(config) -> None:
+    """Remove old source_raw_data.json cache if present (migrated to pkl)."""
+    if config.context_path:
+        json_path = os.path.join(config.context_path, "source_raw_data.json")
+    else:
+        json_path = os.path.join(
+            os.path.dirname(getattr(config, "raw_data_source_path", "")),
+            "source_raw_data.json",
+        )
+    if os.path.exists(json_path):
+        os.remove(json_path)
+        print(f"  Removed legacy JSON cache: {os.path.basename(json_path)}")
 
 
 # ── Quarter discovery & matching ──────────────────────────────────────
@@ -569,6 +720,130 @@ def aggregate_raw_cross_brand(raw_data: dict,
         results.append(row)
 
     return results
+
+
+def merge_vq_data(raw_data: dict, vq_data: dict, vq_questions: list[dict],
+                   sheet_key: str = "primary") -> None:
+    """Merge virtual question responses into parsed raw data in-place.
+
+    Adds VQ columns to the sheet's columns dict and code_map, and adds
+    VQ response values to each respondent's values dict.
+
+    Args:
+        raw_data: Parsed raw data dict from load_raw_data().
+        vq_data: {qid: [{users_wave_id, value, ...}]} from VQ export.
+        vq_questions: [{qid, title, question, type}] VQ metadata.
+        sheet_key: Which sheet to merge into.
+    """
+    sheet = raw_data.get(sheet_key)
+    if not sheet:
+        return
+
+    columns = sheet.get("columns", {})
+    code_map = sheet.get("code_map", {})
+    respondents = sheet.get("respondents", [])
+
+    # Build respondent lookup: id → respondent dict
+    resp_lookup = {}
+    for r in respondents:
+        rid = str(r.get("id", ""))
+        if rid:
+            resp_lookup[rid] = r
+
+    # Assign virtual column indices starting after the last real column
+    max_col = max((int(k) for k in columns.keys()), default=100) + 1
+    vq_count = 0
+
+    for vq in vq_questions:
+        qid = vq["qid"]
+        if qid not in vq_data:
+            continue
+
+        col_idx = str(max_col)
+        vq_code = f"VQ_{qid}"
+
+        columns[col_idx] = {
+            "code": vq_code,
+            "text": vq.get("question", vq.get("title", "")),
+            "type": vq.get("type", "virtual"),
+            "attribute": vq.get("title", f"VQ {qid}"),
+        }
+        code_map[vq_code] = [col_idx]
+
+        # Merge values into respondents
+        for vq_row in vq_data[qid]:
+            rid = str(vq_row.get("users_wave_id", ""))
+            if rid in resp_lookup:
+                resp_lookup[rid]["values"][col_idx] = vq_row["value"]
+
+        max_col += 1
+        vq_count += 1
+
+    if vq_count:
+        print(f"  Merged {vq_count} virtual questions into {sheet_key}")
+
+
+def apply_segment_filter(raw_data: dict, segment_cuts: list, sheet_key: str = "primary") -> dict:
+    """Apply segment filter cuts to raw data, returning filtered respondents.
+
+    For "filter" mode segments: keeps only respondents matching the specified values.
+    For "groupby" mode segments: no filtering (groupby is applied during aggregation).
+
+    Args:
+        raw_data: Parsed raw data dict.
+        segment_cuts: List of SegmentCutConfig-like dicts with id, mode, values.
+        sheet_key: Which sheet to filter.
+
+    Returns:
+        New raw_data dict with filtered respondents (original not modified).
+    """
+    filter_cuts = [sc for sc in segment_cuts if sc.get("mode") == "filter" and sc.get("values")]
+    if not filter_cuts:
+        return raw_data
+
+    sheet = raw_data.get(sheet_key)
+    if not sheet:
+        return raw_data
+
+    code_map = sheet.get("code_map", {})
+    respondents = sheet.get("respondents", [])
+
+    # For each filter segment, find the column and filter respondents
+    filtered = list(respondents)
+    for sc in filter_cuts:
+        seg_code = sc.get("segment_code", "")
+        if not seg_code:
+            # Try to find segment column by segment name in columns
+            seg_name = sc.get("name", "").lower()
+            for code, cols in code_map.items():
+                if seg_name in code.lower():
+                    seg_code = code
+                    break
+
+        if not seg_code:
+            logger.warning("Segment filter: no segment_code for segment id=%s", sc.get("id"))
+            continue
+
+        seg_cols = code_map.get(seg_code, [])
+        if not seg_cols:
+            continue
+
+        seg_ci = str(seg_cols[0])
+        accepted = [str(v).lower() for v in sc["values"]]
+        before = len(filtered)
+        filtered = [
+            r for r in filtered
+            if str(r["values"].get(seg_ci, "")).lower() in accepted
+        ]
+        print(f"  Segment filter '{seg_code}' ({sc['values']}): {before} → {len(filtered)} respondents")
+
+    # Return new raw_data with filtered respondents
+    import copy
+    new_data = copy.copy(raw_data)
+    new_sheet = dict(sheet)
+    new_sheet["respondents"] = filtered
+    new_data[sheet_key] = new_sheet
+    return new_data
 
 
 def aggregate_raw_by_segment(raw_data: dict, sheet_key: str, code: str,

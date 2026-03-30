@@ -120,6 +120,7 @@ User says: "Regenerate with fresh data"
 | Live COM edit on open PowerPoint? | Use `LiveEditor` from `slidegen.edit` |
 | Building config from a slide plan? | `scaffold_config_from_plan()` — auto-selects methods from `_codes` |
 | Synapse data available as JSON? | Use `synapse_report` extraction method (requires `SYNAPSE_API_KEY` env var — without it, pipeline uses Excel only) |
+| Need raw respondent data with VQs and segment cuts? | Use `synapse_raw` extraction method — auto-fetches VQs, applies segment groupby/filter, aggregates locally |
 | Config has errors before deck gen? | `config.validate()` catches all issues upfront |
 
 ---
@@ -131,6 +132,7 @@ config.yaml  ->  ProjectConfig (dataclasses)  ->  validate()  ->  errors or proc
                       |
 Track A (JSON-first):  Synapse /reports/generate  ->  fetch_data_as_json()  ->  source_data.json  (only if SYNAPSE_API_KEY set)
 Track B (Excel):       Excel file  ->  data_loaders.load_all_data()  ->  dict[extraction_id -> list[dict]]  (default — always available)
+Track C (Raw API):     Synapse /surveys/download-responses + VQs + segments  ->  fetch_all_raw()  ->  local aggregation
                       |
 Cache: source_data.json (invalidates on Excel hash OR extraction params hash change)
                       |
@@ -173,6 +175,7 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
 | `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
 | `synapse_report` | JSON-first: calls Synapse `/reports/generate` API (params: `analysis_id`, `reporting_plan_id`, `time_period_map`) |
+| `synapse_raw` | Raw API: fetches respondent-level data + VQs + segments, aggregates locally (same modes as `raw_aggregate`) |
 
 ---
 

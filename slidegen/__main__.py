@@ -15,13 +15,15 @@ def main():
         "  create        Create a demo slide (or import SlideBuilder for custom)\n"
         "  edit          Interactive live editor (requires open PowerPoint)\n"
         "  reconcile     Sync registry from live PowerPoint state\n"
-        "  fetch-synapse Fetch fresh data from Synapse async API → source_data.xlsx\n"
+        "  fetch-synapse Fetch banner plan data from Synapse API → source_data.xlsx\n"
+        "  fetch-raw     Fetch raw respondent data from Synapse API → source_raw_data.xlsx\n"
         "\n"
         "Examples:\n"
         "  python -m slidegen create\n"
         "  python -m slidegen edit demo_slide.pptx\n"
         "  python -m slidegen reconcile demo_slide.pptx\n"
         "  python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml --url <url>\n"
+        "  python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml\n"
     )
 
     if len(sys.argv) < 2:
@@ -43,6 +45,9 @@ def main():
         _cli()
     elif cmd == "fetch-synapse":
         from slidegen.pipeline.synapse_fetcher import _cli
+        _cli()
+    elif cmd == "fetch-raw":
+        from slidegen.pipeline.synapse_raw_fetcher import _cli
         _cli()
     else:
         print(f"Unknown command: {cmd}\n")

@@ -197,15 +197,8 @@ def _download_and_save(
 
 
 def _resolve_api_key(api_key: Optional[str]) -> str:
-    if api_key:
-        return api_key
-    key = os.environ.get(_ENV_KEY_NAME, "")
-    if key:
-        return key
-    raise ValueError(
-        f"API key not provided. Pass --api-key on the CLI or "
-        f"set the {_ENV_KEY_NAME} environment variable."
-    )
+    from slidegen.pipeline.synapse_auth import resolve_api_key
+    return resolve_api_key(api_key)
 
 
 def _build_headers(api_key: str) -> dict:

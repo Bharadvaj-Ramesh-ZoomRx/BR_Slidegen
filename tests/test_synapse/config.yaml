@@ -1,0 +1,164 @@
+# Test Synapse Pipeline — Mock data simulating Synapse API responses
+# 5 slides: Cover, ES, Single Bar, Clustered Compare, Dual Bar
+project:
+  name: "Synapse Pipeline Test"
+  client: "TestCorp Pharma"
+  wave: ""
+  period_current: "Q4'25"
+  period_prior: "Q3'25"
+
+output_path: "output/deck.pptx"
+
+brands:
+  primary:
+    name: "DrugX"
+    full_name: "DrugX (evolocumab)"
+    color_current: "#F75824"
+    color_prior: "#FFC199"
+  competitor:
+    name: "DrugY"
+    full_name: "DrugY (alirocumab)"
+    color_current: "#7030A0"
+    color_prior: "#AD88C8"
+
+fonts:
+  display: "Calibri"
+  body: "Calibri"
+
+# Sheets required by schema but unused with mock method
+sheets:
+  primary:
+    name: "MOCK"
+    q_prior_col: 0
+    q_current_col: 1
+  competitor:
+    name: "MOCK"
+    q_prior_col: 0
+    q_current_col: 1
+
+sample_sizes:
+  primary:   { prior: 150, current: 150 }
+  competitor: { prior: 120, current: 120 }
+
+# Synapse config — points to local dev server
+synapse:
+  api_url: "http://localhost:8000/api"
+  project_id: 1
+  survey_ids: [1]
+  deliverable_ids: [1, 2]
+  segment_ids: [1]
+  reporting_plan_id: 1
+  segments:
+    - id: 1
+      name: "Practice Setting"
+      mode: "groupby"
+    - id: 2
+      name: "Region"
+      mode: "filter"
+      values: ["Northeast", "West"]
+
+extractions:
+  # Mock data simulating what Synapse would return for message recall
+  - id: drugx_message_recall
+    method: mock
+    params:
+      rows:
+        - { desc: "Demonstrated CV risk reduction in clinical trials", code: "Q2_01", prior: 0.72, current: 0.78 }
+        - { desc: "Convenient dosing schedule for patients", code: "Q2_02", prior: 0.65, current: 0.71 }
+        - { desc: "Strong safety profile vs competitors", code: "Q2_03", prior: 0.58, current: 0.63 }
+        - { desc: "Proven efficacy in high-risk populations", code: "Q2_04", prior: 0.52, current: 0.60 }
+        - { desc: "Guideline-recommended first-line therapy", code: "Q2_05", prior: 0.48, current: 0.55 }
+        - { desc: "Real-world evidence supports long-term outcomes", code: "Q2_06", prior: 0.45, current: 0.42 }
+        - { desc: "Patient assistance program available", code: "Q2_07", prior: 0.38, current: 0.44 }
+        - { desc: "Compatible with existing treatment regimens", code: "Q2_08", prior: 0.35, current: 0.39 }
+
+  # Mock data simulating rep performance comparison (segments = VQ-derived)
+  - id: rep_performance
+    method: mock
+    params:
+      rows:
+        - { desc: "Overall quality of sales call", primary_prior: 0.78, primary_current: 0.82, comp_prior: 0.72, comp_current: 0.70 }
+        - { desc: "Knowledgeable about product", primary_prior: 0.81, primary_current: 0.85, comp_prior: 0.74, comp_current: 0.73 }
+        - { desc: "Knowledgeable about disease area", primary_prior: 0.76, primary_current: 0.80, comp_prior: 0.71, comp_current: 0.69 }
+        - { desc: "Presented clinical data effectively", primary_prior: 0.70, primary_current: 0.77, comp_prior: 0.68, comp_current: 0.65 }
+        - { desc: "Addressed my questions/concerns", primary_prior: 0.74, primary_current: 0.79, comp_prior: 0.70, comp_current: 0.68 }
+        - { desc: "Provided useful samples/resources", primary_prior: 0.65, primary_current: 0.72, comp_prior: 0.62, comp_current: 0.60 }
+        - { desc: "Compelling reason to prescribe", primary_prior: 0.55, primary_current: 0.63, comp_prior: 0.50, comp_current: 0.48 }
+
+  # Mock data simulating dual bar (MR + ME with segment cuts)
+  - id: drugx_mr_me
+    method: mock
+    params:
+      rows:
+        - { desc: "CV risk reduction data", mr_prior: 0.72, mr_current: 0.78, me_prior: 0.65, me_current: 0.71 }
+        - { desc: "Convenient dosing", mr_prior: 0.65, mr_current: 0.71, me_prior: 0.58, me_current: 0.65 }
+        - { desc: "Safety profile", mr_prior: 0.58, mr_current: 0.63, me_prior: 0.52, me_current: 0.58 }
+        - { desc: "High-risk population efficacy", mr_prior: 0.52, mr_current: 0.60, me_prior: 0.48, me_current: 0.55 }
+        - { desc: "Guideline-recommended therapy", mr_prior: 0.48, mr_current: 0.55, me_prior: 0.42, me_current: 0.50 }
+        - { desc: "Real-world evidence", mr_prior: 0.45, mr_current: 0.42, me_prior: 0.40, me_current: 0.38 }
+
+asks:
+  # Slide 1 — Cover
+  - id: cover
+    slide_type: cover
+    headline: "{{primary.full_name}} Promotional Effectiveness\nTracking {{period_current}} Report"
+    section: ""
+    source_text: ""
+    data_key: ""
+    extra:
+      subtitle: "Synapse Pipeline Integration Test"
+      date: "March 2026"
+      client: "{{client}}"
+
+  # Slide 2 — Executive Summary
+  - id: executive_summary
+    slide_type: executive_summary
+    headline: "Executive Summary — Key Findings from {{period_current}}"
+    section: ""
+    source_text: "Source: Synapse Pipeline Test Data — {{period_prior}} & {{period_current}}"
+    data_key: ""
+    extra:
+      insights:
+        - "{{primary.name}} message recall improved across 7 of 8 tracked messages, with 'CV risk reduction' leading at 78% (+6pp QoQ)"
+        - "Rep performance ratings for {{primary.name}} improved on all 7 metrics vs {{period_prior}}, widening the gap vs {{competitor.name}}"
+        - "Message effectiveness gains tracked closely with recall improvements — strongest lift in 'high-risk population efficacy' (+7pp)"
+        - "{{competitor.name}} rep performance declined on 5 of 7 metrics, suggesting competitive opportunity in the field"
+
+  # Slide 3 — Single Bar (Message Recall)
+  - id: drugx_mr
+    slide_type: single_bar_with_delta
+    headline: "{{primary.name}} message recall trends — {{period_current}} vs {{period_prior}}"
+    section: "{{primary.full_name}} MESSAGE RECALL — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Synapse Test Q2_01-Q2_08 | n={{primary.name}} {{period_prior}}=150, {{period_current}}=150"
+    data_key: drugx_message_recall
+    brand: primary
+    sort_by: current
+    sort_desc: true
+
+  # Slide 4 — Clustered Compare (Rep Performance)
+  - id: rep_compare
+    slide_type: clustered_compare
+    headline: "Rep performance comparison — {{primary.name}} vs {{competitor.name}}"
+    section: "REP PERFORMANCE — {{primary.name}} vs {{competitor.name}} — {{period_current}}"
+    source_text: "Source: Synapse Test | Segment: Practice Setting (grouped)"
+    data_key: rep_performance
+    sort_by: primary_current
+    sort_desc: true
+    extra:
+      series:
+        - { field: "primary", label: "{{primary.name}}" }
+        - { field: "comp", label: "{{competitor.name}}" }
+
+  # Slide 5 — Dual Bar (MR + ME)
+  - id: drugx_mr_me_slide
+    slide_type: dual_bar_with_delta
+    headline: "{{primary.name}} message recall and effectiveness"
+    section: "{{primary.full_name}} MR & ME — {{period_current}} vs {{period_prior}}"
+    source_text: "Source: Synapse Test | VQ-derived segment: Region (filtered: Northeast, West)"
+    data_key: drugx_mr_me
+    brand: primary
+    sort_by: mr_current
+    sort_desc: true
+    extra:
+      left: { field_prefix: "mr", label: "Message Recall (%)" }
+      right: { field_prefix: "me", label: "Message Effectiveness (%)" }

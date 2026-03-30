@@ -493,7 +493,7 @@ def index_excel(excel_path: str, json_path: str) -> dict:
     return payload
 
 
-# ── JSON auto-cache ─────────────────────────────────────────────────────────
+# ── JSON auto-cache ───────────��─────────────────────────────────��───────────
 
 def _file_hash(path: str) -> str:
     """Fast MD5 hash of a file for staleness checks."""
@@ -573,6 +573,9 @@ def _load_source_json(config) -> dict | None:
 def _save_source_json(data: dict, config) -> str:
     """Save extracted data as source_data.json next to the Excel file."""
     json_path = _json_path_for(config)
+    if not json_path or json_path == "source_data.json":
+        # No context or data path configured — skip JSON cache
+        return ""
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
 
     excel_hash = ""
@@ -606,14 +609,19 @@ def _extract_all_from_excel(config) -> dict:
     the 5 extraction methods. Called only when source_data.json is missing
     or stale.
     """
-    # Load Excel sheets
+    # Check if any extraction actually needs Excel (skip for all-mock / all-synapse configs)
+    _SKIP_EXCEL_METHODS = {"mock", "synapse_report", "synapse_raw", "raw_aggregate"}
+    needs_excel = any(ex.method not in _SKIP_EXCEL_METHODS for ex in config.extractions)
+
+    # Load Excel sheets (only if needed)
     sheets_data = {}
-    for sheet_key, sheet_cfg in config.sheets.items():
-        sheets_data[sheet_key] = pd.read_excel(
-            config.data_source_path,
-            sheet_name=sheet_cfg.name,
-            header=None,
-        )
+    if needs_excel and config.data_source_path:
+        for sheet_key, sheet_cfg in config.sheets.items():
+            sheets_data[sheet_key] = pd.read_excel(
+                config.data_source_path,
+                sheet_name=sheet_cfg.name,
+                header=None,
+            )
 
     # Reuse _sheets from existing JSON if available and Excel hash matches,
     # avoiding a redundant scan that index_excel() already performed.
@@ -817,8 +825,11 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
     # ── Synapse JSON report extractions ──
     synapse_extractions = [ex for ex in config.extractions if ex.method == "synapse_report"]
     if synapse_extractions:
-        import os as _os
-        api_key = _os.environ.get("SYNAPSE_API_KEY", "")
+        from slidegen.pipeline.synapse_auth import resolve_api_key
+        try:
+            api_key = resolve_api_key()
+        except ValueError:
+            api_key = ""
         if api_key:
             from slidegen.pipeline.synapse_json_loader import fetch_data_as_json
             try:
@@ -832,7 +843,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                 # Fallback: skip, data may already be in JSON cache from prior Excel extraction
         else:
             logger.info(
-                "No SYNAPSE_API_KEY set — synapse_report extractions skipped, using Excel only"
+                "No Synapse API token available — synapse_report extractions skipped, using Excel only"
             )
 
     # ── Raw data aggregation (respondent-level) ──
@@ -913,6 +924,132 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
 
                 data[ex.id] = result
                 print(f"  {ex.id}: {len(result)} rows (raw_aggregate/{raw_mode})")
+
+    # ── Synapse raw data fetching (respondent-level via API) ──
+    synapse_raw_extractions = [ex for ex in config.extractions if ex.method == "synapse_raw"]
+    if synapse_raw_extractions:
+        from slidegen.pipeline.synapse_auth import resolve_api_key as _resolve_raw_key
+        try:
+            api_key = _resolve_raw_key()
+        except ValueError:
+            api_key = ""
+        if api_key and config.synapse:
+            from slidegen.pipeline.synapse_raw_fetcher import fetch_all_raw, load_cached_pkl
+            from slidegen.pipeline.raw_data_loader import (
+                dataframes_to_raw_data, merge_vq_data, apply_segment_filter,
+                aggregate_raw, aggregate_raw_multi_code,
+                aggregate_raw_cross_brand, aggregate_raw_by_segment,
+            )
+
+            try:
+                # Try pkl cache first, else fetch fresh from Synapse JSON API
+                cached = load_cached_pkl(config)
+                if cached and cached.get("dataframes"):
+                    raw_result = cached
+                    raw_result.setdefault("vq_data", {})
+                    raw_result.setdefault("vq_questions", [])
+                    raw_result.setdefault("segments", [])
+                else:
+                    raw_result = fetch_all_raw(config, api_key=api_key)
+
+                # Convert DataFrames → dict format for aggregation
+                raw_data = dataframes_to_raw_data(
+                    raw_result.get("dataframes", {}),
+                    header_metadata=raw_result.get("_header_metadata"),
+                )
+
+                if raw_data:
+                    # Merge VQ data into respondent data
+                    if raw_result.get("vq_data"):
+                        for sheet_key in list(raw_data.keys()):
+                            if not sheet_key.startswith("_"):
+                                merge_vq_data(
+                                    raw_data, raw_result["vq_data"],
+                                    raw_result.get("vq_questions", []),
+                                    sheet_key=sheet_key,
+                                )
+
+                    # Apply segment filters from config
+                    if config.synapse and config.synapse.segments:
+                        segment_cuts = [
+                            {"id": sc.id, "name": sc.name, "mode": sc.mode,
+                             "values": sc.values, "segment_code": sc.name}
+                            for sc in config.synapse.segments
+                        ]
+                        for sheet_key in list(raw_data.keys()):
+                            if not sheet_key.startswith("_"):
+                                raw_data = apply_segment_filter(
+                                    raw_data, segment_cuts, sheet_key=sheet_key
+                                )
+
+                    # Build global label shortener
+                    global_shortener_raw = None
+                    if config.label_shortcuts:
+                        shortcuts = [{"keywords": ls.keywords, "short": ls.short}
+                                     for ls in config.label_shortcuts]
+                        global_shortener_raw = make_label_shortener(shortcuts)
+
+                    # Run synapse_raw extractions
+                    for ex in synapse_raw_extractions:
+                        params = ex.params
+                        label_fn = None
+                        if params.get("use_label_shortcuts") and global_shortener_raw:
+                            label_fn = global_shortener_raw
+                        elif "label_shortcuts" in params:
+                            label_fn = make_label_shortener(params["label_shortcuts"])
+
+                        sheet_key = params.get("raw_sheet", ex.sheet)
+                        raw_mode = params.get("mode", "single")
+
+                        if raw_mode == "multi_code":
+                            result = aggregate_raw_multi_code(
+                                raw_data, sheet_key=sheet_key,
+                                codes=params["codes"],
+                                agg=params.get("agg", "top2box"),
+                                quarter_current=params.get("quarter_current", config.period_current),
+                                quarter_prior=params.get("quarter_prior", config.period_prior),
+                            )
+                        elif raw_mode == "cross_brand":
+                            result = aggregate_raw_cross_brand(
+                                raw_data,
+                                primary_sheet=params.get("primary_sheet", "primary"),
+                                comp_sheet=params.get("comp_sheet", "competitor"),
+                                code=params["code"],
+                                agg=params.get("agg", "top2box"),
+                                quarter_current=params.get("quarter_current", config.period_current),
+                                quarter_prior=params.get("quarter_prior", config.period_prior),
+                                label_fn=label_fn,
+                            )
+                        elif raw_mode == "by_segment":
+                            result = aggregate_raw_by_segment(
+                                raw_data, sheet_key=sheet_key,
+                                code=params["code"],
+                                segment_code=params["segment_code"],
+                                segment_values=params["segment_values"],
+                                agg=params.get("agg", "top2box"),
+                                quarter=params.get("quarter_current", config.period_current),
+                                label_fn=label_fn,
+                            )
+                        else:  # single (default)
+                            result = aggregate_raw(
+                                raw_data, sheet_key=sheet_key,
+                                code=params["code"],
+                                agg=params.get("agg", "top2box"),
+                                quarter_current=params.get("quarter_current", config.period_current),
+                                quarter_prior=params.get("quarter_prior", config.period_prior),
+                                label_fn=label_fn,
+                            )
+
+                        data[ex.id] = result
+                        print(f"  {ex.id}: {len(result)} rows (synapse_raw/{raw_mode})")
+
+            except Exception as e:
+                logger.warning("Synapse raw fetch failed: %s — skipping synapse_raw extractions", e)
+        else:
+            if not api_key:
+                logger.info("No Synapse API token available — synapse_raw extractions skipped")
+            if not config.synapse:
+                logger.info("No synapse config — synapse_raw extractions skipped")
 
     # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes

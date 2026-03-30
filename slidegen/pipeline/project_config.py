@@ -63,15 +63,27 @@ class LabelShortcut:
 
 
 @dataclass
+class SegmentCutConfig:
+    """Segment cut configuration: groupby splits data by segment, filter restricts it."""
+    id: int
+    name: str = ""
+    mode: str = "groupby"                 # "groupby" | "filter"
+    values: list[str] = field(default_factory=list)  # for filter: which values to keep
+
+
+@dataclass
 class SynapseConfig:
-    """Synapse API connection parameters for banner plan download."""
+    """Synapse API connection parameters for data fetching."""
     api_url: str                              # e.g. "https://synapse.zoomrx.com/api"
     project_id: int
     survey_ids: list[int]
     deliverable_ids: list[int]
     segment_ids: list[int]
+    reporting_plan_id: int = 0                # for time period / wave resolution
+    wave_ids: list[int] = field(default_factory=list)  # explicit wave IDs (optional)
     multi_question_analysis_ids: list[int] = field(default_factory=list)
     virtual_question_analysis_ids: list[int] = field(default_factory=list)
+    segments: list[SegmentCutConfig] = field(default_factory=list)  # segment cut configs
 
 
 @dataclass
@@ -154,7 +166,7 @@ class ProjectConfig:
         known_methods = {
             "question_code", "multi_question_code", "row_range",
             "question_code_multi_col", "nested_ordinal", "mock",
-            "raw_aggregate", "synapse_report",
+            "raw_aggregate", "synapse_report", "synapse_raw",
         }
         sheet_keys = set(self.sheets.keys())
 
@@ -164,7 +176,7 @@ class ProjectConfig:
                 errors.append(
                     f"extractions[{i}] ({ex.id}): unknown method '{ex.method}'"
                 )
-            if ex.method not in ("mock", "raw_aggregate", "synapse_report") and ex.sheet and ex.sheet not in sheet_keys:
+            if ex.method not in ("mock", "raw_aggregate", "synapse_report", "synapse_raw") and ex.sheet and ex.sheet not in sheet_keys:
                 errors.append(
                     f"extractions[{i}] ({ex.id}): sheet '{ex.sheet}' not in config.sheets {sorted(sheet_keys)}"
                 )
@@ -262,7 +274,7 @@ def _validate_extraction(ex: dict, idx: int, yaml_path: str):
                 f"Missing required field '{field_name}' in extractions[{idx}] "
                 f"(id={ex.get('id', '?')}) in {yaml_path}"
             )
-    if ex.get("method") not in ("mock", "synapse_report") and "sheet" not in ex:
+    if ex.get("method") not in ("mock", "synapse_report", "synapse_raw") and "sheet" not in ex:
         raise ValueError(
             f"Missing required field 'sheet' in extractions[{idx}] "
             f"(id={ex.get('id', '?')}) in {yaml_path}"
@@ -371,14 +383,27 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
     synapse_cfg = None
     synapse_raw = raw.get("synapse")
     if synapse_raw and isinstance(synapse_raw, dict):
+        # Parse segment cut configs
+        segment_cuts = []
+        for sc in synapse_raw.get("segments", []):
+            segment_cuts.append(SegmentCutConfig(
+                id=sc["id"],
+                name=sc.get("name", ""),
+                mode=sc.get("mode", "groupby"),
+                values=sc.get("values", []),
+            ))
+
         synapse_cfg = SynapseConfig(
             api_url=synapse_raw["api_url"],
             project_id=synapse_raw["project_id"],
             survey_ids=synapse_raw["survey_ids"],
             deliverable_ids=synapse_raw["deliverable_ids"],
-            segment_ids=synapse_raw["segment_ids"],
+            segment_ids=synapse_raw.get("segment_ids", []),
+            reporting_plan_id=synapse_raw.get("reporting_plan_id", 0),
+            wave_ids=synapse_raw.get("wave_ids", []),
             multi_question_analysis_ids=synapse_raw.get("multi_question_analysis_ids", []),
             virtual_question_analysis_ids=synapse_raw.get("virtual_question_analysis_ids", []),
+            segments=segment_cuts,
         )
 
     return ProjectConfig(

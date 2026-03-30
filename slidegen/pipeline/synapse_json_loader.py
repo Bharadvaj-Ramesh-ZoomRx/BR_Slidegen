@@ -73,11 +73,8 @@ def fetch_data_as_json(
         dict mapping extraction_id → list[dict], plus _sheets and _sample_sizes.
     """
     synapse = config.synapse
-    resolved_key = api_key or os.environ.get(_ENV_KEY_NAME, "")
-    if not resolved_key:
-        raise ValueError(
-            f"API key not provided. Pass api_key= or set {_ENV_KEY_NAME} env var."
-        )
+    from slidegen.pipeline.synapse_auth import resolve_api_key
+    resolved_key = resolve_api_key(api_key)
 
     resolved_url = (
         synapse_url

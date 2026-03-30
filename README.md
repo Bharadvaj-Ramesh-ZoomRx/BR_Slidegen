@@ -138,11 +138,12 @@ Track B (Excel):       source_data.xlsx  →  data_loaders.load_all_data()  → 
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)  →  deck.pptx
 ```
 
-### Data Loading (Auto-JSON + Two-Track Fetching)
+### Data Loading (Auto-JSON + Three-Track Fetching)
 
-**Two tracks for getting data:**
+**Three tracks for getting data:**
 - **Track A — JSON-First**: For `synapse_report` extractions, calls Synapse `/reports/generate` API directly. Bypasses Excel entirely. **Only activates when `SYNAPSE_API_KEY` env var is set.** If absent, these extractions are skipped.
 - **Track B — Excel** (default): Uses local `source_data.xlsx` or downloads via banner plan API. **If no Synapse API key is present, the pipeline proceeds entirely with the provided Excel file.** Supports non-blocking split: `trigger_generation()` returns immediately, `wait_and_download()` blocks later.
+- **Track C — Raw API**: For `synapse_raw` extractions, fetches raw respondent-level data from Synapse API, auto-discovers and merges all project virtual questions, applies segment cuts (groupby/filter), and aggregates locally. **Only activates when `SYNAPSE_API_KEY` is set AND config has `synapse` section.**
 
 On first run, data is extracted and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices. The JSON auto-invalidates when the Excel file changes (hash check) **or** when extraction params change (extraction hash check). Delete `source_data.json` to force re-extraction.
 
@@ -158,6 +159,7 @@ On first run, data is extracted and saved as `context/{wave}/source_data.json`. 
 | `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
 | `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
 | `synapse_report` | JSON-first: calls Synapse `/reports/generate` API directly (bypasses Excel) |
+| `synapse_raw` | Fetch raw respondent data from Synapse API, auto-merge VQs, apply segment cuts, aggregate locally |
 
 ### Slide Types
 
@@ -237,10 +239,11 @@ slidegen/                     # SlideGen system
   pipeline/                   # Generic deck generation pipeline
     config_generator.py        # Data discovery + config scaffolding + scaffold_config_from_plan()
     project_config.py          # ProjectConfig schema + YAML loader + validate()
-    data_loaders.py            # 8 data extractors + JSON auto-cache + _codes rich index
-    raw_data_loader.py         # Respondent-level parser + quarter cache
+    data_loaders.py            # 9 data extractors + JSON auto-cache + _codes rich index
+    raw_data_loader.py         # Respondent-level parser + quarter cache + VQ merge + segment filter
     synapse_fetcher.py         # Synapse API: trigger_generation() + wait_and_download()
     synapse_json_loader.py     # JSON-first: /reports/generate → slidegen format
+    synapse_raw_fetcher.py     # Raw API: survey responses + VQs + segments → local aggregation
     slide_renderers/           # 20 slide type renderers (package)
     orchestrator.py            # Pipeline entry + per-slide regen (by index or ask_id) + PPTX backup
   pptx_utils/                 # Utility package (11 modules)
