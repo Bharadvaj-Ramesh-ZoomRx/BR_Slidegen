@@ -51,7 +51,71 @@ _STATUS_DONE = "processed"
 _STATUS_FAILED = "failed"
 
 
-# ── Public entry point ────────────────────────────────────────────────────────
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def trigger_generation(
+    config: ProjectConfig,
+    api_key: Optional[str] = None,
+    synapse_url: Optional[str] = None,
+) -> int:
+    """Submit a banner plan generation job (non-blocking).
+
+    Returns the history_id immediately — call wait_and_download() later
+    to poll for completion and download the Excel file.
+
+    This lets other pipeline stages (context building, hypotheses) run
+    while the banner plan generates in the background.
+
+    Args:
+        config:      Loaded ProjectConfig (must have synapse section).
+        api_key:     Bearer token. Falls back to SYNAPSE_API_KEY env var.
+        synapse_url: API base URL override.
+
+    Returns:
+        history_id (int) for the queued generation job.
+    """
+    synapse, resolved_url, headers = _resolve_synapse_params(config, api_key, synapse_url)
+
+    print(f"Submitting banner plan generation for project_id={synapse.project_id}...")
+    history_id = _trigger_generation(resolved_url, synapse, headers)
+    print(f"  Generation queued: history_id={history_id}")
+    return history_id
+
+
+def wait_and_download(
+    config: ProjectConfig,
+    history_id: int,
+    api_key: Optional[str] = None,
+    synapse_url: Optional[str] = None,
+    poll_interval: int = _DEFAULT_POLL_INTERVAL,
+    max_wait: int = _DEFAULT_MAX_WAIT,
+) -> str:
+    """Poll for completion and download the banner plan Excel (blocking).
+
+    Call this after trigger_generation() when you're ready to use the data.
+    Handles polling, downloading, backup, and cache invalidation.
+
+    Args:
+        config:        Loaded ProjectConfig.
+        history_id:    Job ID from trigger_generation().
+        api_key:       Bearer token.
+        synapse_url:   API base URL override.
+        poll_interval: Seconds between polls. Default 10.
+        max_wait:      Maximum wait seconds. Default 300.
+
+    Returns:
+        Absolute path to the saved source_data.xlsx.
+    """
+    _, resolved_url, headers = _resolve_synapse_params(config, api_key, synapse_url)
+
+    # Poll for completion
+    print(f"Polling for completion (max {max_wait}s, interval {poll_interval}s)...")
+    _poll_until_done(resolved_url, headers, history_id, poll_interval, max_wait)
+    print("  Banner plan generation complete.")
+
+    # Download and save
+    return _download_and_save(config, resolved_url, headers, history_id)
+
 
 def fetch_synapse_data(
     config: ProjectConfig,
@@ -60,43 +124,38 @@ def fetch_synapse_data(
     poll_interval: int = _DEFAULT_POLL_INTERVAL,
     max_wait: int = _DEFAULT_MAX_WAIT,
 ) -> str:
-    """Fetch fresh banner plan data from the Synapse API.
+    """Fetch fresh banner plan data from the Synapse API (blocking convenience wrapper).
+
+    Combines trigger_generation() + wait_and_download() into a single call.
+    Use the split functions when you want to run other work in parallel.
 
     Steps:
-      1. Resolve API key (param → SYNAPSE_API_KEY env var)
-      2. Resolve API base URL (param → config.synapse.api_url → config.synapse_api_url)
-      3. POST /banner-plans/generate to submit the job; get back history_id
-      4. Poll GET /banner-plans/histories/{id}/status until done or timeout
-      5. Download Excel from GET /banner-plans/histories/{id}/download
-      6. Backup existing source_data.xlsx (timestamped rename, same dir)
-      7. Atomically replace source_data.xlsx with the new file
-      8. Invalidate source_data.json cache so next run re-extracts
-
-    Args:
-        config:         Loaded ProjectConfig instance (must have synapse section).
-        api_key:        Bearer token. Falls back to SYNAPSE_API_KEY env var.
-        synapse_url:    API base URL override. Falls back to config.synapse.api_url.
-        poll_interval:  Seconds between status polls. Default 10.
-        max_wait:       Maximum total seconds to wait. Default 300.
+      1. POST /banner-plans/generate to submit the job
+      2. Poll until done or timeout
+      3. Download Excel, backup existing, invalidate JSON cache
 
     Returns:
         Absolute path to the saved source_data.xlsx.
-
-    Raises:
-        ValueError:    Missing config, API key, or URL.
-        TimeoutError:  Job not complete within max_wait seconds.
-        RuntimeError:  Job failed or API returned an error.
-        OSError:       File I/O errors during backup or save.
     """
-    # 1. Validate synapse config
+    history_id = trigger_generation(config, api_key, synapse_url)
+    return wait_and_download(config, history_id, api_key, synapse_url,
+                             poll_interval, max_wait)
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _resolve_synapse_params(
+    config: ProjectConfig,
+    api_key: Optional[str],
+    synapse_url: Optional[str],
+) -> tuple[SynapseConfig, str, dict]:
+    """Validate and resolve synapse config, URL, and headers."""
     synapse = config.synapse
     if not synapse:
         raise ValueError(
             "No 'synapse' section in config.yaml. "
             "Add synapse.api_url, synapse.project_id, etc. to enable banner plan download."
         )
-
-    # 2. Resolve credentials and URL
     resolved_key = _resolve_api_key(api_key)
     resolved_url = (synapse_url or synapse.api_url or getattr(config, "synapse_api_url", "")).rstrip("/")
     if not resolved_url:
@@ -104,27 +163,22 @@ def fetch_synapse_data(
             "synapse_url not provided and config has no synapse.api_url field. "
             "Pass --url on the CLI or add synapse.api_url to config.yaml."
         )
-
     headers = _build_headers(resolved_key)
+    return synapse, resolved_url, headers
 
-    # 3. Submit banner plan generation
-    print(f"Submitting banner plan generation for project_id={synapse.project_id}...")
-    history_id = _trigger_generation(resolved_url, synapse, headers)
-    print(f"  Generation queued: history_id={history_id}")
 
-    # 4. Poll for completion
-    print(f"Polling for completion (max {max_wait}s, interval {poll_interval}s)...")
-    _poll_until_done(resolved_url, headers, history_id, poll_interval, max_wait)
-    print("  Banner plan generation complete.")
-
-    # 5. Ensure destination directory exists
+def _download_and_save(
+    config: ProjectConfig,
+    resolved_url: str,
+    headers: dict,
+    history_id: int,
+) -> str:
+    """Download Excel, backup existing, save, and invalidate JSON cache."""
     excel_dest = config.data_source_path
     os.makedirs(os.path.dirname(excel_dest), exist_ok=True)
 
-    # 6. Backup existing Excel
     _backup_existing_excel(excel_dest)
 
-    # 7. Download to .tmp then rename atomically
     tmp_path = excel_dest + ".tmp"
     try:
         print(f"  Downloading Excel → {os.path.basename(excel_dest)}...")
@@ -138,13 +192,9 @@ def fetch_synapse_data(
             os.remove(tmp_path)
         raise
 
-    # 8. Invalidate JSON cache
     _invalidate_json_cache(config)
-
     return excel_dest
 
-
-# ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _resolve_api_key(api_key: Optional[str]) -> str:
     if api_key:

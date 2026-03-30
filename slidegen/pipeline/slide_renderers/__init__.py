@@ -4,19 +4,17 @@ slidegen/pipeline/slide_renderers — Slide type renderer package.
 Each renderer takes (slide, config, ask, data, *, namer=None) and builds
 slide content generically from the ask definition + extracted data.
 
-Slide types:
-  - cover
-  - executive_summary
-  - single_bar_with_delta
-  - dual_bar_with_delta
-  - dual_bar_qoq
-  - clustered_compare
-  - dual_bar_compare       (generic; "dual_brand_compare" is a backward-compat alias)
-  - qoq_bar_with_delta
-  - two_section_bar
-  - stacked_order
-  - lollipop
-  - abacus
+19 renderers across 7 modules:
+  narrative:  cover, executive_summary
+  bar:        single_bar_with_delta, qoq_bar_with_delta, two_section_bar
+  bar_dual:   dual_bar_with_delta, dual_bar_qoq
+  compare:    clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
+  dot:        abacus, dual_abacus, followup_rep, message_mbd
+  line:       trended_scorecard, trended_activity
+  quadrant:   quadrant_scatter
+  heatmap:    heatmap_table
+
+  + "dual_brand_compare" backward-compat alias → dual_bar_compare
 """
 
 from .narrative import render_cover, render_executive_summary

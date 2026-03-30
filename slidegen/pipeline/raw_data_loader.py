@@ -289,14 +289,30 @@ def discover_quarters(raw_data: dict, sheet_key: str = "primary") -> list[str]:
     return quarters
 
 
+_quarter_cache: dict[tuple[str, tuple[str, ...]], str] = {}
+
+
 def _match_quarter(label: str, available: list[str]) -> str:
     """Fuzzy-match a quarter label against available quarters.
 
     Handles common variations: "Q4'25" vs "Q4 2025" vs "Q4'2025" vs "Q4 '25".
     Returns the matched label or empty string if no match.
+    Results are cached to avoid repeated regex matching across extractions.
     """
     if not label or not available:
         return ""
+
+    cache_key = (label, tuple(sorted(available)))
+    if cache_key in _quarter_cache:
+        return _quarter_cache[cache_key]
+
+    result = _match_quarter_impl(label, available)
+    _quarter_cache[cache_key] = result
+    return result
+
+
+def _match_quarter_impl(label: str, available: list[str]) -> str:
+    """Internal quarter matching logic (uncached)."""
     # Exact match first
     if label in available:
         return label
@@ -413,8 +429,8 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
         logger.warning("raw_aggregate: code '%s' not found in sheet '%s'", code, sheet_key)
         return []
 
-    # Convert col_indices keys to int (JSON loads them as strings)
-    col_indices = [int(ci) for ci in col_indices]
+    # Normalize all column indices to strings (JSON keys are always strings)
+    col_indices = [str(ci) for ci in col_indices]
 
     agg_fn = _AGG_FUNCS.get(agg, _top2box)
 
@@ -435,18 +451,15 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
                        quarter_prior, q_pri)
 
     results = []
-    for ci in col_indices:
-        ci_str = str(ci)  # JSON keys are strings
-        col_info = columns.get(str(ci), columns.get(ci, {}))
+    for ci_str in col_indices:
+        col_info = columns.get(ci_str, {})
         attribute = col_info.get("attribute", "")
         if not attribute:
             continue
 
-        # Collect values for this column by period
-        cur_vals = [r["values"].get(ci_str, r["values"].get(ci)) for r in current_resps
-                    if ci_str in r["values"] or ci in r.get("values", {})]
-        pri_vals = [r["values"].get(ci_str, r["values"].get(ci)) for r in prior_resps
-                    if ci_str in r["values"] or ci in r.get("values", {})]
+        # Collect values for this column by period (all keys are strings)
+        cur_vals = [r["values"][ci_str] for r in current_resps if ci_str in r["values"]]
+        pri_vals = [r["values"][ci_str] for r in prior_resps if ci_str in r["values"]]
 
         current_val = agg_fn(cur_vals)
         prior_val = agg_fn(pri_vals) if pri_vals else None
@@ -611,8 +624,7 @@ def aggregate_raw_by_segment(raw_data: dict, sheet_key: str, code: str,
         return []
 
     results = []
-    for ci in [int(c) for c in target_cols]:
-        ci_str = str(ci)
+    for ci_str in [str(c) for c in target_cols]:
         col_info = columns.get(ci_str, {})
         attribute = col_info.get("attribute", "")
         if not attribute:
@@ -621,7 +633,7 @@ def aggregate_raw_by_segment(raw_data: dict, sheet_key: str, code: str,
         row = {"desc": label_fn(attribute) if label_fn else attribute}
         seg_vals = {}
         for seg_name, seg_r in seg_resps.items():
-            vals = [r["values"].get(ci_str) for r in seg_r if ci_str in r["values"]]
+            vals = [r["values"][ci_str] for r in seg_r if ci_str in r["values"]]
             agg_val = agg_fn(vals)
             row[f"{seg_name}_current"] = agg_val
             seg_vals[seg_name] = agg_val

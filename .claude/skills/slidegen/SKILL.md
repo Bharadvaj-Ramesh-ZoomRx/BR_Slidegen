@@ -25,15 +25,14 @@ description: "Use when working with the SlideGen pipeline — creating, editing,
 User says: "Create slides for projects/{name}"
 ```
 
-1. Verify folder structure: `projects/{name}/data/{wave}/`, `reference/{wave}/`, `templates/`
-2. Discover data: `discover_excel_structure()` on the source Excel
-3. Read reference docs: parse `reference/{wave}/asks.md`
-4. Read template: `python -m markitdown template.pptx`
-5. Generate config scaffold: `generate_config_scaffold()`
-6. Map asks to pipeline — match to existing extraction methods and slide types
-7. Write `config.yaml` with all extractions and asks
-8. Generate deck: `generate_deck("projects/{name}/config.yaml")`
-9. Visual QA: convert to images, inspect, fix, re-run
+1. Verify folder structure: `projects/{name}/input/wave/{wave}/`, `templates/`
+2. Index Excel: `index_excel()` → builds `_sheets` + `_codes` rich index
+3. Build context pipeline: `/build-project-context` → `/hypotheses` → `/sfea-insight-writer` → `/slide-plan`
+4. Auto-scaffold config: `scaffold_config_from_plan(slide_plan.md, source_data.json, config.yaml)` — auto-selects extraction methods from `_codes` index
+5. Review + refine config.yaml (source_text, sort_by, extra params)
+6. Validate config: `config.validate()` — catches mismatched data_keys, unknown slide_types, missing params
+7. Generate deck: `generate_deck("projects/{name}/config.yaml")`
+8. Visual QA: convert to images, inspect, fix, re-run
 
 ### 2. Edit Slide N
 
@@ -44,7 +43,8 @@ User says: "Edit Slide 5 — change headline to ..."
 1. Read config, identify ask at index N-1
 2. Backup config: `_backup_config(yaml_path)`
 3. Update config fields (headline, data_key, sort_by, etc.)
-4. Regenerate slide: `regenerate_slide(yaml_path, slide_index=N-1)`
+4. Regenerate slide: `regenerate_slide(yaml_path, slide_index=N-1)` or `regenerate_slide(yaml_path, slide_index="ask_id")`
+   - Accepts 0-based int index or ask_id string (resolves via shape_registry.json)
    - PPTX backup created automatically in `output/{wave}/backups/`
 5. Tell user to reopen/refresh the deck
 6. Report what changed
@@ -92,26 +92,31 @@ User says: "Edit slides with new wave data + new asks — PET_Q1Q2_2026"
 
 | Question | Answer |
 |----------|--------|
-| Text/sort/data change on one slide? | `regenerate_slide()` |
+| Text/sort/data change on one slide? | `regenerate_slide()` (by index or ask_id) |
 | New wave, add/remove slides, or structural change? | `generate_deck()` |
 | New data shape not fitting existing extractors? | Add new method to `data_loaders.py` |
-| New visualization not fitting existing renderers? | Add new renderer to `slide_renderers.py` |
+| New visualization not fitting existing renderers? | Add new renderer to `slide_renderers/` |
 | Live COM edit on open PowerPoint? | Use `LiveEditor` from `slidegen.edit` |
+| Building config from a slide plan? | `scaffold_config_from_plan()` — auto-selects methods from `_codes` |
+| Synapse data available as JSON? | Use `synapse_report` extraction method (requires `SYNAPSE_API_KEY` env var — without it, pipeline uses Excel only) |
+| Config has errors before deck gen? | `config.validate()` catches all issues upfront |
 
 ---
 
 ## Pipeline Architecture
 
 ```
-config.yaml  ->  ProjectConfig (dataclasses)
+config.yaml  ->  ProjectConfig (dataclasses)  ->  validate()  ->  errors or proceed
                       |
-Excel file  ->  data_loaders.load_all_data()  ->  dict[extraction_id -> list[dict]]
+Track A (JSON-first):  Synapse /reports/generate  ->  fetch_data_as_json()  ->  source_data.json  (only if SYNAPSE_API_KEY set)
+Track B (Excel):       Excel file  ->  data_loaders.load_all_data()  ->  dict[extraction_id -> list[dict]]  (default — always available)
+                      |
+Cache: source_data.json (invalidates on Excel hash OR extraction params hash change)
                       |
 orchestrator  ->  RENDERERS[slide_type](slide, config, ask, data, namer)
                       |
                  output/{wave}/deck.pptx
-                 output/{wave}/slide_data.json      (data cache)
-                 output/{wave}/shape_registry.json   (shape state)
+                 output/{wave}/shape_registry.json   (shape state + ask_id mapping)
                  output/{wave}/backups/              (PPTX backups)
 ```
 
@@ -143,6 +148,7 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `row_range` | Fixed row range with column mapping |
 | `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
 | `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
+| `synapse_report` | JSON-first: calls Synapse `/reports/generate` API (params: `analysis_id`, `reporting_plan_id`, `time_period_map`) |
 
 ---
 
@@ -166,6 +172,10 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `hii_scorecard` | Multi-section clustered column chart with section headers + callouts |
 | `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand |
 | `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation |
+| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) |
+| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
+| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
+| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
 
 ### slide_type → extra Fields
 

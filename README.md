@@ -9,7 +9,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** (Q
 ### Prerequisites
 
 ```bash
-pip install pandas openpyxl python-pptx lxml pyyaml pywin32
+pip install pandas openpyxl python-pptx lxml pyyaml requests pywin32
 ```
 
 ### Create a New Project
@@ -38,9 +38,10 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
 
-# Regenerate a single slide (0-based index)
+# Regenerate a single slide (by 0-based index or ask_id string)
 from slidegen.pipeline import regenerate_slide
 regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
+regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index="ryb_mr")  # by ask_id
 ```
 
 Output: `projects/jnj_rybrevant/output/PET_Q3Q4_2025/deck.pptx`
@@ -116,16 +117,23 @@ output/{wave}/
 ### Slide Generation Pipeline
 
 ```
-projects/{name}/config.yaml  →  ProjectConfig (dataclasses)
+projects/{name}/config.yaml  →  ProjectConfig  →  validate()  →  errors or proceed
                                       ↓
-source_data.json (or Excel)  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
+Track A (JSON-first):  Synapse API  →  fetch_data_as_json()  →  source_data.json
+Track B (Excel):       source_data.xlsx  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
                                       ↓
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)  →  deck.pptx
 ```
 
-### Data Loading (Auto-JSON)
+### Data Loading (Auto-JSON + Two-Track Fetching)
 
-On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices. The JSON auto-invalidates when the Excel file changes (hash check). Delete `source_data.json` to force re-extraction.
+**Two tracks for getting data:**
+- **Track A — JSON-First**: For `synapse_report` extractions, calls Synapse `/reports/generate` API directly. Bypasses Excel entirely. **Only activates when `SYNAPSE_API_KEY` env var is set.** If absent, these extractions are skipped.
+- **Track B — Excel** (default): Uses local `source_data.xlsx` or downloads via banner plan API. **If no Synapse API key is present, the pipeline proceeds entirely with the provided Excel file.** Supports non-blocking split: `trigger_generation()` returns immediately, `wait_and_download()` blocks later.
+
+On first run, data is extracted and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices. The JSON auto-invalidates when the Excel file changes (hash check) **or** when extraction params change (extraction hash check). Delete `source_data.json` to force re-extraction.
+
+**Config validation**: `config.validate()` catches mismatched data_keys, unknown slide_types, missing params, and invalid extraction methods before deck generation begins.
 
 ### Data Extraction Methods
 
@@ -136,6 +144,7 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 | `row_range` | Fixed row range with column mapping |
 | `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
 | `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
+| `synapse_report` | JSON-first: calls Synapse `/reports/generate` API directly (bypasses Excel) |
 
 ### Slide Types
 
@@ -213,11 +222,14 @@ projects/                     # Project folders (one per product/brand)
 
 slidegen/                     # SlideGen system
   pipeline/                   # Generic deck generation pipeline
-    config_generator.py        # Data discovery + config scaffolding
-    project_config.py          # ProjectConfig schema + YAML loader
-    data_loaders.py            # Generic data extractors (5 methods) + JSON auto-cache
+    config_generator.py        # Data discovery + config scaffolding + scaffold_config_from_plan()
+    project_config.py          # ProjectConfig schema + YAML loader + validate()
+    data_loaders.py            # 8 data extractors + JSON auto-cache + _codes rich index
+    raw_data_loader.py         # Respondent-level parser + quarter cache
+    synapse_fetcher.py         # Synapse API: trigger_generation() + wait_and_download()
+    synapse_json_loader.py     # JSON-first: /reports/generate → slidegen format
     slide_renderers/           # 20 slide type renderers (package)
-    orchestrator.py            # Pipeline entry + per-slide regen + PPTX backup
+    orchestrator.py            # Pipeline entry + per-slide regen (by index or ask_id) + PPTX backup
   pptx_utils/                 # Utility package (8 modules)
     brand.py                   # BRAND{} dict, colors, fonts, constants
     lxml_helpers.py            # 20 lxml XML chart/axis helpers
@@ -252,4 +264,5 @@ docs/                         # Design docs & architecture notes
 | `python-pptx` | PowerPoint generation |
 | `lxml` | XML manipulation for chart formatting |
 | `pyyaml` | YAML config loading |
+| `requests` | Synapse API integration (JSON-first data fetching + banner plan download) |
 | `pywin32` | COM automation for live editing (Windows only) |

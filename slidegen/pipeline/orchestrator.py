@@ -377,6 +377,38 @@ def _create_sections(prs, sections_config: list[dict], ask_id_to_slide_idx: dict
     print(f"  Created {len(ranges)} sections")
 
 
+def _resolve_ask_id_to_slide_index(
+    ask_id: str, registry_path: str, config: ProjectConfig
+) -> int:
+    """Resolve an ask_id string to a 0-based slide index.
+
+    Looks up the shape_registry.json for slide metadata matching the ask_id.
+    Falls back to scanning config.asks if no registry exists.
+
+    Raises:
+        ValueError: If ask_id is not found.
+    """
+    # Try shape_registry.json first (authoritative — accounts for skipped asks)
+    if os.path.exists(registry_path):
+        with open(registry_path, "r", encoding="utf-8") as f:
+            reg = json.load(f)
+        slides = reg.get("slides", {})
+        for slide_num_str, slide_meta in slides.items():
+            if slide_meta.get("ask_id") == ask_id:
+                return int(slide_num_str) - 1  # registry uses 1-based slide numbers
+
+    # Fallback: find ask_id in config.asks (assumes 1:1 mapping, no skips)
+    for i, ask in enumerate(config.asks):
+        if ask.id == ask_id:
+            return i
+
+    available = [a.id for a in config.asks]
+    raise ValueError(
+        f"ask_id '{ask_id}' not found in shape registry or config. "
+        f"Available: {available}"
+    )
+
+
 def _load_template(config: ProjectConfig):
     """Load template PPTX, returning (Presentation, blank_layout).
 
@@ -435,6 +467,17 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     # 1. Load config
     print(f"Loading config: {yaml_path}")
     config = load_project_config(yaml_path)
+
+    # 1b. Validate config consistency
+    errors = config.validate()
+    if errors:
+        print("\n  Config validation errors:")
+        for err in errors:
+            print(f"    - {err}")
+        raise ValueError(
+            f"Config validation failed with {len(errors)} error(s):\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
 
     # 2. Load data (from JSON if available, else extract from Excel)
     print("Loading data...")
@@ -520,7 +563,7 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
     return saved_path
 
 
-def regenerate_slide(yaml_path: str, slide_index: int,
+def regenerate_slide(yaml_path: str, slide_index: int | str,
                      output_path: str | None = None) -> str:
     """Regenerate a single slide in an existing deck.
 
@@ -529,7 +572,9 @@ def regenerate_slide(yaml_path: str, slide_index: int,
 
     Args:
         yaml_path: Path to project YAML config.
-        slide_index: 0-based slide index to regenerate.
+        slide_index: 0-based slide index (int) OR ask_id string to regenerate.
+                     When a string is passed, the slide index is resolved from
+                     shape_registry.json.
         output_path: Path to existing PPTX. If None, uses config.output_path.
 
     Returns:
@@ -543,6 +588,13 @@ def regenerate_slide(yaml_path: str, slide_index: int,
     pptx_path = output_path or config.output_path
     if not pptx_path or not os.path.exists(pptx_path):
         raise FileNotFoundError(f"Deck not found: {pptx_path}")
+
+    # Resolve ask_id → slide_index if a string was passed
+    registry_path = os.path.join(os.path.dirname(pptx_path), "shape_registry.json")
+    if isinstance(slide_index, str):
+        ask_id = slide_index
+        slide_index = _resolve_ask_id_to_slide_index(ask_id, registry_path, config)
+        print(f"  Resolved ask_id '{ask_id}' → slide index {slide_index}")
 
     # Backup before editing (PRD §10.3)
     backup = _backup_pptx(pptx_path)
@@ -558,7 +610,6 @@ def regenerate_slide(yaml_path: str, slide_index: int,
 
     # Resolve the correct ask index — slide_to_ask mapping accounts for
     # asks that were skipped during generate_deck() (unknown slide_type).
-    registry_path = os.path.join(os.path.dirname(pptx_path), "shape_registry.json")
     ask_index = slide_index  # default: assume 1:1 mapping
     if os.path.exists(registry_path):
         with open(registry_path, "r", encoding="utf-8") as f:

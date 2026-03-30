@@ -386,32 +386,88 @@ def index_excel(excel_path: str, json_path: str) -> dict:
         with open(json_path, "r", encoding="utf-8") as f:
             existing = json.load(f)
         meta = existing.get("_meta", {})
-        if meta.get("excel_hash") == _file_hash(excel_path) and "_sheets" in existing:
-            print(f"  source_data.json up to date — {len(existing['_sheets'])} sheets indexed")
+        if meta.get("excel_hash") == _file_hash(excel_path) and "_sheets" in existing and "_codes" in existing:
+            n_codes = sum(len(v) for v in existing.get("_codes", {}).values())
+            print(f"  source_data.json up to date — {len(existing['_sheets'])} sheets, {n_codes} codes indexed")
             return existing
 
     # Build raw sheet index from Excel
     print(f"  Indexing Excel: {os.path.basename(excel_path)}")
     wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     sheets_index = {}
+    codes_index = {}   # rich per-code metadata for Stage 7 auto-detection
+
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         rows = []
         skipped = 0
+        # Store all parsed rows for _codes analysis
+        all_rows = []  # (row_idx, code, desc, data_vals_tuple)
         for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
             code = str(row[0]).strip() if row[0] is not None else ""
             desc = str(row[1]).strip()[:120] if len(row) > 1 and row[1] is not None else ""
             if code or desc:
-                # Skip stale rows: all data columns (beyond code/desc) are 0 or empty
                 data_cols = row[2:] if len(row) > 2 else ()
                 data_vals = [v for v in data_cols if v is not None and str(v).strip() != ""]
                 if data_vals and all(_is_zero(v) for v in data_vals):
                     skipped += 1
                     continue
                 rows.append({"row": row_idx, "code": code, "desc": desc})
+                all_rows.append((row_idx, code, desc, row))
         sheets_index[sheet_name] = rows
         skipped_msg = f" ({skipped} stale removed)" if skipped else ""
         print(f"    {sheet_name}: {len(rows)} rows{skipped_msg}")
+
+        # Build _codes: analyze question code patterns (codes ending in Z are
+        # typically parent codes with sub-rows beneath them)
+        import re
+        _code_re = re.compile(r'^[A-Z]\d')
+        sheet_codes = {}
+        for idx, (row_idx, code, desc, raw_row) in enumerate(all_rows):
+            if not code or not _code_re.match(code):
+                continue
+            # Count sub-rows: rows after this one until next code row or gap
+            sub_row_count = 0
+            has_sub_codes = False
+            for j in range(idx + 1, len(all_rows)):
+                _, next_code, next_desc, _ = all_rows[j]
+                if next_code and _code_re.match(next_code):
+                    # Another parent code — stop counting
+                    if next_code != code:
+                        break
+                    has_sub_codes = True
+                sub_row_count += 1
+                if sub_row_count > 30:
+                    break
+
+            # Sample data values from specific columns
+            sample_values = {}
+            for ci in (7, 13, 17):
+                if ci < len(raw_row) and raw_row[ci] is not None:
+                    try:
+                        v = float(raw_row[ci])
+                        sample_values[f"col_{ci}"] = round(v, 4)
+                    except (ValueError, TypeError):
+                        pass
+
+            # Detect value range: decimal (0-1) vs whole (0-100+)
+            value_range = "unknown"
+            numeric_samples = [v for v in sample_values.values() if isinstance(v, (int, float))]
+            if numeric_samples:
+                max_v = max(abs(v) for v in numeric_samples)
+                value_range = "decimal" if max_v <= 1.1 else "whole"
+
+            sheet_codes[code] = {
+                "row": row_idx,
+                "desc": desc,
+                "sub_row_count": sub_row_count,
+                "has_sub_codes": has_sub_codes,
+                "sample_values": sample_values,
+                "value_range": value_range,
+            }
+        if sheet_codes:
+            codes_index[sheet_name] = sheet_codes
+
     wb.close()
 
     # Build or update payload
@@ -426,6 +482,8 @@ def index_excel(excel_path: str, json_path: str) -> dict:
         "excel_hash": _file_hash(excel_path),
     }
     payload["_sheets"] = sheets_index
+    if codes_index:
+        payload["_codes"] = codes_index
 
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
     with open(json_path, "w", encoding="utf-8") as f:
@@ -441,6 +499,24 @@ def _file_hash(path: str) -> str:
     """Fast MD5 hash of a file for staleness checks."""
     with open(path, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()[:12]
+
+
+def _extractions_hash(config) -> str:
+    """MD5 hash of serialized extraction configs for cache invalidation.
+
+    If extraction params change (different question code, column, etc.)
+    but the Excel file hasn't changed, this hash will differ and trigger
+    re-extraction.
+    """
+    import json as _json
+    extractions_data = []
+    for ex in config.extractions:
+        extractions_data.append({
+            "id": ex.id, "method": ex.method,
+            "sheet": ex.sheet, "params": ex.params,
+        })
+    serialized = _json.dumps(extractions_data, sort_keys=True, default=str)
+    return hashlib.md5(serialized.encode()).hexdigest()[:12]
 
 
 def _json_path_for(config) -> str:
@@ -474,6 +550,12 @@ def _load_source_json(config) -> dict | None:
             print("  source_data.json stale (Excel changed) — re-extracting")
             return None
 
+    # Invalidate if extraction config changed
+    current_ext_hash = _extractions_hash(config)
+    if meta.get("extractions_hash") and meta["extractions_hash"] != current_ext_hash:
+        print("  source_data.json stale (extraction params changed) — re-extracting")
+        return None
+
     # Strip _meta, return data dict (keep _sheets for discovery)
     data = {k: v for k, v in payload.items() if k != "_meta"}
     n_extractions = sum(1 for k in data if not k.startswith("_"))
@@ -502,6 +584,7 @@ def _save_source_json(data: dict, config) -> str:
             "extracted_at": datetime.now().isoformat(),
             "excel_file": os.path.basename(config.data_source_path),
             "excel_hash": excel_hash,
+            "extractions_hash": _extractions_hash(config),
             "wave": config.wave,
         },
     }
@@ -532,19 +615,35 @@ def _extract_all_from_excel(config) -> dict:
             header=None,
         )
 
-    # Build raw sheet index for downstream discovery (Stage 4)
-    # Stores col0 (code) and col1 (desc) for every row, keyed by sheet
-    raw_index = {}
-    for sheet_key, df in sheets_data.items():
-        rows = []
-        for i in range(len(df)):
-            code = df.iloc[i, 0]
-            desc = df.iloc[i, 1] if df.shape[1] > 1 else None
-            code_str = str(code).strip() if pd.notna(code) else ""
-            desc_str = str(desc).strip()[:120] if pd.notna(desc) else ""
-            if code_str or desc_str:
-                rows.append({"row": i, "code": code_str, "desc": desc_str})
-        raw_index[sheet_key] = rows
+    # Reuse _sheets from existing JSON if available and Excel hash matches,
+    # avoiding a redundant scan that index_excel() already performed.
+    raw_index = None
+    json_path = _json_path_for(config)
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+            meta = existing.get("_meta", {})
+            if (meta.get("excel_hash") == _file_hash(config.data_source_path)
+                    and "_sheets" in existing):
+                raw_index = existing["_sheets"]
+                print("  Reusing _sheets index from existing source_data.json")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    if raw_index is None:
+        # Build raw sheet index from pandas (fallback when no prior index exists)
+        raw_index = {}
+        for sheet_key, df in sheets_data.items():
+            rows = []
+            for i in range(len(df)):
+                code = df.iloc[i, 0]
+                desc = df.iloc[i, 1] if df.shape[1] > 1 else None
+                code_str = str(code).strip() if pd.notna(code) else ""
+                desc_str = str(desc).strip()[:120] if pd.notna(desc) else ""
+                if code_str or desc_str:
+                    rows.append({"row": i, "code": code_str, "desc": desc_str})
+            raw_index[sheet_key] = rows
 
     # Build global label shortener
     global_shortener = None
@@ -642,6 +741,10 @@ def _extract_all_from_excel(config) -> dict:
             # Deferred — handled after main extraction loop (needs raw_data)
             pass
 
+        elif ex.method == "synapse_report":
+            # Deferred — handled in load_all_data() via synapse_json_loader
+            pass
+
         else:
             print(f"  [WARN] Unknown extraction method: {ex.method} for {ex.id}")
 
@@ -684,6 +787,27 @@ def load_all_data(config) -> dict:
     for ex in config.extractions:
         if ex.method == "mock":
             data[ex.id] = ex.params.get("rows", [])
+
+    # ── Synapse JSON report extractions ──
+    synapse_extractions = [ex for ex in config.extractions if ex.method == "synapse_report"]
+    if synapse_extractions:
+        import os as _os
+        api_key = _os.environ.get("SYNAPSE_API_KEY", "")
+        if api_key:
+            from slidegen.pipeline.synapse_json_loader import fetch_data_as_json
+            try:
+                synapse_data = fetch_data_as_json(config, api_key=api_key)
+                for ex in synapse_extractions:
+                    if ex.id in synapse_data:
+                        data[ex.id] = synapse_data[ex.id]
+                        print(f"  {ex.id}: {len(synapse_data[ex.id])} rows (synapse_report)")
+            except Exception as e:
+                logger.warning("Synapse JSON fetch failed: %s — falling back to Excel", e)
+                # Fallback: skip, data may already be in JSON cache from prior Excel extraction
+        else:
+            logger.info(
+                "No SYNAPSE_API_KEY set — synapse_report extractions skipped, using Excel only"
+            )
 
     # ── Raw data aggregation (respondent-level) ──
     raw_extractions = [ex for ex in config.extractions if ex.method == "raw_aggregate"]

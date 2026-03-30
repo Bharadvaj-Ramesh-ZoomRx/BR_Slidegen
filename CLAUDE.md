@@ -17,22 +17,27 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       ├── input/             # ★ USER DROP ZONE — all source files (gitignored)
 │       │   └── wave/                         # Update every wave
 │       │       └── PET_Q3Q4_2025/           #   One folder per wave
-│       │           ├── source_data.xlsx     #     Survey data (Excel)
+│       │           ├── source_data.xlsx     #     Aggregated survey data (Tier 1)
+│       │           ├── source_raw_data.xlsx #     Respondent-level data (Tier 2, optional)
 │       │           ├── call_notes.docx      #     Client call notes
 │       │           ├── prior_wave_es.md     #     Prior wave ES findings (text)
-│       │           ├── [wave_report].pptx   #     Prior wave deck — read by /build-project-context
+│       │           ├── [wave_report].pptx   #     Prior wave deck — read by /prior-wave-context
 │       │           ├── pet_project_kbq.odt  #     Study design + KBQs
 │       │           ├── kbqs.md              #     Standing KBQs
 │       │           └── survey_context.md    #     Survey instrument + Q codes
 │       ├── context/           # ★ SYSTEM GENERATED intermediates (gitignored)
 │       │   ├── market_context.md             # /market-context — product-level, NOT wave-versioned
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned context outputs
-│       │       ├── prior_wave_context.md     # Stage 0.5a: /prior-wave-context (if prior files exist)
-│       │       ├── survey_context.md         # Stage 0.5b: /survey-context (if survey draft exists)
+│       │       ├── prior_wave_context.md     # Stage 0.5b: /prior-wave-context (if prior files exist)
+│       │       ├── survey_context.md         # Stage 0.5c: /survey-context (if survey draft exists)
 │       │       ├── project_context.md        # Stage 1: /build-project-context
 │       │       ├── hypothesis_bank.md        # Stage 2: /hypotheses
-│       │       ├── slide_plan.md             # Stage 3: /slide-plan
-│       │       └── source_data.json          # Auto-extracted from Excel (JSON cache)
+│       │       ├── validated_analysis.md     # Stage 3 Phase 0: /sfea-insight-writer
+│       │       ├── slide_headlines.md        # Stage 3 Phase 1: /sfea-insight-writer
+│       │       ├── exec_summary.md           # Stage 3 Phase 2-3: /sfea-insight-writer (ES + Recs)
+│       │       ├── slide_plan.md             # Stage 4: /slide-plan
+│       │       ├── source_data.json          # Auto-extracted from Excel (Tier 1 JSON cache)
+│       │       └── source_raw_data.json      # Auto-extracted from raw Excel (Tier 2 JSON cache)
 │       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
 │       │   └── PET_Q3Q4_2025/ # Wave-versioned output subfolder
@@ -42,10 +47,13 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
-│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide()
-│   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader
-│   │   ├── data_loaders.py    # 5 generic data extractors + JSON auto-cache
-│   │   ├── slide_renderers/   # 20 slide type renderers (RENDERERS registry)
+│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), index_excel(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json()
+│   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader + validate()
+│   │   ├── data_loaders.py    # 8 data extractors (5 Excel + mock + raw_aggregate + synapse_report) + JSON auto-cache + _codes rich index
+│   │   ├── raw_data_loader.py # Respondent-level data parser (source_raw_data.xlsx) + 4 aggregation modes + quarter cache
+│   │   ├── synapse_fetcher.py # Synapse API — split: trigger_generation() + wait_and_download() + fetch_synapse_data()
+│   │   ├── synapse_json_loader.py # JSON-first data fetching — POST /reports/generate → slidegen format (bypasses Excel)
+│   │   ├── slide_renderers/   # 19 slide type renderers (RENDERERS registry, +1 backward-compat alias)
 │   │   │   ├── __init__.py   #   Registry + exports
 │   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width
 │   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
@@ -56,8 +64,8 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   │   ├── quadrant.py   #   quadrant_scatter
 │   │   │   ├── heatmap.py    #   heatmap_table
 │   │   │   └── narrative.py  #   cover, executive_summary
-│   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen + PPTX backup
-│   │   └── config_generator.py # Data discovery + config scaffolding helpers
+│   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen (by index or ask_id) + PPTX backup
+│   │   └── config_generator.py # Data discovery + config scaffolding + scaffold_config_from_plan()
 │   ├── pptx_utils/            # ★ Utility package (PRD §4.2)
 │   │   ├── __init__.py        # Re-exports everything for backward compat
 │   │   ├── brand.py           # BRAND{} dict, color constants, fonts, slide dims
@@ -88,8 +96,16 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
-│   ├── slidegen/              # ★ Primary skill (pipeline + utils + styling + references)
-│   │   └── references/        # Consolidated: function-ref, chart-patterns, brand-constants, archetypes
+│   ├── market-context/        # Stage 0.5a: /market-context — competitive/clinical landscape
+│   ├── prior-wave-context/    # Stage 0.5b: /prior-wave-context — prior wave findings extraction
+│   ├── survey-context/        # Stage 0.5c: /survey-context — survey structure + Q codes
+│   ├── build-project-context/ # Stage 1: /build-project-context — raw project context
+│   ├── hypotheses/            # Stage 2: /hypotheses — hypothesis bank generation
+│   ├── sfea-insight-writer/   # Stage 3: /sfea-insight-writer — data validation + insights + ES
+│   ├── pet-es-builder/        # Stage 3 alt: /pet-es-builder — standalone ES + Recs writer
+│   ├── slide-plan/            # Stage 4: /slide-plan — structured slide plan from validated analysis
+│   ├── slidegen/              # Stage 5: /slidegen — YAML pipeline + utils + styling
+│   │   └── references/        # Consolidated: function-ref, chart-patterns, chart-types, brand-constants, archetypes
 │   └── pptx/                  # General PPTX read/create/edit skill (non-pipeline)
 └── .gitignore
 ```
@@ -116,9 +132,17 @@ python archive/scripts/discover_data.py    # Data exploration
 ## Pipeline Architecture
 
 ```
-projects/jnj_rybrevant/config.yaml  →  ProjectConfig (dataclasses)
+[Track A — JSON-First]  Synapse /reports/generate  →  fetch_data_as_json()  →  source_data.json directly
+[Track B — Excel]       Synapse /banner-plans       →  trigger_generation() + wait_and_download()  →  source_data.xlsx
+                                                                                                       ↓
+projects/jnj_rybrevant/config.yaml  →  ProjectConfig (dataclasses)  →  validate()  →  errors or proceed
                                       ↓
-source_data.json (or Excel)  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
+load_all_data(config):
+  ├─ Tier 1: source_data.json cache (or extract from Excel via 6 methods + mock)
+  │   ├─ synapse_report extractions → JSON-first via fetch_data_as_json() (if SYNAPSE_API_KEY set)
+  │   └─ Excel-based extractions → pandas extraction (fallback)
+  │   Cache invalidates on Excel hash change OR extraction params hash change
+  └─ Tier 2: raw_aggregate extractions → source_raw_data.xlsx (respondent-level)
                                       ↓
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
                                       ↓
@@ -127,11 +151,22 @@ orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
                       output/{wave}/backups/               (PPTX backups)
 ```
 
-### Data Loading (Auto-JSON)
+### Data Loading (Two-Tier Auto-JSON + Two-Track Fetching)
 
-On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices, no question-code walking. The JSON auto-invalidates when the Excel file changes (hash check). Delete `source_data.json` to force re-extraction.
+**Two-Track Data Fetching:**
+- **Track A — JSON-First**: For `synapse_report` extractions, calls Synapse `/reports/generate` API directly → JSON. Bypasses Excel entirely. **Only activates when `SYNAPSE_API_KEY` env var is set.** If the key is absent, these extractions are silently skipped.
+- **Track B — Excel** (default): Uses local `source_data.xlsx` with pandas extraction. **This is the default path — if no Synapse API key is present, the pipeline proceeds entirely with the provided Excel file.**
+- Both tracks produce the same `source_data.json` format — renderers don't change.
+
+**Tier 1 (aggregated):** On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices, no question-code walking. The JSON auto-invalidates when the Excel file changes (hash check) **or** when extraction params change (extractions hash check). Delete `source_data.json` to force re-extraction.
+
+**Tier 2 (respondent-level):** When extractions use `method: raw_aggregate`, individual respondent rows are parsed from `source_raw_data.xlsx` and cached as `source_raw_data.json`. Same hash-based invalidation. Aggregation functions: `top2box`, `yes_pct`, `recall_pct`, `mean`.
+
+**`_codes` Rich Index:** `index_excel()` now builds a `_codes` section per sheet with per-question-code metadata: `sub_row_count`, `has_sub_codes`, `sample_values`, `value_range` (decimal vs whole). Used by `scaffold_config_from_plan()` for auto-detecting extraction methods and pct_mode.
 
 ### Data Extraction Methods
+
+**Tier 1 — Aggregated Excel** (`source_data.xlsx` → `source_data.json`):
 
 | Method | Use Case |
 |--------|----------|
@@ -140,6 +175,18 @@ On first run, data is extracted from Excel and saved as `context/{wave}/source_d
 | `row_range` | Fixed row range with column mapping |
 | `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
 | `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
+| `mock` | Hardcoded test data from `params.rows` (skips JSON cache) |
+| `synapse_report` | JSON-first: calls Synapse `/reports/generate` API directly (params: `analysis_id`, `reporting_plan_id`, `time_period_map`) |
+
+**Tier 2 — Respondent-level** (`source_raw_data.xlsx` → `source_raw_data.json`):
+
+| Method | Use Case |
+|--------|----------|
+| `raw_aggregate` | Parse individual respondent rows, aggregate with `top2box`, `yes_pct`, `recall_pct`, or `mean` |
+
+Raw aggregate supports 4 modes via `params.mode`: `single` (one code, prior/current), `multi_code` (multiple codes, one row each), `cross_brand` (primary vs competitor for same code), `by_segment` (segment respondents by a segment_code value).
+
+Both tiers auto-cache to JSON with Excel file hash validation. Delete the JSON to force re-extraction.
 
 ### Slide Type Renderers
 
@@ -190,10 +237,11 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 
 ## Dependencies
 
-- `pandas`, `openpyxl` (Excel reading — only on first run per wave)
+- `pandas`, `openpyxl` (Excel reading — only on first run per wave, then cached as JSON)
 - `python-pptx` (PowerPoint generation)
 - `lxml` (XML manipulation for native PPT charts)
 - `pyyaml` (YAML config loading)
+- `requests` (Synapse API integration — banner plan download)
 - `pywin32` (win32com — live PowerPoint editing via COM, Windows only)
 
 ## SlideGen API
@@ -203,9 +251,46 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
 
-# ── Regenerate a single slide ──
+# ── Regenerate a single slide (by index or ask_id) ──
 from slidegen.pipeline import regenerate_slide
-regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
+regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)       # 0-based index
+regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index="ryb_mr") # by ask_id (resolves via shape_registry)
+
+# ── Config validation ──
+from slidegen.pipeline.project_config import load_project_config
+config = load_project_config("projects/jnj_rybrevant/config.yaml")
+errors = config.validate()  # returns list of error messages (empty = valid)
+
+# ── Index Excel for discovery (Stage 0) ──
+from slidegen.pipeline import index_excel
+index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
+            "projects/{name}/context/{wave}/source_data.json")
+# Builds _sheets index + _codes rich index (sub_row_count, has_sub_codes, value_range)
+
+# ── Fetch data from Synapse API ──
+from slidegen.pipeline import fetch_synapse_data, trigger_generation, wait_and_download
+config = load_project_config("projects/jnj_rybrevant/config.yaml")
+
+# Option A: Blocking convenience wrapper
+fetch_synapse_data(config, api_key="...")  # polls async job, downloads Excel, invalidates cache
+
+# Option B: Non-blocking split (run other work while banner plan generates)
+history_id = trigger_generation(config, api_key="...")  # returns immediately
+# ... do other work (context building, hypotheses, etc.) ...
+excel_path = wait_and_download(config, history_id, api_key="...")  # blocking poll + download
+
+# Option C: JSON-first (bypasses Excel entirely for synapse_report extractions)
+from slidegen.pipeline import fetch_data_as_json
+data = fetch_data_as_json(config, api_key="...")  # same dict format as load_all_data()
+
+# ── Auto-scaffold config from slide plan ──
+from slidegen.pipeline.config_generator import scaffold_config_from_plan
+yaml_str = scaffold_config_from_plan(
+    "projects/{name}/context/{wave}/slide_plan.md",
+    "projects/{name}/context/{wave}/source_data.json",
+    base_config_path="projects/{name}/config.yaml",  # optional: merge into existing
+)
+# Parses slide plan, cross-checks codes against _codes index, auto-selects methods
 
 # ── Data discovery (for new projects) ──
 from slidegen.pipeline.config_generator import discover_excel_structure
@@ -260,6 +345,22 @@ Regenerate all slides
 When the user says **"Create slides for projects/{name}"** or **"Run the full create workflow"**:
 
 **Gate structure: Stages 0 through 0.5c run automatically without individual gates — each sub-skill asks only one lightweight file-list confirmation before extracting. The single user validation gate is at the end of Stage 1: the user reviews ALL generated context files before Stage 2 begins. Stages 5–6 are internal — no gate.**
+
+### Stage -1 — Fetch Synapse Data (optional, on demand)
+Two tracks available:
+- **Track A — JSON-First**: For `synapse_report` extractions, calls `/reports/generate` directly → JSON. No Excel needed.
+- **Track B — Excel**: Downloads `source_data.xlsx` via banner plan API. Supports non-blocking split: `trigger_generation()` returns immediately, `wait_and_download()` blocks later — lets Stages 0.5–1 run in parallel.
+```python
+# Track A (JSON-first)
+from slidegen.pipeline import fetch_data_as_json
+data = fetch_data_as_json(config, api_key="...")
+
+# Track B (Excel — non-blocking)
+from slidegen.pipeline import trigger_generation, wait_and_download
+history_id = trigger_generation(config, api_key="...")
+# ... run other stages in parallel ...
+excel_path = wait_and_download(config, history_id, api_key="...")
+```
 
 ### Stage 0 — Index Excel → JSON (automatic, always)
 Converts `source_data.xlsx` into `context/{wave}/source_data.json`. Runs first, no prompt.
@@ -322,7 +423,7 @@ Reads `validated_analysis.md`, `slide_headlines.md`, `exec_summary.md`, `hypothe
 **→ Pause:** Show slide count, section breakdown, slide titles, and ES/Recs placement. Ask user to confirm before Stage 5.
 
 ### Stage 5 — Generate config.yaml (internal — no user gate)
-Maps the slide plan to YAML extractions and asks. **Must search `source_data.json` → `_sheets` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 6.
+Maps the slide plan to YAML extractions and asks. Can use `scaffold_config_from_plan()` to auto-generate from `slide_plan.md` + `_codes` index — auto-selects extraction method, pct_mode, and sheet mapping. **Must search `source_data.json` → `_codes` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 6.
 
 ### Stage 6 — Run `generate_deck()`
 Executes the pipeline: loads config → extracts data (or reads JSON cache) → renders all slides → saves `output/{wave}/deck.pptx`. If `source_data.json` has only the index (from Stage 0), automatically extracts from Excel and saves the full JSON.
@@ -384,21 +485,6 @@ Stage 4    /slide-plan            →  context/{wave}/slide_plan.md
 Stage 5    config.yaml            ← internal, no gate
 Stage 6    generate_deck()        →  output/{wave}/deck.pptx
 ```
-    ✋ User confirms
-    ↓ Stage 3: /sfea-insight-writer
-        Phase 0 (auto): validate vs source_data.json
-context/{wave}/validated_analysis.md
-        Phase 1: headlines        ✋ User confirms
-context/{wave}/slide_headlines.md
-        Phase 2–3: ES + Recs      ✋ User confirms
-context/{wave}/exec_summary.md
-    ↓ Stage 4: /slide-plan
-context/{wave}/slide_plan.md      (includes per-slide insights + ES/Recs slides)
-    ✋ User confirms
-    ↓ Stage 5: config.yaml                    ← internal, searches _sheets
-    ↓ Stage 6: generate_deck()
-output/{wave}/deck.pptx
-```
 
 ### Manual / Incremental Workflow
 
@@ -411,7 +497,7 @@ When the user says **"Edit Slide N — ..."** (e.g. change headline, update data
 1. **Read config** — Load current `config.yaml`, identify the ask at index N-1
 2. **Backup config** — Call `_backup_config()` to save timestamped copy to `config_history/`
 3. **Update config** — Modify the relevant fields in the YAML (headline, data_key, sort_by, etc.)
-4. **Regenerate slide** — Call `regenerate_slide(yaml_path, slide_index=N-1)` — automatically creates PPTX backup in `output/{wave}/backups/`, then clears and re-renders only that slide
+4. **Regenerate slide** — Call `regenerate_slide(yaml_path, slide_index=N-1)` or `regenerate_slide(yaml_path, slide_index="ask_id")` — automatically creates PPTX backup in `output/{wave}/backups/`, then clears and re-renders only that slide. When passing an ask_id string, resolves the slide index via `shape_registry.json` (or falls back to config.asks order).
 5. **Refresh PowerPoint** — Tell user to reopen/refresh the deck in PowerPoint to see changes
 6. **Report** — Summarize what changed
 
@@ -453,10 +539,11 @@ Each project supports wave-based folder versioning for input data and output:
 project:
   wave: "PET_Q3Q4_2025"          # wave identifier
 
-data_source_path: "input/wave/{{wave}}/source_data.xlsx"  # wave-versioned (user drop zone)
-template_path: "templates/template.pptx"              # shared (no {{wave}})
-output_path: "output/{{wave}}/deck.pptx"              # wave-versioned
-context_path: "context/{{wave}}/"                     # system-generated intermediates
+data_source_path: "input/wave/{{wave}}/source_data.xlsx"      # Tier 1: aggregated (wave-versioned)
+raw_data_source_path: "input/wave/{{wave}}/source_raw_data.xlsx"  # Tier 2: respondent-level (optional)
+template_path: "templates/template.pptx"                      # shared (no {{wave}})
+output_path: "output/{{wave}}/deck.pptx"                      # wave-versioned
+context_path: "context/{{wave}}/"                             # system-generated intermediates
 ```
 
 - `{{wave}}` in paths is interpolated from `project.wave` at config load time

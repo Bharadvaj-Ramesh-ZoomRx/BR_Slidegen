@@ -136,6 +136,92 @@ class ProjectConfig:
     def competitor(self) -> BrandConfig:
         return self.brands["competitor"]
 
+    def validate(self) -> list[str]:
+        """Validate config consistency. Returns list of error messages (empty = valid).
+
+        Checks:
+        - ask.data_key references a known extraction.id (or mock/raw_aggregate)
+        - ask.slide_type exists in RENDERERS
+        - extraction.method is a known method
+        - extraction.sheet exists in config.sheets (unless mock)
+        - Required params per extraction method are present
+        - Extra data_key references (left/right, primary_key/comp_key) are valid
+        """
+        from slidegen.pipeline.slide_renderers import RENDERERS
+
+        errors = []
+        extraction_ids = {ex.id for ex in self.extractions}
+        known_methods = {
+            "question_code", "multi_question_code", "row_range",
+            "question_code_multi_col", "nested_ordinal", "mock",
+            "raw_aggregate", "synapse_report",
+        }
+        sheet_keys = set(self.sheets.keys())
+
+        # Validate extractions
+        for i, ex in enumerate(self.extractions):
+            if ex.method not in known_methods:
+                errors.append(
+                    f"extractions[{i}] ({ex.id}): unknown method '{ex.method}'"
+                )
+            if ex.method not in ("mock", "raw_aggregate", "synapse_report") and ex.sheet and ex.sheet not in sheet_keys:
+                errors.append(
+                    f"extractions[{i}] ({ex.id}): sheet '{ex.sheet}' not in config.sheets {sorted(sheet_keys)}"
+                )
+            # Required params per method
+            params = ex.params
+            if ex.method == "question_code" and "code" not in params:
+                errors.append(f"extractions[{i}] ({ex.id}): method 'question_code' requires params.code")
+            if ex.method == "multi_question_code" and "codes" not in params:
+                errors.append(f"extractions[{i}] ({ex.id}): method 'multi_question_code' requires params.codes")
+            if ex.method == "row_range":
+                for rk in ("row_start", "row_end", "col_map"):
+                    if rk not in params:
+                        errors.append(f"extractions[{i}] ({ex.id}): method 'row_range' requires params.{rk}")
+            if ex.method == "question_code_multi_col":
+                if "code" not in params:
+                    errors.append(f"extractions[{i}] ({ex.id}): method 'question_code_multi_col' requires params.code")
+                if "columns" not in params:
+                    errors.append(f"extractions[{i}] ({ex.id}): method 'question_code_multi_col' requires params.columns")
+            if ex.method == "nested_ordinal":
+                for rk in ("row_start", "row_end"):
+                    if rk not in params:
+                        errors.append(f"extractions[{i}] ({ex.id}): method 'nested_ordinal' requires params.{rk}")
+            if ex.method == "synapse_report":
+                for rk in ("analysis_id", "reporting_plan_id"):
+                    if rk not in params:
+                        errors.append(f"extractions[{i}] ({ex.id}): method 'synapse_report' requires params.{rk}")
+
+        # Validate asks
+        for i, ask in enumerate(self.asks):
+            if ask.slide_type not in RENDERERS:
+                errors.append(
+                    f"asks[{i}] ({ask.id}): unknown slide_type '{ask.slide_type}'"
+                )
+            # Check primary data_key
+            if ask.data_key and ask.data_key not in extraction_ids:
+                errors.append(
+                    f"asks[{i}] ({ask.id}): data_key '{ask.data_key}' not found in extractions"
+                )
+            # Check extra data_key references
+            extra = ask.extra or {}
+            for nested_key in ("left", "right"):
+                nested = extra.get(nested_key, {})
+                if isinstance(nested, dict) and nested.get("data_key"):
+                    dk = nested["data_key"]
+                    if dk not in extraction_ids:
+                        errors.append(
+                            f"asks[{i}] ({ask.id}): extra.{nested_key}.data_key '{dk}' not found in extractions"
+                        )
+            for ek in ("primary_key", "comp_key"):
+                dk = extra.get(ek)
+                if dk and dk not in extraction_ids:
+                    errors.append(
+                        f"asks[{i}] ({ask.id}): extra.{ek} '{dk}' not found in extractions"
+                    )
+
+        return errors
+
     @property
     def font_display(self) -> str:
         return self.fonts.get("display", "Calibri")
@@ -176,7 +262,7 @@ def _validate_extraction(ex: dict, idx: int, yaml_path: str):
                 f"Missing required field '{field_name}' in extractions[{idx}] "
                 f"(id={ex.get('id', '?')}) in {yaml_path}"
             )
-    if ex.get("method") != "mock" and "sheet" not in ex:
+    if ex.get("method") not in ("mock", "synapse_report") and "sheet" not in ex:
         raise ValueError(
             f"Missing required field 'sheet' in extractions[{idx}] "
             f"(id={ex.get('id', '?')}) in {yaml_path}"
