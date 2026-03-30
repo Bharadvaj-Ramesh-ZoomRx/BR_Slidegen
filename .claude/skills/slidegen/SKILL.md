@@ -86,6 +86,25 @@ User says: "Edit slides with new wave data + new asks — PET_Q1Q2_2026"
 5. Gap analysis: check if new asks need new extractors or renderers
 6. Full regen: `generate_deck(yaml_path)`
 
+### 6. Refresh Deck
+
+```
+User says: "Refresh this deck" / "Refresh with new data"
+```
+
+1. Call `refresh_deck(yaml_path)` — forces re-extraction from Excel, regenerates all data-driven slides
+2. Returns `{refreshed: [...], skipped: [...], errors: [...]}`
+3. Report what was refreshed and any errors
+
+### 7. Force Fresh Extraction
+
+```
+User says: "Regenerate with fresh data"
+```
+
+1. Call `generate_deck(yaml_path, force_fresh=True)` — bypasses JSON cache
+2. Staleness warnings print automatically when data is >24h old
+
 ---
 
 ## Decision Rules
@@ -93,6 +112,8 @@ User says: "Edit slides with new wave data + new asks — PET_Q1Q2_2026"
 | Question | Answer |
 |----------|--------|
 | Text/sort/data change on one slide? | `regenerate_slide()` (by index or ask_id) |
+| Refresh all data and rebuild? | `refresh_deck()` — re-extracts + regenerates data-driven slides |
+| Force fresh extraction (bypass cache)? | `generate_deck(force_fresh=True)` or `--fresh` CLI flag |
 | New wave, add/remove slides, or structural change? | `generate_deck()` |
 | New data shape not fitting existing extractors? | Add new method to `data_loaders.py` |
 | New visualization not fitting existing renderers? | Add new renderer to `slide_renderers/` |
@@ -132,8 +153,11 @@ orchestrator  ->  RENDERERS[slide_type](slide, config, ask, data, namer)
 | `layout` | `LAYOUTS{}`, `slide_header`, `slide_footer`, `section_header_bar`, `cover_slide`, `divider_slide`, `manual_legend`, `module_badge` |
 | `charts` | `CHART_PATTERNS{}`, `enable_data_labels`, `delete_data_label`, `add_single_bar_chart`, `add_clustered_bar_chart` |
 | `tables` | `add_delta_col`, `add_delta_table`, `add_value_table` |
+| `text` | `format_run`, `add_run`, `set_paragraph_alignment`, `truncate_text`, `wrap_label`, `delta_format` |
+| `images` | `insert_image`, `add_logo` (standard position placement) |
+| `deck` | `load_template`, `clear_slide`, `clear_sections`, `create_sections` |
 | `com` | `com_connect`, `com_find_shape`, `com_set_text`, `com_set_fill`, `com_move`, `com_resize` |
-| `registry` | `load_registry`, `save_registry`, `registry_get`, `registry_tag_slide`, `registry_find_by_type`, `registry_diff_slide` |
+| `registry` | `load_registry`, `save_registry`, `registry_get`, `registry_tag_slide` (+ `last_data_pull`, `last_refreshed`, `renderer`), `registry_find_by_type`, `registry_diff_slide` |
 
 Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS, CHART_PATTERNS`
 

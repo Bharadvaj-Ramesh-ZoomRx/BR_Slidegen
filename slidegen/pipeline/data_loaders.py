@@ -556,8 +556,8 @@ def _load_source_json(config) -> dict | None:
         print("  source_data.json stale (extraction params changed) — re-extracting")
         return None
 
-    # Strip _meta, return data dict (keep _sheets for discovery)
-    data = {k: v for k, v in payload.items() if k != "_meta"}
+    # Keep _meta alongside data (renderers ignore it; orchestrator uses extracted_at)
+    data = dict(payload)
     n_extractions = sum(1 for k in data if not k.startswith("_"))
 
     # If JSON only has _sheets (index-only from Stage 0) but no extractions,
@@ -760,7 +760,10 @@ def _extract_all_from_excel(config) -> dict:
 
 # ── Master loader ────────────────────────────────────────────────────────────
 
-def load_all_data(config) -> dict:
+_STALENESS_THRESHOLD_HOURS = 24
+
+
+def load_all_data(config, force_fresh: bool = False) -> dict:
     """Load all data extractions — from JSON if available, else from Excel.
 
     Flow:
@@ -770,18 +773,41 @@ def load_all_data(config) -> dict:
 
     Args:
         config: ProjectConfig instance
+        force_fresh: If True, skip JSON cache and re-extract from Excel.
 
     Returns:
-        dict mapping extraction.id → list[dict]
+        dict mapping extraction.id → list[dict] (includes _meta and _sheets)
     """
-    # Try JSON first
-    data = _load_source_json(config)
+    data = None
+
+    if not force_fresh:
+        # Try JSON first
+        data = _load_source_json(config)
+    else:
+        print("  --fresh: forcing re-extraction from Excel")
 
     if data is None:
         # Extract from Excel and save JSON for next time
         print("  Extracting from Excel...")
         data = _extract_all_from_excel(config)
         _save_source_json(data, config)
+
+    # ── Staleness reporting (PRD §9.3) ──
+    meta = data.get("_meta", {})
+    extracted_at = meta.get("extracted_at", "")
+    if extracted_at:
+        try:
+            from datetime import datetime as _dt
+            pull_time = _dt.fromisoformat(extracted_at)
+            age_hours = (datetime.now() - pull_time).total_seconds() / 3600
+            if age_hours > _STALENESS_THRESHOLD_HOURS:
+                print(
+                    f"  [STALE] Data extracted {age_hours:.0f}h ago "
+                    f"({extracted_at[:16]}). "
+                    f"Use force_fresh=True to re-extract."
+                )
+        except (ValueError, TypeError):
+            pass
 
     # Always inject mock extractions (not stored in JSON)
     for ex in config.extractions:

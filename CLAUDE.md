@@ -74,8 +74,11 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── layout.py          # LAYOUTS{} dict + 10 slide chrome functions
 │   │   ├── charts.py          # CHART_PATTERNS{} dict + 4 chart builders
 │   │   ├── tables.py          # 3 table builders (delta col/table, value table)
+│   │   ├── text.py            # 6 text formatting helpers (format_run, add_run, delta_format, etc.)
+│   │   ├── images.py          # Image/logo placement (insert_image, add_logo)
+│   │   ├── deck.py            # Template handling (load_template, clear_slide, sections)
 │   │   ├── com.py             # 7 COM helpers for live editing
-│   │   └── registry.py        # 6 registry CRUD functions
+│   │   └── registry.py        # 6 registry CRUD functions (+ last_data_pull, last_refreshed, renderer)
 │   ├── __init__.py            # Package exports: SlideBuilder, LiveEditor, reconcile
 │   ├── __main__.py            # CLI: python -m slidegen <create|edit|reconcile>
 │   ├── config.py              # Centralized paths and settings
@@ -95,6 +98,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   ├── explore*.py            # Early data exploration scripts
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
+│   └── analyst_setup.md       # Analyst onboarding guide (git clone + OneDrive projects)
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
 │   ├── market-context/        # Stage 0.5a: /market-context — competitive/clinical landscape
 │   ├── prior-wave-context/    # Stage 0.5b: /prior-wave-context — prior wave findings extraction
@@ -115,9 +119,11 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 ```bash
 # ── Generic Pipeline (YAML-driven) ──
 python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
+python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fresh  # force re-extract
 # Or from Python:
 #   from slidegen.pipeline import generate_deck
 #   generate_deck("projects/jnj_rybrevant/config.yaml")
+#   generate_deck("projects/jnj_rybrevant/config.yaml", force_fresh=True)
 
 # ── SlideGen System ──
 python -m slidegen create                   # Demo slide creation
@@ -251,6 +257,14 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
 
+# ── Force fresh data extraction (bypass JSON cache) ──
+generate_deck("projects/jnj_rybrevant/config.yaml", force_fresh=True)
+
+# ── Refresh deck (re-extract all data + regenerate data-driven slides) ──
+from slidegen.pipeline import refresh_deck
+result = refresh_deck("projects/jnj_rybrevant/config.yaml")
+# Returns: {refreshed: [slide_ids], skipped: [slide_ids], errors: [...]}
+
 # ── Regenerate a single slide (by index or ask_id) ──
 from slidegen.pipeline import regenerate_slide
 regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)       # 0-based index
@@ -319,6 +333,8 @@ All workflows are triggered via **natural language** in the Claude Code terminal
 | Edit slides with new wave data | `Edit slides with new wave data — PET_Q1Q2_2026` | update config → `generate_deck()` |
 | Add/remove/reorder slides | `Add slide after N...` / `Remove Slide N` | `generate_deck()` |
 | Edit slides with new wave data + new asks | `Edit slides with new wave data + new asks — PET_Q1Q2_2026` | update config + extractions → `generate_deck()` |
+| Refresh all data + rebuild | `Refresh this deck` | `refresh_deck()` |
+| Force fresh extraction | `Regenerate with fresh data` | `generate_deck(force_fresh=True)` |
 | Brand new project | `Create slides for projects/{name}` | full create workflow |
 
 ### Example inputs:
@@ -338,6 +354,8 @@ Add a slide after Slide 6 — clustered_compare for HCP satisfaction
 Remove Slide 8
 Move Slide 10 before Slide 5
 Regenerate all slides
+Refresh this deck                    # Re-extract all data and rebuild data-driven slides
+Regenerate with fresh data           # Force re-extraction even if cache is valid
 ```
 
 ## Workflow: Create Slides (Full Pipeline)
@@ -523,11 +541,28 @@ When the user says **"Edit slides with new wave data + new asks — {wave_id}"**
 6. **Regenerate deck** — Run `generate_deck()` — output goes to `output/{wave_id}/deck.pptx`
 7. **Report** — Summarize changes from previous wave
 
+## Workflow: Refresh Deck
+
+When the user says **"Refresh this deck"** or **"Refresh with new data"**:
+
+1. **Force re-extraction** — Deletes `source_data.json` cache, re-extracts from Excel
+2. **Identify data-driven slides** — Reads `shape_registry.json`, finds slides with `data_source` entries
+3. **Regenerate each** — Calls `regenerate_slide()` for each data-driven slide (with PPTX backup)
+4. **Update timestamps** — Sets `last_data_pull` and `last_refreshed` in registry
+5. **Report** — Returns `{refreshed: [...], skipped: [...], errors: [...]}`
+
+```python
+from slidegen.pipeline import refresh_deck
+result = refresh_deck("projects/jnj_rybrevant/config.yaml")
+```
+
+**Staleness reporting**: When data is loaded, the pipeline checks `_meta.extracted_at` against a 24-hour threshold. If stale, prints a `[STALE]` warning with hours since extraction. Use `force_fresh=True` or `--fresh` CLI flag to bypass the JSON cache.
+
 ## Shape Naming
 
 Pipeline-generated slides assign `zrx_{slide:03d}_{shape:03d}` names to all shapes (e.g. `zrx_001_001` through `zrx_001_008` for slide 1). This enables:
 - LiveEditor targeting via COM
-- Shape registry saved to `output/{wave}/shape_registry.json` with data lineage per slide
+- Shape registry saved to `output/{wave}/shape_registry.json` with data lineage per slide (includes `last_data_pull`, `last_refreshed`, `renderer` fields)
 - Per-slide regeneration without affecting other slides
 - PPTX backup before each `regenerate_slide()` call (stored in `output/{wave}/backups/`)
 
@@ -551,6 +586,24 @@ context_path: "context/{{wave}}/"                             # system-generated
 - Input, context, and output get wave subfolders — old waves are preserved
 - To start a new wave: update `project.wave`, `period_current`, `period_prior` in config.yaml and place new data in `input/wave/{new_wave}/`
 - If `wave` is omitted or empty, paths are used as-is (backward compatible)
+
+## OneDrive Distribution
+
+SlideGen uses a **git + OneDrive** split:
+- **Git repo** provides `slidegen/` package, `.claude/skills/`, docs — updated via `git pull`
+- **OneDrive shared folder** is where `projects/` lives — configs, templates, input data, and output. The `projects/` folder is **gitignored**. Analysts symlink the OneDrive folder into their clone.
+
+**Analyst setup:** Clone repo → symlink OneDrive `projects/` into clone → install deps. See `docs/analyst_setup.md`.
+
+## CLI Usage
+
+```bash
+# Generate deck
+python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
+
+# Generate with forced fresh data extraction (bypass JSON cache)
+python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fresh
+```
 
 ## Config Versioning
 

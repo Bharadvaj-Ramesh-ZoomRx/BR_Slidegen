@@ -52,7 +52,10 @@ def registry_get(name: str, path: Optional[str] = None) -> dict:
 
 
 def registry_tag_slide(slide_idx: int, module: str, section: str,
-                       data_source: str = "", path: Optional[str] = None) -> None:
+                       data_source: str = "", path: Optional[str] = None,
+                       last_data_pull: str = "",
+                       last_refreshed: str = "",
+                       renderer: str = "") -> None:
     """Store a slide-level metadata record in the registry.
 
     Enables 'rebuild slide 14 from scratch' without touching other slides.
@@ -64,16 +67,26 @@ def registry_tag_slide(slide_idx: int, module: str, section: str,
         section: section name (e.g. "Key Findings - Personal Promotions")
         data_source: data source description (e.g. "Lung SFEA SB.xlsx / RYB sheet")
         path: registry file path (default REGISTRY_PATH)
+        last_data_pull: ISO timestamp when source data was last extracted
+        last_refreshed: ISO timestamp when this slide was last re-rendered
+        renderer: renderer name (e.g. "single_bar_with_delta")
     """
     reg = load_registry(path)
     if "slides" not in reg:
         reg["slides"] = {}
-    reg["slides"][str(slide_idx)] = {
+    record = {
         "module":      module,
         "section":     section,
         "data_source": data_source,
         "tagged_at":   datetime.now().isoformat(),
     }
+    if last_data_pull:
+        record["last_data_pull"] = last_data_pull
+    if last_refreshed:
+        record["last_refreshed"] = last_refreshed
+    if renderer:
+        record["renderer"] = renderer
+    reg["slides"][str(slide_idx)] = record
     save_registry(reg, path)
 
 

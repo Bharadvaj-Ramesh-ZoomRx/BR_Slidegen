@@ -34,9 +34,18 @@ Claude Code runs a 6-stage pipeline: indexes Excel → builds project context �
 # Generate from an existing config
 python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
 
+# Force fresh data extraction (bypass JSON cache)
+python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fresh
+
 # Or from Python
 from slidegen.pipeline import generate_deck
 generate_deck("projects/jnj_rybrevant/config.yaml")
+generate_deck("projects/jnj_rybrevant/config.yaml", force_fresh=True)  # bypass cache
+
+# Refresh deck (re-extract all data + regenerate data-driven slides)
+from slidegen.pipeline import refresh_deck
+result = refresh_deck("projects/jnj_rybrevant/config.yaml")
+# Returns: {refreshed: [...], skipped: [...], errors: [...]}
 
 # Regenerate a single slide (by 0-based index or ask_id string)
 from slidegen.pipeline import regenerate_slide
@@ -56,6 +65,8 @@ All workflows are triggered via natural language in the Claude Code terminal:
 | Edit 1 slide | `Edit Slide N — ...` | `regenerate_slide()` — single slide regen |
 | New wave, same asks | `Edit slides with new wave data — PET_Q1Q2_2026` | Update config wave → `generate_deck()` |
 | New wave + new asks | `Edit slides with new wave data + new asks — PET_Q1Q2_2026` | Update config + extractions → `generate_deck()` |
+| Refresh all data | `Refresh this deck` | `refresh_deck()` — re-extracts + rebuilds |
+| Force fresh extraction | `Regenerate with fresh data` | `generate_deck(force_fresh=True)` |
 | Add/remove/reorder | `Add slide after N...` / `Remove Slide N` | Modify asks → `generate_deck()` |
 
 ### Examples
@@ -79,6 +90,8 @@ Add a slide after Slide 6 — clustered_compare for HCP satisfaction
 Remove Slide 8
 Move Slide 10 before Slide 5
 Regenerate all slides
+Refresh this deck
+Regenerate with fresh data
 ```
 
 ## Architecture
@@ -230,21 +243,26 @@ slidegen/                     # SlideGen system
     synapse_json_loader.py     # JSON-first: /reports/generate → slidegen format
     slide_renderers/           # 20 slide type renderers (package)
     orchestrator.py            # Pipeline entry + per-slide regen (by index or ask_id) + PPTX backup
-  pptx_utils/                 # Utility package (8 modules)
+  pptx_utils/                 # Utility package (11 modules)
     brand.py                   # BRAND{} dict, colors, fonts, constants
     lxml_helpers.py            # 20 lxml XML chart/axis helpers
     shapes.py                  # 7 shape primitives
     layout.py                  # LAYOUTS{} dict + slide chrome functions
     charts.py                  # CHART_PATTERNS{} + chart builders
     tables.py                  # Delta/value table builders
+    text.py                    # Text formatting helpers (format_run, add_run, delta_format)
+    images.py                  # Image/logo placement (insert_image, add_logo)
+    deck.py                    # Template handling (load_template, clear_slide, sections)
     com.py                     # COM helpers for live editing
-    registry.py                # Registry CRUD operations
+    registry.py                # Registry CRUD + timestamps (last_data_pull, last_refreshed, renderer)
   create.py                   # SlideBuilder class
   edit.py                     # LiveEditor class (win32com)
   reconcile.py                # Registry reconciliation
 
 archive/                      # Superseded scripts & old artifacts
-docs/                         # Design docs & architecture notes
+docs/
+  analyst_setup.md             # Analyst onboarding guide
+  SlideGen_PRD.md              # Product requirements document
 ```
 
 ## Key Conventions
@@ -254,6 +272,12 @@ docs/                         # Design docs & architecture notes
 - **Brand colors**: Defined per-project in YAML. J&J: RYB orange (`#F75824`), TAG violet (`#7030A0`).
 - **Fonts**: Defined per-project in YAML. J&J: Johnson Display (headers), Johnson Text (body).
 - **Shape naming**: Pipeline assigns `zrx_{slide:03d}_{shape:03d}` names for COM targeting and registry tracking.
+
+## OneDrive Distribution (Analyst Deployment)
+
+Git + OneDrive split: analysts clone the repo for `slidegen/` package and `.claude/skills/`. The `projects/` folder lives entirely on a shared OneDrive folder (gitignored) — analysts symlink it into their clone.
+
+**Analyst**: Clone repo → symlink OneDrive `projects/` into clone → install deps. See `docs/analyst_setup.md`.
 
 ## Dependencies
 

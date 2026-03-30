@@ -18,11 +18,16 @@ import os
 import shutil
 from datetime import datetime
 from pptx import Presentation
-from pptx.util import Emu
 
 from slidegen.pipeline.project_config import load_project_config, ProjectConfig, AskConfig, DataExtractionConfig
 from slidegen.pipeline.data_loaders import load_all_data
 from slidegen.pipeline.slide_renderers import RENDERERS
+from slidegen.pptx_utils.deck import (
+    load_template as _load_template_impl,
+    clear_slide as _clear_slide_impl,
+    clear_sections as _clear_sections_impl,
+    create_sections as _create_sections_impl,
+)
 
 
 # ── Shape naming ─────────────────────────────────────────────────────────────
@@ -36,7 +41,8 @@ class ShapeNamer:
 
     def __init__(self, slide_idx: int, ask_id: str = "",
                  data_key: str = "", config_hash: str = "",
-                 source_file: str = ""):
+                 source_file: str = "", renderer: str = "",
+                 last_data_pull: str = ""):
         self._slide_idx = slide_idx
         self._counter = 0
         self._registry: dict[str, dict] = {}
@@ -44,6 +50,8 @@ class ShapeNamer:
         self._data_key = data_key
         self._config_hash = config_hash
         self._source_file = source_file
+        self._renderer = renderer
+        self._last_data_pull = last_data_pull
 
     def name(self, shape, label: str = "") -> str:
         """Assign a zrx_ name to a shape and record it in the registry."""
@@ -66,9 +74,12 @@ class ShapeNamer:
     @property
     def slide_metadata(self) -> dict:
         """Return per-slide metadata including data_source lineage (PRD §6.2)."""
+        now = datetime.now().isoformat()
         meta = {
             "ask_id": self._ask_id,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": now,
+            "last_refreshed": now,
+            "renderer": self._renderer,
             "shapes": self._registry,
         }
         if self._data_key or self._source_file:
@@ -77,6 +88,8 @@ class ShapeNamer:
                 "config_hash": self._config_hash,
                 "source_file": self._source_file,
             }
+        if self._last_data_pull:
+            meta["last_data_pull"] = self._last_data_pull
         return meta
 
 
@@ -269,112 +282,21 @@ def _config_hash(yaml_path: str) -> str:
     return _file_hash(yaml_path)
 
 
-# ── Slide clearing ───────────────────────────────────────────────────────────
+# ── Slide/section management (delegated to pptx_utils.deck) ─────────────────
 
 def _clear_slide(slide):
-    """Remove all shapes from a slide, preserving the slide itself."""
-    sp_tree = slide.shapes._spTree
-    removable = [
-        '{http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing}sp',
-        '{http://schemas.openxmlformats.org/presentationml/2006/main}sp',
-    ]
-    for child in list(sp_tree):
-        tag = child.tag
-        if (tag.endswith('}sp') or tag.endswith('}graphicFrame') or
-                tag.endswith('}pic') or tag.endswith('}grpSp') or
-                tag.endswith('}cxnSp')):
-            sp_tree.remove(child)
-
-
-_P14_NS = "http://schemas.microsoft.com/office/powerpoint/2010/main"
-_SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+    """Remove all shapes from a slide."""
+    _clear_slide_impl(slide)
 
 
 def _clear_sections(prs):
-    """Remove all PowerPoint sections from the presentation."""
-    from pptx.oxml.ns import qn
-    from lxml import etree
-
-    ext_lst = prs.part._element.find(qn('p:extLst'))
-    if ext_lst is None:
-        return
-    for ext in list(ext_lst):
-        if ext.get("uri") == _SECTION_EXT_URI:
-            section_lst = ext.find(f"{{{_P14_NS}}}sectionLst")
-            if section_lst is not None:
-                # Remove all sections
-                for section in list(section_lst):
-                    section_lst.remove(section)
+    """Remove all PowerPoint sections."""
+    _clear_sections_impl(prs)
 
 
-def _create_sections(prs, sections_config: list[dict], ask_id_to_slide_idx: dict):
-    """Create PowerPoint sections from config.
-
-    sections_config: [{"name": "Section Name", "start": "ask_id"}, ...]
-    ask_id_to_slide_idx: {"ask_id": 0-based slide index}
-
-    Each section starts at the slide for `start` ask_id and runs until
-    the next section begins.
-    """
-    from pptx.oxml.ns import qn
-    from lxml import etree
-    import uuid
-
-    if not sections_config:
-        return
-
-    # Get the sldIdLst to find slide IDs
-    sld_id_lst = prs.part._element.find(qn('p:sldIdLst'))
-    sld_ids = [elem.get("id") for elem in sld_id_lst]
-    total_slides = len(sld_ids)
-
-    # Build section ranges: [(name, start_idx, end_idx), ...]
-    ranges = []
-    for i, sec in enumerate(sections_config):
-        start_ask = sec.get("start", "")
-        start_idx = ask_id_to_slide_idx.get(start_ask, 0)
-        ranges.append((sec["name"], start_idx))
-
-    # Sort by start index
-    ranges.sort(key=lambda x: x[1])
-
-    # Find or create the sectionLst element
-    ext_lst = prs.part._element.find(qn('p:extLst'))
-    if ext_lst is None:
-        ext_lst = etree.SubElement(prs.part._element, qn('p:extLst'))
-
-    # Find the section extension
-    section_ext = None
-    for ext in ext_lst:
-        if ext.get("uri") == _SECTION_EXT_URI:
-            section_ext = ext
-            break
-
-    if section_ext is None:
-        section_ext = etree.SubElement(ext_lst, qn('p:ext'))
-        section_ext.set("uri", _SECTION_EXT_URI)
-
-    section_lst = section_ext.find(f"{{{_P14_NS}}}sectionLst")
-    if section_lst is None:
-        section_lst = etree.SubElement(
-            section_ext,
-            f"{{{_P14_NS}}}sectionLst")
-
-    # Build sections
-    for i, (name, start_idx) in enumerate(ranges):
-        end_idx = ranges[i + 1][1] if i + 1 < len(ranges) else total_slides
-
-        section_el = etree.SubElement(section_lst, f"{{{_P14_NS}}}section")
-        section_el.set("name", name)
-        section_el.set("id", "{" + str(uuid.uuid4()).upper() + "}")
-
-        sld_id_lst_el = etree.SubElement(section_el, f"{{{_P14_NS}}}sldIdLst")
-        for idx in range(start_idx, end_idx):
-            if idx < len(sld_ids):
-                sld_id_el = etree.SubElement(sld_id_lst_el, f"{{{_P14_NS}}}sldId")
-                sld_id_el.set("id", sld_ids[idx])
-
-    print(f"  Created {len(ranges)} sections")
+def _create_sections(prs, sections_config, ask_id_to_slide_idx):
+    """Create PowerPoint sections from config."""
+    _create_sections_impl(prs, sections_config, ask_id_to_slide_idx)
 
 
 def _resolve_ask_id_to_slide_index(
@@ -410,56 +332,18 @@ def _resolve_ask_id_to_slide_index(
 
 
 def _load_template(config: ProjectConfig):
-    """Load template PPTX, returning (Presentation, blank_layout).
-
-    If a template exists, loads it and removes all original slides so that only
-    the slide masters/layouts remain (logos, fonts, backgrounds are preserved).
-    Falls back to a blank presentation if no template is available.
-    """
-    from pptx.oxml.ns import qn
-
-    if config.template_path and os.path.exists(config.template_path):
-        prs = Presentation(config.template_path)
-        original_count = len(prs.slides)
-
-        # Find the "Blank" layout (preferred for data slides)
-        blank_layout = None
-        for layout in prs.slide_layouts:
-            if layout.name == "Blank":
-                blank_layout = layout
-                break
-        if blank_layout is None:
-            blank_layout = prs.slide_layouts[0]
-
-        # Delete all original template slides — we only want the masters/layouts
-        sld_id_lst = prs.part._element.find(qn('p:sldIdLst'))
-        for _ in range(original_count):
-            first = sld_id_lst[0]
-            rId = first.get(qn('r:id'))
-            prs.part.drop_rel(rId)
-            sld_id_lst.remove(first)
-
-        # Clear old template sections (they reference deleted slides)
-        _clear_sections(prs)
-
-        print(f"  Template loaded: {os.path.basename(config.template_path)}"
-              f" (master/layouts retained, {original_count} slides cleared)")
-        return prs, blank_layout
-    else:
-        prs = Presentation()
-        prs.slide_width = Emu(12192000)   # 13.33 inches
-        prs.slide_height = Emu(6858000)   # 7.50 inches
-        layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
-        print("  No template — using blank presentation")
-        return prs, layout
+    """Load template PPTX, returning (Presentation, blank_layout)."""
+    return _load_template_impl(config)
 
 
-def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
+def generate_deck(yaml_path: str, output_path: str | None = None,
+                   force_fresh: bool = False) -> str:
     """Generate a full slide deck from a YAML project config.
 
     Args:
         yaml_path: Path to the project YAML file.
         output_path: Override output path. If None, uses config.output_path.
+        force_fresh: If True, skip JSON cache and re-extract from Excel/Synapse.
 
     Returns:
         Path to the generated PPTX file.
@@ -481,7 +365,11 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
 
     # 2. Load data (from JSON if available, else extract from Excel)
     print("Loading data...")
-    data = load_all_data(config)
+    data = load_all_data(config, force_fresh=force_fresh)
+
+    # Extract data pull timestamp for registry lineage
+    data_meta = data.get("_meta", {})
+    last_data_pull = data_meta.get("extracted_at", "")
 
     # Print extraction summary
     for key, val in data.items():
@@ -518,6 +406,8 @@ def generate_deck(yaml_path: str, output_path: str | None = None) -> str:
             data_key=getattr(ask, 'data_key', ''),
             config_hash=cfg_hash,
             source_file=config.data_source_path,
+            renderer=ask.slide_type,
+            last_data_pull=last_data_pull,
         )
         try:
             renderer(slide, config, ask, data, namer=namer)
@@ -584,6 +474,8 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
 
     # Load data (from JSON if available, else extract from Excel)
     data = load_all_data(config)
+    data_meta = data.get("_meta", {})
+    last_data_pull = data_meta.get("extracted_at", "")
 
     pptx_path = output_path or config.output_path
     if not pptx_path or not os.path.exists(pptx_path):
@@ -633,6 +525,8 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
         data_key=getattr(ask, 'data_key', ''),
         config_hash=_config_hash(yaml_path),
         source_file=config.data_source_path,
+        renderer=ask.slide_type,
+        last_data_pull=last_data_pull,
     )
     renderer(slide, config, ask, data, namer=namer)
     namer.name_remaining(slide)
@@ -657,14 +551,138 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
         return alt_path
 
 
+# ── Deck refresh (PRD §9.2) ──────────────────────────────────────────────────
+
+def refresh_deck(yaml_path: str, output_path: str | None = None) -> dict:
+    """Refresh all data-driven slides in an existing deck.
+
+    Forces re-extraction of data from Excel/Synapse, then regenerates every
+    slide that has a data_source recorded in shape_registry.json.
+
+    Args:
+        yaml_path: Path to project YAML config.
+        output_path: Path to existing PPTX. If None, uses config.output_path.
+
+    Returns:
+        Summary dict: {refreshed: [ask_ids], skipped: [ask_ids], errors: [...]}
+    """
+    config = load_project_config(yaml_path)
+    pptx_path = output_path or config.output_path
+    if not pptx_path or not os.path.exists(pptx_path):
+        raise FileNotFoundError(f"Deck not found: {pptx_path}")
+
+    registry_path = os.path.join(os.path.dirname(pptx_path), "shape_registry.json")
+    if not os.path.exists(registry_path):
+        raise FileNotFoundError(f"Shape registry not found: {registry_path}")
+
+    # Load registry to find data-driven slides
+    with open(registry_path, "r", encoding="utf-8") as f:
+        reg = json.load(f)
+
+    slides_meta = reg.get("slides", {})
+
+    # Force fresh data extraction
+    print("Refreshing deck — forcing data re-extraction...")
+    data = load_all_data(config, force_fresh=True)
+    data_meta = data.get("_meta", {})
+    last_data_pull = data_meta.get("extracted_at", "")
+
+    # Backup before refresh
+    backup = _backup_pptx(pptx_path)
+    if backup:
+        print(f"  Backup saved: {backup}")
+
+    prs = Presentation(pptx_path)
+    slide_to_ask = reg.get("slide_to_ask", [])
+    cfg_hash = _config_hash(yaml_path)
+
+    result = {"refreshed": [], "skipped": [], "errors": []}
+
+    for slide_num_str, slide_info in slides_meta.items():
+        slide_idx = int(slide_num_str) - 1  # registry uses 1-based
+        ask_id = slide_info.get("ask_id", "")
+
+        # Skip slides without data sources (cover, ES, etc.)
+        if not slide_info.get("data_source"):
+            result["skipped"].append(ask_id or f"slide_{slide_num_str}")
+            continue
+
+        if slide_idx < 0 or slide_idx >= len(prs.slides):
+            result["errors"].append(f"{ask_id}: slide index {slide_idx} out of range")
+            continue
+
+        # Find the ask config
+        ask_index = slide_idx
+        if slide_to_ask and slide_idx < len(slide_to_ask):
+            ask_index = slide_to_ask[slide_idx]
+
+        if ask_index >= len(config.asks):
+            result["errors"].append(f"{ask_id}: ask index {ask_index} out of range")
+            continue
+
+        ask = config.asks[ask_index]
+        renderer_fn = RENDERERS.get(ask.slide_type)
+        if renderer_fn is None:
+            result["errors"].append(f"{ask_id}: unknown slide_type '{ask.slide_type}'")
+            continue
+
+        # Clear and re-render
+        slide = prs.slides[slide_idx]
+        _clear_slide(slide)
+
+        namer = ShapeNamer(
+            slide_idx + 1, ask_id=ask.id,
+            data_key=getattr(ask, 'data_key', ''),
+            config_hash=cfg_hash,
+            source_file=config.data_source_path,
+            renderer=ask.slide_type,
+            last_data_pull=last_data_pull,
+        )
+        try:
+            renderer_fn(slide, config, ask, data, namer=namer)
+            namer.name_remaining(slide)
+            notes_text = _build_speaker_notes(ask, config, data)
+            _add_speaker_notes(slide, notes_text)
+            # Update registry entry for this slide
+            slides_meta[slide_num_str] = namer.slide_metadata
+            result["refreshed"].append(ask_id)
+            print(f"  [{slide_num_str}] {ask_id} refreshed")
+        except Exception as e:
+            result["errors"].append(f"{ask_id}: {e}")
+            print(f"  [{slide_num_str}] {ask_id} ERROR: {e}")
+
+    # Save updated deck
+    try:
+        prs.save(pptx_path)
+    except PermissionError:
+        alt = pptx_path.replace(".pptx", "_refreshed.pptx")
+        prs.save(alt)
+        pptx_path = alt
+        print(f"  [!] Saved to {alt} (original is open in PowerPoint)")
+
+    # Save updated registry
+    reg["slides"] = slides_meta
+    reg["last_refreshed"] = datetime.now().isoformat()
+    with open(registry_path, "w", encoding="utf-8") as f:
+        json.dump(reg, f, indent=2)
+
+    print(f"\nRefresh complete: {len(result['refreshed'])} refreshed, "
+          f"{len(result['skipped'])} skipped, {len(result['errors'])} errors")
+    return result
+
+
 # ── CLI entry point ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) < 2:
-        print("Usage: python -m slidegen.pipeline.orchestrator <project.yaml> [output.pptx]")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+
+    if len(args) < 1:
+        print("Usage: python -m slidegen.pipeline.orchestrator <project.yaml> [output.pptx] [--fresh]")
         sys.exit(1)
 
-    yaml_path = sys.argv[1]
-    output = sys.argv[2] if len(sys.argv) > 2 else None
-    generate_deck(yaml_path, output)
+    yaml_path = args[0]
+    output = args[1] if len(args) > 1 else None
+    fresh = "--fresh" in flags
+    generate_deck(yaml_path, output, force_fresh=fresh)

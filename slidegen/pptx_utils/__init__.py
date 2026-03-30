@@ -11,6 +11,9 @@ Submodules:
     layout         — Slide chrome, decorations, LAYOUTS{} dict
     charts         — High-level chart builders, CHART_PATTERNS{} dict
     tables         — Table builders (delta columns, value columns)
+    text           — Text formatting helpers (run-level, paragraph alignment)
+    images         — Image and logo placement utilities
+    deck           — Template handling, slide scaffolding, presentation management
     com            — COM helpers for live editing via win32com
     registry       — Shape registry CRUD operations
 """
@@ -80,6 +83,18 @@ from .registry import (
     load_registry, save_registry, registry_get,
     registry_tag_slide, registry_find_by_type, registry_diff_slide,
 )
+
+# ── Text formatting helpers ──────────────────────────────────────────────────
+from .text import (
+    format_run, add_run, set_paragraph_alignment,
+    truncate_text, wrap_label, delta_format,
+)
+
+# ── Image/logo placement ────────────────────────────────────────────────────
+from .images import insert_image as _insert_image_new, add_logo
+
+# ── Deck/template management ────────────────────────────────────────────────
+from .deck import load_template, clear_slide, clear_sections, create_sections
 
 # ── Re-export pptx.util for convenience ──────────────────────────────────────
 from pptx.util import Inches, Pt, Emu
