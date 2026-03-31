@@ -545,6 +545,7 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
                    quarter_current: str = "",
                    quarter_prior: str = "",
                    label_fn: Optional[Callable[[str], str]] = None,
+                   skip_zero: bool = False,
                    ) -> list[dict]:
     """Aggregate respondent-level data for a question code.
 
@@ -562,6 +563,7 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
         quarter_current: quarter label for current period (e.g. "Q4'25")
         quarter_prior: quarter label for prior period (e.g. "Q3'25")
         label_fn: optional label shortening function
+        skip_zero: if True, omit rows where both prior and current are 0 or None
 
     Returns:
         list[dict] with {desc, code, prior, current, n_current, n_prior}
@@ -625,6 +627,11 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
             "n_current": len(cur_vals),
             "n_prior": len(pri_vals),
         })
+
+    if skip_zero:
+        results = [r for r in results
+                   if not (r["current"] in (0, 0.0, None)
+                           and r["prior"] in (0, 0.0, None))]
 
     return results
 
@@ -921,5 +928,109 @@ def aggregate_raw_by_segment(raw_data: dict, sheet_key: str, code: str,
             row["diff"] = round(v1 - v2, 1) if v1 is not None and v2 is not None else None
 
         results.append(row)
+
+    return results
+
+
+def aggregate_raw_by_hii(raw_data: dict, sheet_key: str, code: str,
+                          quality_code: str = "Q1_87Z",
+                          ltip_code: str = "C1_85DZ",
+                          agg: str = "top2box",
+                          quarter: str = "",
+                          label_fn: Optional[Callable[[str], str]] = None,
+                          skip_zero: bool = False,
+                          ) -> list[dict]:
+    """Aggregate a question code split by HII vs Others.
+
+    HII = quality_code overall quality == 7 (top-box) AND ltip_code any col >= 6.
+    Others = everyone else with valid values for both.
+
+    Returns rows with {desc, hi_current, other_current, diff}.
+    """
+    sheet = raw_data.get(sheet_key, {})
+    if not sheet:
+        return []
+
+    columns = sheet.get("columns", {})
+    code_map = sheet.get("code_map", {})
+    respondents = sheet.get("respondents", [])
+    agg_fn = _AGG_FUNCS.get(agg, _top2box)
+
+    available_quarters = discover_quarters(raw_data, sheet_key)
+    q = _match_quarter(quarter, available_quarters) if quarter else ""
+    resps = [r for r in respondents if r["quarter"] == q] if q else respondents
+
+    # Find overall quality column
+    quality_cols = code_map.get(quality_code, [])
+    quality_ci = None
+    for ci in quality_cols:
+        attr = columns.get(str(ci), {}).get("attribute", "").lower()
+        if "overall quality" in attr:
+            quality_ci = str(ci)
+            break
+    if quality_ci is None and quality_cols:
+        quality_ci = str(quality_cols[0])
+    if quality_ci is None:
+        logger.warning("by_hii: quality_code '%s' not found", quality_code)
+        return []
+
+    ltip_cols = [str(ci) for ci in code_map.get(ltip_code, [])]
+    if not ltip_cols:
+        logger.warning("by_hii: ltip_code '%s' not found", ltip_code)
+        return []
+
+    # Classify respondents
+    hii_resps, other_resps = [], []
+    for r in resps:
+        q_val = r["values"].get(quality_ci)
+        ltip_vals = [r["values"].get(c) for c in ltip_cols if c in r["values"]]
+        if q_val is None or not ltip_vals:
+            continue
+        ltip_max = max((v for v in ltip_vals if isinstance(v, (int, float))), default=None)
+        if ltip_max is None:
+            continue
+        if q_val == 7 and ltip_max >= 6:
+            hii_resps.append(r)
+        else:
+            other_resps.append(r)
+
+    logger.info("by_hii: %d HII, %d Others (of %d total)",
+                len(hii_resps), len(other_resps), len(resps))
+
+    # Aggregate target code per segment
+    target_cols = code_map.get(code, [])
+    if not target_cols:
+        logger.warning("by_hii: code '%s' not found", code)
+        return []
+
+    results = []
+    for ci in [int(c) for c in target_cols]:
+        ci_str = str(ci)
+        col_info = columns.get(ci_str, {})
+        attribute = col_info.get("attribute", "")
+        if not attribute:
+            continue
+
+        hi_vals = [r["values"].get(ci_str) for r in hii_resps if ci_str in r["values"]]
+        ot_vals = [r["values"].get(ci_str) for r in other_resps if ci_str in r["values"]]
+
+        hi_agg = agg_fn(hi_vals)
+        ot_agg = agg_fn(ot_vals)
+
+        row = {
+            "desc": label_fn(attribute) if label_fn else attribute,
+            "hi_current": hi_agg,
+            "other_current": ot_agg,
+        }
+        if hi_agg is not None and ot_agg is not None:
+            row["diff"] = round(hi_agg - ot_agg, 1)
+        else:
+            row["diff"] = None
+        results.append(row)
+
+    if skip_zero:
+        results = [r for r in results
+                   if not (r["hi_current"] in (0, 0.0, None)
+                           and r["other_current"] in (0, 0.0, None))]
 
     return results

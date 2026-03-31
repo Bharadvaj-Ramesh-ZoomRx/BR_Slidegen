@@ -852,7 +852,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
         from slidegen.pipeline.raw_data_loader import (
             load_raw_data, aggregate_raw, aggregate_raw_multi_code,
             aggregate_raw_cross_brand, aggregate_raw_by_segment,
-            validate_raw_extractions,
+            aggregate_raw_by_hii, validate_raw_extractions,
         )
 
         raw_data = load_raw_data(config)
@@ -912,6 +912,18 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                         label_fn=label_fn,
                     )
 
+                elif raw_mode == "by_hii":
+                    result = aggregate_raw_by_hii(
+                        raw_data, sheet_key=sheet_key,
+                        code=params["code"],
+                        quality_code=params.get("quality_code", "Q1_87Z"),
+                        ltip_code=params.get("ltip_code", "C1_85DZ"),
+                        agg=params.get("agg", "top2box"),
+                        quarter=params.get("quarter_current", config.period_current),
+                        label_fn=label_fn,
+                        skip_zero=params.get("skip_zero", False),
+                    )
+
                 else:  # single (default)
                     result = aggregate_raw(
                         raw_data, sheet_key=sheet_key,
@@ -920,6 +932,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                         quarter_current=params.get("quarter_current", config.period_current),
                         quarter_prior=params.get("quarter_prior", config.period_prior),
                         label_fn=label_fn,
+                        skip_zero=params.get("skip_zero", False),
                     )
 
                 data[ex.id] = result
