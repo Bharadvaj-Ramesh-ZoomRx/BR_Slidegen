@@ -121,3 +121,36 @@ add_val_axis_reference_line(chart, x_value=35,
 ```
 
 Note: This injects a supplementary scatter series into the chart's plot area.
+
+---
+
+## Renderer-Data Compatibility Rules
+
+Each slide_type requires specific data field names. Using the wrong data format produces empty charts.
+
+| slide_type | Required data fields | Common mistake |
+|---|---|---|
+| `single_bar_with_delta` | `desc`, `prior`, `current` (+ optional `short`) | Works with any standard extraction — safest default |
+| `abacus` | `desc` (or `short`), `prior`, `current` | Same as single_bar — works with standard data |
+| `dual_bar_with_delta` | `{prefix}_current`, `{prefix}_prior` per side | **Fails with simple `prior`/`current`** — needs prefixed fields |
+| `clustered_compare` | `primary_current`, `comp_current` (or `extra.primary_key` + `extra.comp_key`) | **Fails with simple `prior`/`current`** — needs two-brand merged data |
+| `hii_scorecard` | Needs `extra.sections` defining layout | **Empty without `extra` config** |
+| `heatmap_table` | Needs `extra.columns` defining column layout | **Empty without `extra` config** |
+| `executive_summary` | `ask.extra.insights` list OR `ask.source_text` path to .md | Fallback reads bullet lines from markdown |
+
+### Safe Defaults for simple `{desc, prior, current}` data:
+- **`single_bar_with_delta`** for ranked lists, comparisons, breakdowns
+- **`abacus`** for attribute ratings (scatter dot plot with value tables)
+- **`executive_summary`** for text-only insights (populate `extra.insights`)
+
+### Label Shortcuts
+Long labels truncated at LABEL_MAX (65 chars). Fix: add `label_shortcuts` config with `keywords` -> `short` mappings, set `use_label_shortcuts: true` in extraction params.
+
+### pct_mode
+- `pct` (default): 0-1 decimals -> multiply by 100 (0.46 -> 46%)
+- `straight`: already whole-number percentages (46 -> 46%)
+- Auto-detected from `_codes.value_range`
+
+### Template Rules
+- NEVER use a prior wave report PPTX as template — clearing slides with embedded charts corrupts the file
+- Always use a clean blank template created by python-pptx with correct slide dimensions

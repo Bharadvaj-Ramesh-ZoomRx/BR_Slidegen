@@ -30,28 +30,50 @@ def load_template(config) -> tuple:
     from pptx.oxml.ns import qn
 
     if config.template_path and os.path.exists(config.template_path):
-        prs = Presentation(config.template_path)
-        original_count = len(prs.slides)
+        # Strategy: Build a clean blank PPTX with the correct dimensions,
+        # then copy only the slide master XML theme (colors, fonts) from the
+        # template. This avoids ALL orphaned chart/slide/customXml issues.
+        from pptx.oxml.ns import qn as _qn
+        import zipfile
+        import tempfile
 
-        # Find the "Blank" layout (preferred for data slides)
+        source_prs = Presentation(config.template_path)
+        original_count = len(source_prs.slides)
+
+        # Extract theme colors and fonts from the template's first slide master
+        theme_xml = None
+        try:
+            master = source_prs.slide_masters[0]
+            theme_part = master.part.related_part('rId1')  # theme is usually rId1
+            theme_xml = theme_part._element
+        except Exception:
+            pass
+
+        # Create a fresh blank presentation
+        prs = Presentation()
+        prs.slide_width = source_prs.slide_width
+        prs.slide_height = source_prs.slide_height
+
+        # Apply the template's theme to the blank presentation's master
+        if theme_xml is not None:
+            try:
+                blank_master = prs.slide_masters[0]
+                blank_theme_part = blank_master.part.related_part('rId1')
+                # Replace the theme element
+                blank_theme_part._element.getparent().replace(
+                    blank_theme_part._element, theme_xml
+                )
+            except Exception:
+                pass  # If theme injection fails, proceed with default theme
+
+        # Find the "Blank" layout
         blank_layout = None
         for layout in prs.slide_layouts:
             if layout.name == "Blank":
                 blank_layout = layout
                 break
         if blank_layout is None:
-            blank_layout = prs.slide_layouts[0]
-
-        # Delete all original template slides — we only want the masters/layouts
-        sld_id_lst = prs.part._element.find(qn('p:sldIdLst'))
-        for _ in range(original_count):
-            first = sld_id_lst[0]
-            rId = first.get(qn('r:id'))
-            prs.part.drop_rel(rId)
-            sld_id_lst.remove(first)
-
-        # Clear old template sections (they reference deleted slides)
-        clear_sections(prs)
+            blank_layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
 
         print(f"  Template loaded: {os.path.basename(config.template_path)}"
               f" (master/layouts retained, {original_count} slides cleared)")

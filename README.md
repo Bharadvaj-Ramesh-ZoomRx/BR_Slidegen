@@ -1,295 +1,221 @@
 # R3M Report — Pharma Promotional Effectiveness Tracking
 
-Generic slide deck generator for pharma consulting reports. Builds PowerPoint decks from survey data using a **YAML-driven pipeline**. All interaction happens through natural language in the **Claude Code terminal** — no manual config writing or code changes needed.
+Builds PowerPoint slide decks from PET survey data using a YAML-driven pipeline. Say what you want in plain English in the Claude Code terminal — no manual config or code changes needed.
 
-Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** (Q3/Q4 2025).
+**Active project:** Rybrevant (RYB) + Lazcluze vs Tagrisso (TAG) | **Wave:** Q1 2026
 
-## Getting Started
+---
 
-### Prerequisites
+## For Analysts
 
-```bash
-pip install pandas openpyxl python-pptx lxml pyyaml requests pywin32
-```
+### Setup (one-time)
 
-### Create a New Project
+1. Clone this repo
+2. Symlink the shared OneDrive `projects/` folder into your clone (see [analyst_setup.md](docs/analyst_setup.md))
+3. Install dependencies:
+   ```bash
+   pip install pandas openpyxl python-pptx lxml pyyaml requests pywin32 python-dotenv
+   ```
 
-1. Create the project folder: `projects/your_project/`
-2. Place source Excel in `projects/your_project/input/wave/{wave}/source_data.xlsx`
-3. Place reference docs in the same wave folder:
-   - `market_context.md` — curated market, disease, product, competitive context
-   - `kbqs.md` — standing key business questions
-   - `survey_context.md` — survey instrument, question codes, response scales
-   - `call_notes.docx` — client call notes (optional)
-   - `pet_project_kbq.odt` — study design + KBQs (optional)
-   - `prior_wave_es.md` — prior wave executive summary findings (optional)
-4. Optionally place a template deck in `projects/your_project/templates/template.pptx`
-5. In the Claude Code terminal, say: **`Create slides for projects/your_project`**
+### Generate a Deck
 
-Claude Code runs a 6-stage pipeline: indexes Excel → builds project context → generates hypotheses → creates slide plan → writes config.yaml → builds the deck.
-
-### Run an Existing Project
-
-```bash
-# Generate from an existing config
-python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml
-
-# Force fresh data extraction (bypass JSON cache)
-python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fresh
-
-# Or from Python
-from slidegen.pipeline import generate_deck
-generate_deck("projects/jnj_rybrevant/config.yaml")
-generate_deck("projects/jnj_rybrevant/config.yaml", force_fresh=True)  # bypass cache
-
-# Refresh deck (re-extract all data + regenerate data-driven slides)
-from slidegen.pipeline import refresh_deck
-result = refresh_deck("projects/jnj_rybrevant/config.yaml")
-# Returns: {refreshed: [...], skipped: [...], errors: [...]}
-
-# Regenerate a single slide (by 0-based index or ask_id string)
-from slidegen.pipeline import regenerate_slide
-regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index=4)
-regenerate_slide("projects/jnj_rybrevant/config.yaml", slide_index="ryb_mr")  # by ask_id
-```
-
-Output: `projects/jnj_rybrevant/output/PET_Q3Q4_2025/deck.pptx`
-
-## Workflows
-
-All workflows are triggered via natural language in the Claude Code terminal:
-
-| Scenario | User Says | What Happens |
-|----------|-----------|--------------|
-| Brand new project | `Create slides for projects/{name}` | Discover data, generate config, build deck |
-| Edit 1 slide | `Edit Slide N — ...` | `regenerate_slide()` — single slide regen |
-| New wave, same asks | `Edit slides with new wave data — PET_Q1Q2_2026` | Update config wave → `generate_deck()` |
-| New wave + new asks | `Edit slides with new wave data + new asks — PET_Q1Q2_2026` | Update config + extractions → `generate_deck()` |
-| Refresh all data | `Refresh this deck` | `refresh_deck()` — re-extracts + rebuilds |
-| Force fresh extraction | `Regenerate with fresh data` | `generate_deck(force_fresh=True)` |
-| Add/remove/reorder | `Add slide after N...` / `Remove Slide N` | Modify asks → `generate_deck()` |
-
-### Examples
+Open the Claude Code terminal and say:
 
 ```
-# ── Create ──
 Create slides for projects/jnj_rybrevant
-Create slides for projects/pfizer_ibrance wave PET_Q1_2026
-
-# ── Edit single slide ──
-Edit Slide 5 — change headline to "Updated Message Recall"
-Edit Slide 3 — sort bars descending by current value
-Edit Slide 9 — use data from Q2_15Z instead of Q2_10Z
-
-# ── New wave ──
-Edit slides with new wave data — PET_Q1Q2_2026, Q1'26 vs Q2'26
-Edit slides with new wave data + new asks — PET_Q1Q2_2026
-
-# ── Add / remove / reorder ──
-Add a slide after Slide 6 — clustered_compare for HCP satisfaction
-Remove Slide 8
-Move Slide 10 before Slide 5
-Regenerate all slides
-Refresh this deck
-Regenerate with fresh data
 ```
 
-## Architecture
+That's it. Claude runs the full pipeline and produces `output/{wave}/deck.pptx`.
 
-### Full Create Pipeline (Stage 0–5)
+### Common Tasks
 
-```
-input/wave/{wave}/                       # User drop zone
-  source_data.xlsx                       #   Survey data
-  market_context.md, kbqs.md, ...        #   Reference docs
-        ↓
-Stage 0: index_excel()                   # Excel → JSON index (automatic)
-        ↓
-context/{wave}/source_data.json          #   _sheets: row-level code+desc index
-        ↓
-Stage 1: /build-project-context          # Synthesize → project_context.md
-    ✋ User confirms
-Stage 2: /hypotheses                     # Generate → hypothesis_bank.md (can reference _sheets)
-    ✋ User confirms
-Stage 3: /slide-plan                     # Plan → slide_plan.md (can reference _sheets)
-    ✋ User confirms
-Stage 4: config.yaml                     # Map slides to extractions (searches _sheets)
-Stage 5: generate_deck()                 # Build → deck.pptx
-        ↓
-context/{wave}/                          # System-generated intermediates
-  project_context.md                     #   Stage 1 output
-  hypothesis_bank.md                     #   Stage 2 output
-  slide_plan.md                          #   Stage 3 output
-  source_data.json                       #   Stage 0 index + Stage 5 extracted data
-output/{wave}/
-  deck.pptx                             #   Generated deck
-  shape_registry.json                    #   Shape state + data lineage
-  backups/                               #   PPTX backups before edits
-```
+| What you want | What to say |
+|---------------|-------------|
+| Generate full deck | `Create slides for projects/{name}` |
+| Regenerate with new data | `Regenerate with fresh data` |
+| Edit one slide | `Edit Slide 5 — change headline to "..."` |
+| New wave, same slides | `Edit slides with new wave data — Q2 2026` |
+| Add a slide | `Add slide after Slide 6 — clustered_compare for HCP satisfaction` |
+| Remove a slide | `Remove Slide 8` |
+| Refresh all data | `Refresh this deck` |
 
-### Slide Generation Pipeline
+### Input Files
+
+Place these in `projects/{name}/input/wave/{wave}/`:
+
+| File | Required? | What it is |
+|------|-----------|-----------|
+| `source_data.xlsx` | Yes | Aggregated survey data from Synapse |
+| `KBQs.md` | Yes | Standing key business questions |
+| `Call Notes.docx` | Recommended | Client call notes and action items |
+| `[prior wave].pptx` | Recommended | Prior wave report deck |
+| `[survey draft].docx` | Recommended | Survey instrument for this wave |
+| `PET Project...odt` | Optional | Study design and methodology |
+
+### Output
 
 ```
-projects/{name}/config.yaml  →  ProjectConfig  →  validate()  →  errors or proceed
-                                      ↓
-Track A (JSON-first):  Synapse API  →  fetch_data_as_json()  →  source_data.json
-Track B (Excel):       source_data.xlsx  →  data_loaders.load_all_data()  →  dict[extraction_id → list[dict]]
-                                      ↓
-orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)  →  deck.pptx
+projects/{name}/output/{wave}/
+  deck.pptx              # The generated deck
+  shape_registry.json    # Shape metadata for live editing
+  backups/               # Auto-saved before each edit
 ```
 
-### Data Loading (Auto-JSON + Three-Track Fetching)
+---
 
-**Three tracks for getting data:**
-- **Track A — JSON-First**: For `synapse_report` extractions, calls Synapse `/reports/generate` API directly. Bypasses Excel entirely. **Only activates when `SYNAPSE_API_KEY` env var is set.** If absent, these extractions are skipped.
-- **Track B — Excel** (default): Uses local `source_data.xlsx` or downloads via banner plan API. **If no Synapse API key is present, the pipeline proceeds entirely with the provided Excel file.** Supports non-blocking split: `trigger_generation()` returns immediately, `wait_and_download()` blocks later.
-- **Track C — Raw API**: For `synapse_raw` extractions, fetches raw respondent-level data from Synapse API, auto-discovers and merges all project virtual questions, applies segment cuts (groupby/filter), and aggregates locally. **Only activates when `SYNAPSE_API_KEY` is set AND config has `synapse` section.**
+## How It Works
 
-On first run, data is extracted and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices. The JSON auto-invalidates when the Excel file changes (hash check) **or** when extraction params change (extraction hash check). Delete `source_data.json` to force re-extraction.
+### Pipeline Stages
 
-**Config validation**: `config.validate()` catches mismatched data_keys, unknown slide_types, missing params, and invalid extraction methods before deck generation begins.
+```
+Stage 0    Index Excel              automatic    source_data.json
+Stage 0.5  Build context            automatic    market_context.md
+           (market, prior wave,                  prior_wave_context.md
+            survey structure)                    survey_context.md
 
-### Data Extraction Methods
+Stage 1    Project context          user review  project_context.md
+Stage 2    Hypothesis bank          user review  hypothesis_bank.md
+Stage 3    Data validation +        user review  validated_analysis.md
+           headlines + ES + recs                 slide_headlines.md
+                                                 exec_summary.md
+Stage 4    Slide plan               user review  slide_plan.md
+Stage 5    Config generation        automatic    config.yaml
+Stage 6    Deck generation          automatic    deck.pptx
+```
 
-| Method | Use Case |
-|--------|----------|
-| `question_code` | Find a code row, walk sub-rows, extract prior/current values |
-| `multi_question_code` | One row per code (e.g. CTA: compelling, changed opinion, closing) |
-| `row_range` | Fixed row range with column mapping |
-| `question_code_multi_col` | Multiple columns per row (e.g. HII: hi vs other) |
-| `nested_ordinal` | Grouped ordinal sub-rows (e.g. 1st/2nd/3rd recall order) |
-| `synapse_report` | JSON-first: calls Synapse `/reports/generate` API directly (bypasses Excel) |
-| `synapse_raw` | Fetch raw respondent data from Synapse API, auto-merge VQs, apply segment cuts, aggregate locally |
+Stages marked "user review" pause for your confirmation before continuing.
 
-### Slide Types
+### Wave Versioning
 
-20 reusable slide types, each driven by YAML config:
-
-| Slide Type | Description |
-|------------|-------------|
-| `cover` | Title/cover slide |
-| `executive_summary` | Bullet-list insights |
-| `single_bar_with_delta` | Horizontal bar + QoQ delta column |
-| `dual_bar_with_delta` | Two side-by-side bars + deltas (e.g. MR + ME) |
-| `dual_bar_qoq` | Two side-by-side Q4-vs-Q3 clustered bars + deltas |
-| `clustered_compare` | Clustered bar comparing two groups + delta/gap columns |
-| `dual_bar_compare` | Side-by-side dual brand bar comparison + insight callout |
-| `qoq_bar_with_delta` | Q4 vs Q3 clustered bar + delta column |
-| `two_section_bar` | Two vertically stacked bar sections (e.g. RYB Rx + TAG Rx) |
-| `stacked_order` | Stacked bar with ordinal breakdown + total column |
-| `abacus` | XY scatter abacus with label/value tables + delta column |
-| `dual_abacus` | Two side-by-side abacus panels (e.g. Acad vs Comm by brand) |
-| `followup_rep` | Follow-up rep abacus with dual delta columns |
-| `hii_scorecard` | Multi-section clustered column chart with section headers |
-| `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments |
-| `message_mbd` | Multi-column abacus for Motivation/Believability/Differentiation |
-| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) |
-| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
-| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
-| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
-
-## Wave Versioning
-
-Data, context, and output are versioned by wave (e.g. `PET_Q3Q4_2025`, `PET_Q1Q2_2026`). Templates are shared across waves.
+Each wave gets its own folder for input, context, and output. Templates are shared.
 
 ```
 projects/jnj_rybrevant/
   config.yaml
-  templates/template.pptx              # shared across waves
-  input/wave/
-    PET_Q3Q4_2025/source_data.xlsx     # wave-versioned input
-    PET_Q1Q2_2026/source_data.xlsx
+  templates/template.pptx            # shared across waves
+  input/wave/Q1 2026/                # wave input
   context/
-    PET_Q3Q4_2025/                     # wave-versioned system-generated files
-      source_data.json                 #   auto-extracted from Excel
-      hypothesis_bank.md               #   analysis intermediates
-      slide_plan.md
-  output/
-    PET_Q3Q4_2025/                     # wave-versioned output
-      deck.pptx
-      shape_registry.json
-      backups/
-    PET_Q1Q2_2026/deck.pptx
+    market_context.md                # shared (not wave-specific)
+    Q1 2026/                         # wave context (9 generated files)
+  output/Q1 2026/deck.pptx          # wave output
 ```
 
-In `config.yaml`, `{{wave}}` in paths is interpolated from `project.wave`:
-```yaml
-project:
-  wave: "PET_Q3Q4_2025"
-data_source_path: "input/wave/{{wave}}/source_data.xlsx"
-template_path: "templates/template.pptx"           # no {{wave}} — shared
-context_path: "context/{{wave}}/"
-output_path: "output/{{wave}}/deck.pptx"
-```
+To start a new wave: update `project.wave` in config.yaml, place new Excel in the wave folder, and run.
 
-To start a new wave: update `project.wave`, `period_current`, `period_prior` in config and place new data in `input/wave/{new_wave}/`. Old wave output is preserved.
+---
+
+## Slide Types
+
+20 chart types available, each driven by YAML config:
+
+| Type | Best for |
+|------|----------|
+| `single_bar_with_delta` | Ranked list with QoQ change (most common) |
+| `abacus` | Attribute ratings — dot plot with value tables |
+| `executive_summary` | Text-based insights or recommendations |
+| `clustered_compare` | Two groups compared on same metric |
+| `dual_bar_with_delta` | Two related metrics side-by-side (e.g. MR + ME) |
+| `dual_bar_compare` | Two brands shown in separate chart panels |
+| `qoq_bar_with_delta` | Current vs prior clustered bars |
+| `two_section_bar` | Two stacked bar sections (e.g. RYB top, TAG bottom) |
+| `stacked_order` | Ordinal breakdown (1st / 2nd / 3rd recall) |
+| `message_mbd` | Motivation / Believability / Differentiation scatter |
+| `hii_scorecard` | Multi-section metric scorecard |
+| `dual_doughnut` | Side-by-side doughnut pairs |
+| `trended_scorecard` | Mini line chart grid (5-quarter trend) |
+| `trended_activity` | Reach / SOV / frequency trend panels |
+| `quadrant_scatter` | Stated vs derived importance 2x2 |
+| `heatmap_table` | Green gradient table with QoQ deltas |
+| `cover` | Title slide |
+| `dual_abacus` | Two abacus panels (e.g. Acad vs Comm) |
+| `followup_rep` | Follow-up rep abacus with dual deltas |
+| `dual_bar_qoq` | Two brands, each with QoQ clustered bars |
+
+---
+
+## Data Extraction Methods
+
+| Method | When to use |
+|--------|-------------|
+| `question_code` | Standard: find a Q code, walk its sub-rows |
+| `multi_question_code` | Multiple Q codes, one row each |
+| `row_range` | Specific Excel rows by position |
+| `question_code_multi_col` | One code, multiple value columns |
+| `nested_ordinal` | Ordinal sub-rows (1st / 2nd / 3rd) |
+| `mock` | Hardcoded test data |
+| `synapse_report` | Synapse API JSON-first (bypasses Excel) |
+| `synapse_raw` | Synapse raw respondent data + local aggregation |
+
+---
 
 ## Project Structure
 
 ```
-projects/                     # Project folders (one per product/brand)
-  jnj_rybrevant/              # J&J Rybrevant PET Q4'25
-    config.yaml                # Auto-generated YAML config
-    input/wave/                # Source files — user drop zone (gitignored)
-    context/                   # System-generated intermediates (gitignored)
-    templates/                 # Template decks (gitignored)
-    output/                    # Generated deliverables (gitignored)
+projects/                        gitignored — lives on shared OneDrive
+  jnj_rybrevant/                 production (symlinked to SharePoint)
+  jnj_rybrevant_session/         session variant
 
-slidegen/                     # SlideGen system
-  pipeline/                   # Generic deck generation pipeline
-    config_generator.py        # Data discovery + config scaffolding + scaffold_config_from_plan()
-    project_config.py          # ProjectConfig schema + YAML loader + validate()
-    data_loaders.py            # 9 data extractors + JSON auto-cache + _codes rich index
-    raw_data_loader.py         # Respondent-level parser + quarter cache + VQ merge + segment filter
-    synapse_fetcher.py         # Synapse API: trigger_generation() + wait_and_download()
-    synapse_json_loader.py     # JSON-first: /reports/generate → slidegen format
-    synapse_raw_fetcher.py     # Raw API: survey responses + VQs + segments → local aggregation
-    slide_renderers/           # 20 slide type renderers (package)
-    orchestrator.py            # Pipeline entry + per-slide regen (by index or ask_id) + PPTX backup
-  pptx_utils/                 # Utility package (11 modules)
-    brand.py                   # BRAND{} dict, colors, fonts, constants
-    lxml_helpers.py            # 20 lxml XML chart/axis helpers
-    shapes.py                  # 7 shape primitives
-    layout.py                  # LAYOUTS{} dict + slide chrome functions
-    charts.py                  # CHART_PATTERNS{} + chart builders
-    tables.py                  # Delta/value table builders
-    text.py                    # Text formatting helpers (format_run, add_run, delta_format)
-    images.py                  # Image/logo placement (insert_image, add_logo)
-    deck.py                    # Template handling (load_template, clear_slide, sections)
-    com.py                     # COM helpers for live editing
-    registry.py                # Registry CRUD + timestamps (last_data_pull, last_refreshed, renderer)
-  create.py                   # SlideBuilder class
-  edit.py                     # LiveEditor class (win32com)
-  reconcile.py                # Registry reconciliation
+slidegen/                        the engine
+  pipeline/
+    orchestrator.py              entry point: generate_deck(), regenerate_slide()
+    project_config.py            YAML schema + loader + validate()
+    data_loaders.py              9 extractors + JSON cache + _codes index
+    config_generator.py          auto-scaffold config from slide plan
+    raw_data_loader.py           respondent-level parser
+    synapse_auth.py              API token resolution (key, env var, Azure AD)
+    synapse_fetcher.py           banner plan download
+    synapse_json_loader.py       JSON-first data fetch
+    synapse_raw_fetcher.py       raw survey data fetch
+    slide_renderers/             20 renderers (one per chart type)
+  pptx_utils/                   PowerPoint helpers (11 modules)
+  create.py                     SlideBuilder class
+  edit.py                       LiveEditor (COM-based live editing)
+  reconcile.py                  registry sync from PowerPoint
 
-archive/                      # Superseded scripts & old artifacts
-docs/
-  analyst_setup.md             # Analyst onboarding guide
-  SlideGen_PRD.md              # Product requirements document
+.claude/skills/                  Claude Code skills (10 pipeline stages)
+archive/                         legacy scripts
+docs/                            setup guides + PRD
 ```
+
+---
 
 ## Key Conventions
 
-- **Percentages**: Raw Excel values are decimals (0.0–1.0). `pct()` converts to percentage. Some rows store whole numbers — use `straight()` for those.
-- **Delta**: Always current minus prior in percentage points.
-- **Brand colors**: Defined per-project in YAML. J&J: RYB orange (`#F75824`), TAG violet (`#7030A0`).
-- **Fonts**: Defined per-project in YAML. J&J: Johnson Display (headers), Johnson Text (body).
-- **Shape naming**: Pipeline assigns `zrx_{slide:03d}_{shape:03d}` names for COM targeting and registry tracking.
+| Topic | Rule |
+|-------|------|
+| Percentages | Excel stores 0.0-1.0 decimals. `pct_mode: pct` multiplies by 100. `pct_mode: straight` for values already in %. Auto-detected from `_codes.value_range`. |
+| Column layout | Never hardcode column positions. `index_excel()` auto-detects and stores in `_column_layouts`. |
+| Deltas | Always current minus prior, in percentage points. |
+| Colors | Per-project in YAML. J&J: RYB orange `#F75824`, TAG violet `#7030A0`. |
+| Fonts | Per-project in YAML. J&J: Johnson Display (headers), Johnson Text (body). |
+| Shape names | `zrx_{slide:03d}_{shape:03d}` for COM targeting and registry. |
+| Templates | Prior wave reports are accepted as templates — the pipeline extracts the theme into a clean PPTX. |
+| Long labels | Shortened via `label_shortcuts` in config. Max 65 chars (single bar), 55 (dual). |
+| Renderer compatibility | Simple `{desc, prior, current}` data works with `single_bar_with_delta`, `abacus`, `executive_summary`. Complex renderers need specific field names. |
 
-## OneDrive Distribution (Analyst Deployment)
+---
 
-Git + OneDrive split: analysts clone the repo for `slidegen/` package and `.claude/skills/`. The `projects/` folder lives entirely on a shared OneDrive folder (gitignored) — analysts symlink it into their clone.
+## CLI
 
-**Analyst**: Clone repo → symlink OneDrive `projects/` into clone → install deps. See `docs/analyst_setup.md`.
+```bash
+python -m slidegen.pipeline.orchestrator projects/{name}/config.yaml           # generate deck
+python -m slidegen.pipeline.orchestrator projects/{name}/config.yaml --fresh   # force re-extract
+python -m slidegen create                                                      # demo slide
+python -m slidegen edit <file.pptx>                                            # live editor
+python -m slidegen reconcile <file.pptx>                                       # sync registry
+python -m slidegen fetch-synapse projects/{name}/config.yaml                   # fetch banner plan
+python -m slidegen fetch-raw projects/{name}/config.yaml                       # fetch raw data
+```
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| `pandas` | DataFrame operations (Excel extraction only — first run per wave) |
+| `pandas` | Excel extraction (first run per wave, then cached) |
 | `openpyxl` | Excel file reading |
 | `python-pptx` | PowerPoint generation |
-| `lxml` | XML manipulation for chart formatting |
+| `lxml` | XML chart formatting |
 | `pyyaml` | YAML config loading |
-| `requests` | Synapse API integration (JSON-first data fetching + banner plan download) |
-| `pywin32` | COM automation for live editing (Windows only) |
+| `requests` | Synapse API integration |
+| `pywin32` | COM live editing (Windows only) |
+| `python-dotenv` | `.env` file loading for API keys (optional) |

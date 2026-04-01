@@ -359,6 +359,80 @@ def _is_zero(v) -> bool:
             return False
 
 
+def _detect_column_layout(header_rows: list) -> dict | None:
+    """Detect prior/current/segment column positions from Excel header rows.
+
+    Scans header rows (0-3) for time period labels (e.g., "Quarterly - Q4 2025",
+    "Total", "High Impact", "Community", "Academic") and returns a layout dict:
+    {
+        "prior_col": int,       # 0-indexed column for prior wave total
+        "current_col": int,     # 0-indexed column for current wave total
+        "prior_label": str,     # e.g., "Quarterly - Q4 2025"
+        "current_label": str,   # e.g., "Quarterly - Q1 2026"
+        "segments": [           # segment columns detected from rows 2-3
+            {"name": "High Impact - LTIP", "columns": {"Others": col, "High Impact": col}},
+            {"name": "Acad-Comm Lite", "columns": {"Community": col, "Academic": col}},
+        ]
+    }
+    """
+    import re
+    if not header_rows or len(header_rows) < 2:
+        return None
+
+    layout = {"segments": []}
+    row1 = header_rows[0] if len(header_rows) > 0 else ()
+    row2 = header_rows[1] if len(header_rows) > 1 else ()
+    row3 = header_rows[2] if len(header_rows) > 2 else ()
+
+    # Find "Total" columns in row 2 — these are the main prior/current totals
+    total_cols = []
+    for ci, val in enumerate(row2):
+        if val and str(val).strip().lower() == "total":
+            total_cols.append(ci)
+
+    # Match Total columns to period labels in row 1
+    period_pattern = re.compile(r'(Quarterly|Monthly|Wave)\s*[-–]\s*(.+)', re.IGNORECASE)
+    period_cols = []
+    for ci, val in enumerate(row1):
+        if val:
+            m = period_pattern.match(str(val).strip())
+            if m:
+                period_cols.append((ci, m.group(2).strip()))
+
+    # Map each Total column to its nearest period label
+    if len(total_cols) >= 2 and len(period_cols) >= 2:
+        layout["prior_col"] = total_cols[0]
+        layout["current_col"] = total_cols[1]
+        layout["prior_label"] = period_cols[0][1] if period_cols else ""
+        layout["current_label"] = period_cols[1][1] if len(period_cols) > 1 else ""
+    elif len(total_cols) == 1:
+        layout["prior_col"] = total_cols[0]
+        layout["current_col"] = total_cols[0]
+        layout["prior_label"] = period_cols[0][1] if period_cols else ""
+        layout["current_label"] = layout["prior_label"]
+    else:
+        return None  # Can't detect layout
+
+    # Detect segment columns from row 2-3
+    seen_segments = set()
+    for ci, val in enumerate(row2):
+        if val and str(val).strip().lower() not in ("total", "", "varying sample for overall data"):
+            seg_name = str(val).strip()
+            if seg_name.startswith("Varying Sample"):
+                continue
+            if seg_name not in seen_segments:
+                seen_segments.add(seg_name)
+                # Find sub-columns in row 3
+                sub_cols = {}
+                for ci2 in range(ci, min(ci + 4, len(row3))):
+                    if row3[ci2]:
+                        sub_cols[str(row3[ci2]).strip()] = ci2
+                if sub_cols:
+                    layout["segments"].append({"name": seg_name, "columns": sub_cols})
+
+    return layout
+
+
 def index_excel(excel_path: str, json_path: str) -> dict:
     """Convert Excel to JSON index — runs as Stage 0 before any analysis.
 
@@ -397,13 +471,22 @@ def index_excel(excel_path: str, json_path: str) -> dict:
     sheets_index = {}
     codes_index = {}   # rich per-code metadata for Stage 7 auto-detection
 
+    # ── Column layout detection (auto-discover prior/current/segment columns) ──
+    column_layouts = {}  # sheet_name → {prior_col, current_col, segments: [...]}
+
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         rows = []
         skipped = 0
         # Store all parsed rows for _codes analysis
         all_rows = []  # (row_idx, code, desc, data_vals_tuple)
+
+        # Parse header rows (0-3) to detect column layout
+        header_rows = []
         for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+            if row_idx < 4:
+                header_rows.append(row)
+                continue
             code = str(row[0]).strip() if row[0] is not None else ""
             desc = str(row[1]).strip()[:120] if len(row) > 1 and row[1] is not None else ""
             if code or desc:
@@ -451,11 +534,33 @@ def index_excel(excel_path: str, json_path: str) -> dict:
                         pass
 
             # Detect value range: decimal (0-1) vs whole (0-100+)
+            # When header row looks like a base size (>1), check sub-row values
+            sample_cols = [7, 13, 17]
             value_range = "unknown"
             numeric_samples = [v for v in sample_values.values() if isinstance(v, (int, float))]
             if numeric_samples:
                 max_v = max(abs(v) for v in numeric_samples)
-                value_range = "decimal" if max_v <= 1.1 else "whole"
+                if max_v <= 1.1:
+                    value_range = "decimal"
+                elif sub_row_count > 0:
+                    # Header may be a base size — check first sub-row values
+                    sub_vals = []
+                    for j2 in range(idx + 1, min(idx + 4, len(all_rows))):
+                        _, _, _, sub_raw_row = all_rows[j2]
+                        for sc in sample_cols:
+                            if sc < len(sub_raw_row) and sub_raw_row[sc] is not None:
+                                try:
+                                    sv = float(sub_raw_row[sc])
+                                    if sv > 0:
+                                        sub_vals.append(abs(sv))
+                                except (ValueError, TypeError):
+                                    pass
+                    if sub_vals and max(sub_vals) <= 1.1:
+                        value_range = "decimal"
+                    else:
+                        value_range = "whole"
+                else:
+                    value_range = "whole"
 
             sheet_codes[code] = {
                 "row": row_idx,
@@ -467,6 +572,12 @@ def index_excel(excel_path: str, json_path: str) -> dict:
             }
         if sheet_codes:
             codes_index[sheet_name] = sheet_codes
+
+        # Detect column layout from header rows
+        if header_rows:
+            layout = _detect_column_layout(header_rows)
+            if layout:
+                column_layouts[sheet_name] = layout
 
     wb.close()
 
@@ -484,6 +595,8 @@ def index_excel(excel_path: str, json_path: str) -> dict:
     payload["_sheets"] = sheets_index
     if codes_index:
         payload["_codes"] = codes_index
+    if column_layouts:
+        payload["_column_layouts"] = column_layouts
 
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
     with open(json_path, "w", encoding="utf-8") as f:

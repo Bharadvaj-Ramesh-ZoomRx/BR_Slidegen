@@ -6,17 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Generic pharma consulting report generator — builds PowerPoint slide decks from survey data using a **YAML-driven pipeline**. Each project (brand/product) is defined by a YAML config file; no code changes needed to add new projects.
 
-Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** — covers message recall, effectiveness, rep performance, call-to-action metrics, prescription intent, and high-impact interactions across Q3/Q4 2025.
+Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** — covers message recall, effectiveness, rep performance, call-to-action metrics, prescription intent, and high-impact interactions. Active wave: **Q1 2026** (prior: Q4 2025).
 
 ## Folder Structure
 
 ```
-├── projects/                  # Project folders (one per product/brand)
-│   └── jnj_rybrevant/         # J&J Rybrevant PET Q4'25
+├── projects/                  # Project folders (one per product/brand) — gitignored, lives on OneDrive
+│   ├── jnj_rybrevant/         # J&J Rybrevant PET (production — symlinked to OneDrive SharePoint)
+│   └── jnj_rybrevant_session/ # J&J Rybrevant PET (session-based variant)
 │       ├── config.yaml        # YAML config — brands, sheets, extractions, asks
 │       ├── input/             # ★ USER DROP ZONE — all source files (gitignored)
 │       │   └── wave/                         # Update every wave
-│       │       └── PET_Q3Q4_2025/           #   One folder per wave
+│       │       └── Q1 2026/                 #   One folder per wave (e.g. Q1 2026, PET_Q3Q4_2025)
 │       │           ├── source_data.xlsx     #     Aggregated survey data (Tier 1)
 │       │           ├── source_raw_data.xlsx #     Respondent-level data (Tier 2, optional)
 │       │           ├── call_notes.docx      #     Client call notes
@@ -27,7 +28,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │           └── survey_context.md    #     Survey instrument + Q codes
 │       ├── context/           # ★ SYSTEM GENERATED intermediates (gitignored)
 │       │   ├── market_context.md             # /market-context — product-level, NOT wave-versioned
-│       │   └── PET_Q3Q4_2025/ # Wave-versioned context outputs
+│       │   └── Q1 2026/       # Wave-versioned context outputs
 │       │       ├── prior_wave_context.md     # Stage 0.5b: /prior-wave-context (if prior files exist)
 │       │       ├── survey_context.md         # Stage 0.5c: /survey-context (if survey draft exists)
 │       │       ├── project_context.md        # Stage 1: /build-project-context
@@ -40,21 +41,22 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │       └── source_raw_data.json      # Auto-extracted from raw Excel (Tier 2 JSON cache)
 │       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
-│       │   └── PET_Q3Q4_2025/ # Wave-versioned output subfolder
+│       │   └── Q1 2026/       # Wave-versioned output subfolder
 │       │       ├── deck.pptx          # Generated deck
 │       │       ├── shape_registry.json # Shape state with data lineage
 │       │       └── backups/           # PPTX backups before edits (max 10)
 │       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
-│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), index_excel(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json()
+│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), refresh_deck(), index_excel(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json(), fetch_all_raw(), load_cached_pkl()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader + validate()
 │   │   ├── data_loaders.py    # 9 data extractors (5 Excel + mock + raw_aggregate + synapse_report + synapse_raw) + JSON auto-cache + _codes rich index
 │   │   ├── raw_data_loader.py # Respondent-level data parser (source_raw_data.xlsx) + 4 aggregation modes + quarter cache
 │   │   ├── synapse_fetcher.py # Synapse API — banner plan: trigger_generation() + wait_and_download() + fetch_synapse_data()
 │   │   ├── synapse_json_loader.py # JSON-first data fetching — POST /reports/generate → slidegen format (bypasses Excel)
+│   │   ├── synapse_auth.py    # Synapse API token resolution (explicit key, env var, Azure AD auto-acquire + caching)
 │   │   ├── synapse_raw_fetcher.py # Raw data from Synapse API — survey responses + segments + VQs → local aggregation
-│   │   ├── slide_renderers/   # 19 slide type renderers (RENDERERS registry, +1 backward-compat alias)
+│   │   ├── slide_renderers/   # 20 slide type renderers (RENDERERS registry, +1 backward-compat alias)
 │   │   │   ├── __init__.py   #   Registry + exports
 │   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width
 │   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
@@ -81,7 +83,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── com.py             # 7 COM helpers for live editing
 │   │   └── registry.py        # 6 registry CRUD functions (+ last_data_pull, last_refreshed, renderer)
 │   ├── __init__.py            # Package exports: SlideBuilder, LiveEditor, reconcile
-│   ├── __main__.py            # CLI: python -m slidegen <create|edit|reconcile|fetch-raw>
+│   ├── __main__.py            # CLI: python -m slidegen <create|edit|reconcile|fetch-synapse|fetch-raw>
 │   ├── config.py              # Centralized paths and settings
 │   ├── create.py              # SlideBuilder class — python-pptx creation + registry
 │   ├── edit.py                # LiveEditor class — win32com live editing + edit log
@@ -100,6 +102,9 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   └── pptx.zip               # Old PPTX artifacts
 ├── docs/                      # Design docs & architecture notes
 │   └── analyst_setup.md       # Analyst onboarding guide (git clone + OneDrive projects)
+├── scripts/                   # Utility scripts (config generators, one-off tools)
+├── tests/                     # Test suite
+├── web/                       # Web interface (if applicable)
 ├── .claude/skills/            # Claude Code skills (auto-discovered)
 │   ├── market-context/        # Stage 0.5a: /market-context — competitive/clinical landscape
 │   ├── prior-wave-context/    # Stage 0.5b: /prior-wave-context — prior wave findings extraction
@@ -130,7 +135,8 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fr
 python -m slidegen create                   # Demo slide creation
 python -m slidegen edit <filename.pptx>     # Interactive live editor
 python -m slidegen reconcile <filename.pptx> # Sync registry from PowerPoint
-python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml  # Fetch raw data from Synapse API
+python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml  # Fetch banner plan from Synapse API
+python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml      # Fetch raw respondent data from Synapse API
 
 # ── Legacy (archived) ──
 python archive/src/generate_asks.py        # Monolithic 14-slide deck (POC)
@@ -237,11 +243,26 @@ All tiers auto-cache to JSON with Excel file hash validation. Delete the JSON to
 
 ## Data Source Layout
 
-All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `header=None` (0-indexed rows/cols):
+Each project's `source_data.xlsx` has a different column layout. **Never hardcode column positions** — use `index_excel()` to auto-detect everything from the Excel header rows and store it in `source_data.json`.
 
-- **RYB sheet**: col 0=code, col 1=desc, col 7=Q3 Total, col 17=Q4 Total
-- **TAG sheet**: col 0=code, col 1=desc, col 7=Q3 Total, col 13=Q4 Total
-- **Additonal Analysis sheet** (note: misspelled in source): col 1=metric, col 2=RYB_Q3, col 3=RYB_Q4, col 4=TAG_Q3, col 5=TAG_Q4; message rows 30-39 use cols 3-8 for MR/ME/Believable
+### Auto-Detection via `source_data.json`
+
+`index_excel()` reads the Excel header rows (rows 0-3) and builds:
+
+- **`_column_layouts`** — per-sheet prior/current column positions with period labels, plus segment columns:
+  ```json
+  {"Rybrevant": {
+      "prior_col": 7, "prior_label": "Q4 2025",
+      "current_col": 17, "current_label": "Q1 2026",
+      "segments": [
+          {"name": "High Impact - LTIP", "columns": {"Others": 11, "High Impact": 12}},
+          {"name": "Acad-Comm Lite", "columns": {"Community": 15, "Academic": 16}}
+      ]
+  }}
+  ```
+- **`_codes`** — per-question-code metadata: `row`, `desc`, `sub_row_count`, `has_sub_codes`, `sample_values`, `value_range` (decimal vs whole)
+
+The `config.yaml` `sheets` section still provides the sheet-name-to-role mapping (`primary`, `competitor`, etc.) and column positions, but these can be auto-populated from `_column_layouts` during config scaffolding. The pipeline resolves question codes → data via `_codes` metadata.
 
 ## Key Conventions
 
@@ -256,6 +277,11 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 - **Data labels**: Bar charts use `inEnd` position with white text to prevent overflow. Abacus scatter charts show per-point percentage labels above dots with dynamic y-offset based on row count.
 - **Abacus extra options**: `hide_val_cols: true` removes value columns (when data labels show values), `current_field`/`prior_field` remap data fields, `color_current`/`color_prior` override brand colors, `legend_current`/`legend_prior` for custom legend text.
 - **Alternating row backgrounds**: Label tables and delta/value tables use consistent grey/white alternating rows (grey first).
+- **Label truncation**: Labels are truncated at `LABEL_MAX` (65 chars for single_bar, 55 for dual). Use `label_shortcuts` in config with `use_label_shortcuts: true` in extraction params to map long labels to clean short versions. The shortener also auto-replaces "Johnson & Johnson (Formerly Janssen)" → "J&J".
+- **Template files**: Always use a **clean blank template** created by python-pptx. Never use a prior wave report PPTX as template — clearing slides with embedded charts leaves orphaned XML relationships that cause PowerPoint repair errors.
+- **Renderer-data compatibility**: Most extractions produce simple `{desc, prior, current}` rows. Only `single_bar_with_delta`, `abacus`, and `executive_summary` work with this format. Renderers like `dual_bar_with_delta`, `clustered_compare`, `hii_scorecard`, and `heatmap_table` require specific field prefixes or `extra` config — do not assign them unless the extraction is configured to produce matching data.
+- **pct_mode auto-detection**: `_codes.value_range` in `source_data.json` distinguishes `decimal` (0-1) vs `whole` (0-100). Use `pct` for decimals, `straight` for whole. When header row looks like a base size but sub-rows are decimals, the indexer correctly classifies as `decimal`.
+- **T2B extraction**: For rep attributes (Q1_87Z), `question_code` pulls ALL scale distribution sub-rows (rated 1-7). To get T2B summary rows only, use `row_range` targeting the consolidated T2B block in the Excel.
 
 ## Dependencies
 
@@ -265,6 +291,7 @@ All scripts read `source_data.xlsx` (originally "Lung SFEA SB.xlsx") with `heade
 - `pyyaml` (YAML config loading)
 - `requests` (Synapse API integration — banner plan download)
 - `pywin32` (win32com — live PowerPoint editing via COM, Windows only)
+- `python-dotenv` (optional — `.env` file loading for Synapse API keys)
 
 ## SlideGen API
 
@@ -601,7 +628,7 @@ Each project supports wave-based folder versioning for input data and output:
 
 ```yaml
 project:
-  wave: "PET_Q3Q4_2025"          # wave identifier
+  wave: "Q1 2026"                 # wave identifier
 
 data_source_path: "input/wave/{{wave}}/source_data.xlsx"      # Tier 1: aggregated (wave-versioned)
 raw_data_source_path: "input/wave/{{wave}}/source_raw_data.xlsx"  # Tier 2: respondent-level (optional)

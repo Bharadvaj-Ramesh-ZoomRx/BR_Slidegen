@@ -111,11 +111,11 @@ BAR_GAP_STD = 80
 CLUSTERED_OVERLAP = -10
 CLUSTERED_GAP = 65
 
-# Label truncation lengths
-LABEL_MAX_SINGLE = 40
-LABEL_MAX_DUAL = 35
-LABEL_MAX_CLUSTERED = 45
-LABEL_MAX_STACKED = 40
+# Label truncation lengths (fallback — prefer label_shortcuts for clean short labels)
+LABEL_MAX_SINGLE = 65
+LABEL_MAX_DUAL = 55
+LABEL_MAX_CLUSTERED = 65
+LABEL_MAX_STACKED = 55
 
 # Small segment threshold for stacked bars (%)
 STACKED_HIDE_THRESHOLD = 3

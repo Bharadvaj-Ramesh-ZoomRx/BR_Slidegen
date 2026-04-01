@@ -52,6 +52,33 @@ def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data:
     brand = config.primary.color_current
     insights = extra.get("insights", [])
 
+    # Fallback: if no insights in extra, try reading from source_text markdown file
+    if not insights and ask.source_text:
+        import os
+        src_path = ask.source_text
+        # Resolve relative to project dir if needed
+        if not os.path.isabs(src_path):
+            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(
+                getattr(config, 'data_source_path', '') or '')))
+            src_path = os.path.join(project_dir, src_path)
+        if os.path.exists(src_path):
+            try:
+                with open(src_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                # Extract bullet points (lines starting with - or •)
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped.startswith(("- ", "• ", "* ")):
+                        insight = stripped.lstrip("-•* ").strip()
+                        if len(insight) > 10:
+                            insights.append(insight)
+                    elif stripped.startswith(("1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")):
+                        insight = stripped.split(".", 1)[1].strip().lstrip("*").strip()
+                        if len(insight) > 10:
+                            insights.append(insight)
+            except Exception:
+                pass
+
     if not insights:
         textbox(slide, "No insights provided", 2, 3, 8, 1, fsize=14, color=C_RED)
         return

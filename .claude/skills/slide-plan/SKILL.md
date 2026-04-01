@@ -125,32 +125,48 @@ If a hypothesis cluster is too large for one slide, split it. If two clusters te
 **Selection decision tree:**
 ```
 Single brand, single metric, ranked list?
-  → single_bar_with_delta
+  → single_bar_with_delta ← SAFEST DEFAULT for {desc, prior, current} data
 
 Same metric, two brands or segments compared?
-  → clustered_compare (overlaid bars)
-  → dual_bar_compare (side-by-side separated charts)
-  → two_section_bar (stacked vertically)
+  → clustered_compare — ONLY if data has primary_current + comp_current fields
+  → dual_bar_compare — ONLY if two separate data keys merged
+  → two_section_bar — ONLY if extra.top + extra.bottom configured
+  ⚠ If data only has {desc, prior, current}: use single_bar_with_delta instead
 
 Two related metrics for same brand (e.g., MR + ME)?
-  → dual_bar_with_delta
+  → dual_bar_with_delta — ONLY if data has {prefix}_current fields per side
+  ⚠ If data only has {desc, prior, current}: use single_bar_with_delta instead
 
 QoQ comparison (current vs prior period)?
   → qoq_bar_with_delta (single brand)
   → dual_bar_qoq (two brands, side-by-side)
 
 Recall order breakdown (1st/2nd/3rd)?
-  → stacked_order
+  → stacked_order — ONLY with nested_ordinal extraction
+  ⚠ Regular row_range data won't stack correctly
 
 Attribute ratings / rep performance?
-  → abacus (with value columns and delta)
+  → abacus (with value columns and delta) ← works with {desc, prior, current}
 
 Message effectiveness with M/B/D sub-dimensions?
   → message_mbd
 
-Text-only insights?
-  → executive_summary
+Scorecard / multi-section metric table?
+  → hii_scorecard — ONLY if extra.sections configured
+  → heatmap_table — ONLY if extra.columns configured
+  ⚠ Without extra config: use executive_summary with insights list instead
+
+Text-only insights / qualitative findings?
+  → executive_summary — populate ask.extra.insights as list of strings
 ```
+
+**⚠ CRITICAL — Data compatibility check before assigning slide_type:**
+Most extractions produce simple `{desc, prior, current}` rows. Only these renderers work with that format:
+- `single_bar_with_delta` ✓
+- `abacus` ✓
+- `executive_summary` ✓ (text only, needs `extra.insights`)
+
+All other renderers need specific field prefixes, extra config, or multi-key data merges. Do NOT assign them unless the extraction is specifically configured to produce matching data.
 
 ---
 
