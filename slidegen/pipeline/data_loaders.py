@@ -91,14 +91,28 @@ def extract_by_question_code(
     max_rows: int = 20,
     label_fn: Optional[Callable[[str], str]] = None,
     converter: Callable = pct,
+    occurrence: int = 1,
+    dim_col: Optional[int] = None,
 ) -> list[dict]:
     """Find a question code row, walk sub-rows, extract prior/current values.
+
+    Args:
+        occurrence: Which occurrence of the code to use (1-based). Default 1
+            targets the first block. Use 2+ to skip to later blocks of the
+            same code (e.g. T2B block vs full distribution).
+        dim_col: If set, capture the value in this column as a "dim" field
+            on each row. Used by mbd_pivot aggregation to identify
+            Motivating/Believable/Differentiated dimensions.
 
     Returns list of: {"desc": str, "prior": float, "current": float, "code": str}
     """
     results = []
+    match_count = 0
     for i in range(len(sheet)):
         if sheet.iloc[i, code_col] == code:
+            match_count += 1
+            if match_count < occurrence:
+                continue
             j = i + 1
             while j < len(sheet) and pd.notna(sheet.iloc[j, desc_col]):
                 desc = str(sheet.iloc[j, desc_col]).strip()
@@ -114,16 +128,129 @@ def extract_by_question_code(
                         j += 1
                         continue
                     label = label_fn(desc) if label_fn else desc
-                    results.append({
+                    row_data = {
                         "desc": label,
                         "code": str(row_code),
                         "prior": prior_val,
                         "current": current_val,
-                    })
+                    }
+                    if dim_col is not None:
+                        dim_val = sheet.iloc[j, dim_col]
+                        row_data["dim"] = str(dim_val).strip() if pd.notna(dim_val) else ""
+                    results.append(row_data)
                 j += 1
                 if j - i > max_rows:
                     break
             break
+    return results
+
+
+# ── Post-extraction aggregators ─────────────────────────────────────────────
+
+def _aggregate_avg_by_desc(rows: list[dict]) -> list[dict]:
+    """Group rows by desc, compute geometric mean of prior/current values.
+
+    Used for Message Effectiveness: each message has M/B/D sub-rows in the
+    raw extraction. This collapses them into one row per message with the
+    geometric mean (cube root of M×B×D) as the aggregate score.
+    """
+    import math
+    from collections import OrderedDict
+
+    groups: dict[str, list[dict]] = OrderedDict()
+    for r in rows:
+        key = r["desc"]
+        groups.setdefault(key, []).append(r)
+
+    results = []
+    for desc, group in groups.items():
+        priors = [r["prior"] for r in group if r.get("prior") is not None and r["prior"] > 0]
+        currents = [r["current"] for r in group if r.get("current") is not None and r["current"] > 0]
+
+        geo_prior = round(math.prod(priors) ** (1 / len(priors)), 1) if priors else None
+        geo_current = round(math.prod(currents) ** (1 / len(currents)), 1) if currents else None
+
+        results.append({
+            "desc": desc,
+            "code": group[0].get("code", ""),
+            "prior": geo_prior,
+            "current": geo_current,
+        })
+
+    return results
+
+
+# Dimension detection patterns for mbd_pivot
+_DIM_PATTERNS = {
+    "motiv": ["motivat", "m", "sq001"],
+    "believ": ["believab", "b", "sq002"],
+    "diff": ["differenti", "d", "sq003"],
+}
+
+
+def _detect_dimension(dim_value: str) -> Optional[str]:
+    """Detect M/B/D dimension from a cell value.
+
+    Handles variants: "Motivating", "M", "SQ001", etc.
+    Returns "motiv", "believ", "diff", or None.
+    """
+    v = dim_value.strip().lower()
+    for dim_key, patterns in _DIM_PATTERNS.items():
+        for pat in patterns:
+            if v == pat or v.startswith(pat):
+                return dim_key
+    return None
+
+
+def _aggregate_mbd_pivot(rows: list[dict]) -> list[dict]:
+    """Pivot M/B/D sub-rows into motiv/believ/diff fields + compute CE.
+
+    Input rows must have a "dim" field (from dim_col) identifying the
+    dimension. Groups by desc, pivots dimensions into separate fields,
+    then computes Composite Effectiveness (CE) as geometric mean of M×B×D.
+
+    Returns list of: {desc, motiv, motiv_prior, believ, believ_prior,
+                      diff, diff_prior, ce_current, ce_prior}
+    """
+    import math
+    from collections import OrderedDict
+
+    groups: dict[str, dict] = OrderedDict()
+    for r in rows:
+        key = r["desc"]
+        if key not in groups:
+            groups[key] = {"desc": key, "code": r.get("code", "")}
+
+        dim = _detect_dimension(r.get("dim", ""))
+        if dim is None:
+            logger.warning("mbd_pivot: unrecognized dimension '%s' for desc '%s'", r.get("dim"), key)
+            continue
+
+        groups[key][dim] = r.get("current")
+        groups[key][f"{dim}_prior"] = r.get("prior")
+
+    results = []
+    for entry in groups.values():
+        m_cur = entry.get("motiv")
+        b_cur = entry.get("believ")
+        d_cur = entry.get("diff")
+        m_pri = entry.get("motiv_prior")
+        b_pri = entry.get("believ_prior")
+        d_pri = entry.get("diff_prior")
+
+        # Compute CE (geometric mean) for current and prior
+        if all(v is not None and v > 0 for v in (m_cur, b_cur, d_cur)):
+            entry["ce_current"] = round((m_cur * b_cur * d_cur) ** (1/3), 1)
+        else:
+            entry["ce_current"] = None
+
+        if all(v is not None and v > 0 for v in (m_pri, b_pri, d_pri)):
+            entry["ce_prior"] = round((m_pri * b_pri * d_pri) ** (1/3), 1)
+        else:
+            entry["ce_prior"] = None
+
+        results.append(entry)
+
     return results
 
 
@@ -797,17 +924,28 @@ def _extract_all_from_excel(config) -> dict:
         converter = straight if params.get("pct_mode") == "straight" else pct
 
         if ex.method == "question_code":
+            # Per-extraction desc_col override (e.g. VA/Starter Kit labels in col 0)
+            effective_desc_col = params.get("desc_col", sheet_cfg.desc_col)
             data[ex.id] = extract_by_question_code(
                 df,
                 code=params["code"],
                 q_prior_col=sheet_cfg.q_prior_col,
                 q_current_col=sheet_cfg.q_current_col,
                 code_col=sheet_cfg.code_col,
-                desc_col=sheet_cfg.desc_col,
+                desc_col=effective_desc_col,
                 max_rows=params.get("max_rows", 20),
                 label_fn=label_fn,
                 converter=converter,
+                occurrence=params.get("occurrence", 1),
+                dim_col=params.get("dim_col"),
             )
+
+            # Post-extraction aggregation
+            aggregate = params.get("aggregate")
+            if aggregate == "avg_by_desc":
+                data[ex.id] = _aggregate_avg_by_desc(data[ex.id])
+            elif aggregate == "mbd_pivot":
+                data[ex.id] = _aggregate_mbd_pivot(data[ex.id])
 
         elif ex.method == "multi_question_code":
             data[ex.id] = extract_multi_question_code(

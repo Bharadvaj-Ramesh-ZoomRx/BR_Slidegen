@@ -33,10 +33,9 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │       ├── survey_context.md         # Stage 0.5c: /survey-context (if survey draft exists)
 │       │       ├── project_context.md        # Stage 1: /build-project-context
 │       │       ├── hypothesis_bank.md        # Stage 2: /hypotheses
-│       │       ├── validated_analysis.md     # Stage 3 Phase 0: /sfea-insight-writer
-│       │       ├── slide_headlines.md        # Stage 3 Phase 1: /sfea-insight-writer
-│       │       ├── exec_summary.md           # Stage 3 Phase 2-3: /sfea-insight-writer (ES + Recs)
-│       │       ├── slide_plan.md             # Stage 4: /slide-plan
+│       │       ├── validated_analysis.md     # Stage 3 Phase 0: /sfea-insight-writer (data validation)
+│       │       ├── narrative_threads.md      # Stage 3 Phase 1: /sfea-insight-writer (arcs + headlines + ES + recs)
+│       │       ├── slide_plan.md             # Stage 4: /slide-plan (arc-informed)
 │       │       ├── source_data.json          # Auto-extracted from Excel (Tier 1 JSON cache)
 │       │       └── source_raw_data.json      # Auto-extracted from raw Excel (Tier 2 JSON cache)
 │       ├── templates/         # Template decks — shared across waves (gitignored)
@@ -111,9 +110,9 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   ├── survey-context/        # Stage 0.5c: /survey-context — survey structure + Q codes
 │   ├── build-project-context/ # Stage 1: /build-project-context — raw project context
 │   ├── hypotheses/            # Stage 2: /hypotheses — hypothesis bank generation
-│   ├── sfea-insight-writer/   # Stage 3: /sfea-insight-writer — data validation + insights + ES
+│   ├── sfea-insight-writer/   # Stage 3: /sfea-insight-writer — data validation + narrative threads (arcs + headlines + ES + recs)
 │   ├── pet-es-builder/        # Stage 3 alt: /pet-es-builder — standalone ES + Recs writer
-│   ├── slide-plan/            # Stage 4: /slide-plan — structured slide plan from validated analysis
+│   ├── slide-plan/            # Stage 4: /slide-plan — arc-informed slide plan from narrative threads
 │   ├── slidegen/              # Stage 5: /slidegen — YAML pipeline + utils + styling
 │   │   └── references/        # Consolidated: function-ref, chart-patterns, chart-types, brand-constants, archetypes
 │   └── pptx/                  # General PPTX read/create/edit skill (non-pipeline)
@@ -485,16 +484,14 @@ Reads five context files. Required: `market_context.md`, `project_context.md`, `
 Produces `context/{wave}/hypothesis_bank.md`.
 **→ Pause:** Show hypothesis count by type (new, prior wave validation, action item, methodology artifact), domain breakdown. Confirm before Stage 3.
 
-### Stage 3 — Validate Data + Write Insights & ES (`/sfea-insight-writer`)
-Reads `hypothesis_bank.md`, `project_context.md`, and `source_data.json`. Runs in four sub-phases:
+### Stage 3 — Validate Data + Narrative Threads (`/sfea-insight-writer`)
+Reads `hypothesis_bank.md`, `project_context.md`, `market_context.md`, and `source_data.json`. Runs in two phases:
 - **Phase 0 (auto):** Validates every hypothesis against actual survey data — extracts prior/current/delta per question code, produces `context/{wave}/validated_analysis.md`
-- **Phase 1:** Writes data-grounded talking headlines per domain → `context/{wave}/slide_headlines.md` ✋ User confirms
-- **Phase 2:** Writes Executive Summary in selected format → `context/{wave}/exec_summary.md` ✋ User confirms
-- **Phase 3:** Writes numbered Recommendations → appended to exec_summary.md
+- **Phase 1:** Synthesizes story arcs (3-5 cross-domain narrative threads using CONVERGENCE/TENSION/DIVERGENCE/CLOSURE patterns), then writes arc-informed slide headlines, arc-organized executive summary, and arc-driven recommendations — all in one integrated document → `context/{wave}/narrative_threads.md` ✋ Single user gate
 
 ### Stage 4 — Build Slide Plan (`/slide-plan`)
-Reads `validated_analysis.md`, `slide_headlines.md`, `exec_summary.md`, `hypothesis_bank.md`, `kbqs.md`, and `survey_context.md`. Clusters hypotheses into slides with chart specs, synthesized per-slide insights (drawn from validated analysis), and matched headlines. Always includes Cover (Slide 1), ES (Slide 2), and Recs (Slide 3) before data slides. Produces `context/{wave}/slide_plan.md`.
-**→ Pause:** Show slide count, section breakdown, slide titles, and ES/Recs placement. Ask user to confirm before Stage 5.
+Reads `narrative_threads.md`, `validated_analysis.md`, `hypothesis_bank.md`, `kbqs.md`, and `survey_context.md`. Clusters hypotheses into slides with chart specs, arc assignments, and matched headlines (copied verbatim from narrative_threads.md). Each slide is tagged to a story arc with a "Role in arc" field. Sequencing is arc-informed: ACT NOW arcs first, then MONITOR, then CELEBRATE. Always includes Cover (Slide 1), ES (Slide 2), Recs (Slide 3) before data slides. Produces `context/{wave}/slide_plan.md`.
+**→ Pause:** Show slide count, arc distribution, section breakdown. Ask user to confirm before Stage 5.
 
 ### Stage 5 — Generate config.yaml (internal — no user gate)
 Maps the slide plan to YAML extractions and asks. Can use `scaffold_config_from_plan()` to auto-generate from `slide_plan.md` + `_codes` index — auto-selects extraction method, pct_mode, and sheet mapping. **Must search `source_data.json` → `_codes` for every question code in the slide plan** — never copy from existing configs. Each slide becomes an `ask` entry; each data source becomes an `extraction` entry. If a code is not found, flags it explicitly. Proceeds automatically to Stage 6.
@@ -549,12 +546,13 @@ Stage 2    /hypotheses
            writes: context/{wave}/hypothesis_bank.md
     ✋ User confirms count by type + domain coverage
 
-Stage 3    /sfea-insight-writer   →  validated_analysis.md
-                                  →  slide_headlines.md      ✋
-                                  →  exec_summary.md         ✋
+Stage 3    /sfea-insight-writer
+  Phase 0:   Validate hypotheses  →  validated_analysis.md       (auto)
+  Phase 1:   Narrative threads    →  narrative_threads.md        ✋
+             (story arcs + headlines + ES + recs — single gate)
 
 Stage 4    /slide-plan            →  context/{wave}/slide_plan.md
-    ✋ User confirms slide count + section breakdown
+    ✋ User confirms slide count + arc distribution
 
 Stage 5    config.yaml            ← internal, no gate
 Stage 6    generate_deck()        →  output/{wave}/deck.pptx

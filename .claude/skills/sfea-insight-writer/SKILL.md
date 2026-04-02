@@ -1,11 +1,11 @@
 ---
 name: sfea-insight-writer
-description: "Use when writing data-validated analysis, slide headlines, executive summary, and recommendations for a PET SFEA wave. Trigger when: user says 'write insights', 'build ES', 'run insight writer', or Stage 2 hypothesis bank has been signed off and Stage 3 is ready to begin. Reads hypothesis_bank.md, project_context.md, and source_data.json. Runs in 4 phases: Phase 0 (auto) validates hypotheses vs data → validated_analysis.md; Phase 1 writes talking headlines → slide_headlines.md; Phase 2 writes ES → exec_summary.md; Phase 3 appends Recommendations."
+description: "Use when writing data-validated analysis, narrative threads, headlines, executive summary, and recommendations for a PET SFEA wave. Trigger when: user says 'write insights', 'build ES', 'run insight writer', or Stage 2 hypothesis bank has been signed off and Stage 3 is ready to begin. Reads hypothesis_bank.md, project_context.md, and source_data.json. Runs in 2 phases: Phase 0 (auto) validates hypotheses vs data → validated_analysis.md; Phase 1 synthesizes story arcs + headlines + ES + recs → narrative_threads.md (single human gate)."
 ---
 
 # SFEA Insight Writer
 
-Generates data-validated analysis, consulting-grade slide headlines, executive summary, and recommendations for any SFEA study wave. Invoked after the hypothesis bank is signed off.
+Generates data-validated analysis and narrative threads (story arcs, slide headlines, executive summary, and recommendations) for any SFEA study wave. Invoked after the hypothesis bank is signed off.
 
 ---
 
@@ -17,11 +17,9 @@ Stage 1: /build-project-context   →  project_context.md
 Stage 2: /hypotheses              →  hypothesis_bank.md
                                         ✋ User signs off
 Stage 3: /sfea-insight-writer     ←  YOU ARE HERE
-         Phase 0: Data Analysis   →  validated_analysis.md
-         Phase 1: Headlines       →  slide_headlines.md       ✋
-         Phase 2: ES              →  exec_summary.md          ✋
-         Phase 3: Recs            →  (appended to exec_summary.md)
-Stage 4: /slide-plan              ←  reads all three outputs
+         Phase 0: Data Validation →  validated_analysis.md       (auto)
+         Phase 1: Narrative       →  narrative_threads.md        ✋ SINGLE GATE
+Stage 4: /slide-plan              ←  reads both outputs
 Stage 5: config.yaml + generate_deck()
 ```
 
@@ -36,6 +34,7 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 | **Hypothesis Bank** | `{project}/context/{wave}/hypothesis_bank.md` | Required |
 | **Project Context** | `{project}/context/{wave}/project_context.md` | Required |
 | **Source Data** | `{project}/context/{wave}/source_data.json` | Required |
+| **Market Context** | `{project}/context/market_context.md` | Required |
 | **ES Format** | Ask user — A through H; default **A** | Optional |
 
 If any required file is missing, stop and tell the user which is absent.
@@ -45,6 +44,7 @@ Report before reading:
 Input files:
   ✓ hypothesis_bank.md     (signed-off hypothesis bank)
   ✓ project_context.md     (brand names, wave labels, field intel, methodology flags)
+  ✓ market_context.md      (competitive landscape, clinical context)
   ✓ source_data.json       (survey data keyed by question code)
 ES format: A (Narrative + Recommendations)
 ```
@@ -53,20 +53,28 @@ ES format: A (Narrative + Recommendations)
 
 ## STEP 2 — Read all files in full
 
-Read all three files completely before doing anything else.
+Read all files completely before doing anything else.
 
 **From `project_context.md` extract and hold:**
 - Primary brand and competitor brand(s) — use exact names throughout; never "the competition"
 - Wave label (current) and prior wave label — for QoQ framing
 - Sample sizes — n= per brand per wave
 - Methodology flags — survey changes, screener/benchmark changes affecting QoQ comparability
-- Prior wave top findings — for contrast and trend framing
+- Prior wave top findings and recommendations — for trend framing and CLOSURE arc detection
 - Study design notes — HII definition, segment cuts used, new questions this wave
+- Field intelligence / call notes — what reps reported, what the client flagged
+- Client priorities / KBQs — what the client is trying to decide or act on
+
+**From `market_context.md` extract and hold:**
+- Competitive events — label updates, data readouts, formulary changes, competitor launches
+- Clinical context — mechanism of action, treatment landscape, standard of care shifts
+- Strategic timing — upcoming readouts, reviews, or decisions that create urgency
 
 **From `hypothesis_bank.md` extract and hold:**
 - All hypotheses with their domain, rationale, "Test with:" question codes, segment cuts, and flags
 - Expected direction per hypothesis (the prediction)
 - METHODOLOGY ARTIFACT and [ACTION ITEM] flags
+- PRIOR WAVE VALIDATION hypotheses — these test whether prior recommendations are showing results
 
 **From `source_data.json` extract and hold:**
 - For each question code referenced in the hypothesis bank: prior value, current value, and delta (current − prior in pp)
@@ -75,7 +83,7 @@ Read all three files completely before doing anything else.
 
 ---
 
-## PHASE 0 — DATA ANALYSIS
+## PHASE 0 — DATA VALIDATION
 
 For every hypothesis in the bank, validate it against the actual data. This phase is **automatic** — no user gate.
 
@@ -132,117 +140,271 @@ Save as `{project}/context/{wave}/validated_analysis.md`.
 
 ---
 
-## PHASE 1 — SLIDE HEADLINES
+## PHASE 1 — NARRATIVE THREADS
 
-Write one talking headline per domain (and per slide where the hypothesis bank provides slide-level granularity). Headlines are **strategic insights** — data is the evidence, project context is the frame.
+This is the core editorial phase. It synthesizes validated data into story arcs, then writes headlines, executive summary, and recommendations — all in one integrated document. **This is the single human gate in Stage 3.**
 
-### Context Anchoring (do this before writing each headline)
+Phase 1 has five steps executed in order:
 
-Before writing the headline for a domain, look up the relevant context from `project_context.md`:
-
-| Question | Where to find it |
-|---|---|
-| *Why might this metric be moving?* | Market context section — competitive events, label updates, formulary changes, campaign launches |
-| *What did reps report doing differently?* | Field intelligence / call notes section |
-| *Was this flagged as a risk or priority last wave?* | Prior wave ES findings + recommendations |
-| *What is the client trying to decide or act on?* | KBQs / client priorities section |
-| *Is there a strategic moment (readout, launch, review) this connects to?* | Market context / project notes |
-
-Use the answers to frame the headline around **what is at stake** — not just what moved.
-
-**Example: same data, two different framings**
-
-*Data fact (Phase 0):* RYB recall = 61% (−2pp QoQ); TAG recall = 58% (+3pp QoQ); gap = 3pp (was 8pp)
-
-*Metric-sy headline (wrong — no context):*
-> "RYB maintained recall leadership at 61% vs. TAG 58%; the gap narrowed from 8pp to 3pp QoQ"
-
-*Strategic headline (right — uses context):*
-> "RYB's recall lead is narrowing as TAG gains ground on NCCN messaging — the argument most tied to 1L prescribing intent; reinforcing NCCN delivery before the OS data readout is now the priority call to action"
-
-The difference: the strategic version tells the client what is at risk, why it matters now, and what to do.
+```
+Step A: Build findings matrix           (internal — not shown to user)
+Step B: Detect patterns → story arcs    (the editorial backbone)
+Step C: Write headlines per arc         (per-slide, arc-informed)
+Step D: Write executive summary         (arc-organized, cross-domain)
+Step E: Write recommendations           (arc-driven, impact-ordered)
+```
 
 ---
 
-### Format
+### STEP A — Build Findings Matrix + KBQ Map
+
+Create an internal working matrix from validated_analysis.md. Tag every CONFIRMED and PARTIALLY CONFIRMED hypothesis on five dimensions:
+
+| Hypothesis | KBQ | Brand affected | Direction | Metric type | Segment pattern |
+|---|---|---|---|---|---|
+| H[N] | [KBQ #] | [Primary/Competitor/Both] | [Positive/Negative/Stable] | [Activity/Recall/Effectiveness/Quality/Intent/Closing/Tactics/NPP] | [Overall/Academic/Community/HII/non-HII] |
+
+The **KBQ** column is the primary organizing key — it maps every finding back to the business question it answers. Use the hypothesis bank's domain assignment (each hypothesis was generated under a specific KBQ). Additional questions and cross-cutting hypotheses map to the KBQ they most directly inform.
+
+Also tag:
+- **Prior wave link**: Does this finding confirm or contradict a prior wave recommendation? (CLOSURE candidate)
+- **Cross-domain echo**: Does this finding's direction match findings in other domains for the same brand? (CONVERGENCE candidate)
+
+Do NOT show this matrix to the user. It is an analytical working tool for Step B.
+
+---
+
+### STEP B — Build KBQ-Governed Story Arcs
+
+**Core principle: KBQs govern arc structure. Pattern types inform arc framing.**
+
+The KBQs are the client's questions. The arcs are the answers. Each arc should be recognizable as answering a KBQ — not just describing a statistical pattern that happens to cross domains. Pattern types (CONVERGENCE, TENSION, DIVERGENCE, CLOSURE) are the editorial lens that shapes *how* the answer is told, not *what* the answer is about.
+
+#### Two-pass process
+
+**Pass 1 — KBQ-anchored grouping:**
+Group all validated findings (CONFIRMED, PARTIALLY CONFIRMED, and surprising NOT CONFIRMED) by the KBQ they answer. Each KBQ with 3+ validated findings is an arc candidate.
+
+If a KBQ has <3 findings: either merge it with a related KBQ that shares findings, or absorb its findings into a broader arc. Do not drop a KBQ — every KBQ in the hypothesis bank must be addressed, even if its answer is "insufficient data to conclude" or it merges into another arc.
+
+If two KBQs share enough findings that they form a single coherent answer, merge them into one arc. Name both KBQs in the arc title or "KBQ anchor" field.
+
+**Pass 2 — Pattern-type framing:**
+For each KBQ-anchored arc, ask: *What is the shape of this KBQ's answer?*
+
+| Pattern | When it applies to a KBQ answer | Signal |
+|---|---|---|
+| **CONVERGENCE** | Multiple metrics within this KBQ's scope all point the same direction | The answer is clear and reinforcing |
+| **TENSION** | The KBQ's answer is "yes, but…" — positive on some metrics, negative on others | The answer reveals a strategic dilemma |
+| **DIVERGENCE** | The KBQ's answer differs by segment (Academic vs Community, HII vs non-HII) | The answer is "depends where you look" |
+| **CLOSURE** | The KBQ's answer directly validates or invalidates a prior wave recommendation | The loop between advice and outcome |
+
+A single arc can carry multiple pattern types (e.g., TENSION + CLOSURE). Lead with the dominant one.
+
+#### Governing Question as narrative spine
+
+The study's **Governing Question** (from `KBQs.md`) is the spine that connects all arcs. Before writing arcs, state how the arc sequence answers the Governing Question:
+
+```
+**Governing Question:** [verbatim from KBQs.md]
+**Arc sequence answer:** [1-2 sentences explaining how the arcs, in order, build toward answering the governing question]
+```
+
+The arc sequence should read as a logical progression: outcome → message strategy → competitive landscape → field execution → channel strategy. A reader should be able to read just the arc titles in order and understand the wave's story.
+
+#### Rules for arc construction
+
+1. **Each arc must be anchored to 1-2 KBQs.** The KBQ anchor is shown explicitly. An arc without a KBQ anchor is disallowed — if you can't name which business question it answers, it's a pattern observation, not a story arc.
+2. **Each arc must be supported by 3+ hypotheses from at least 2 different metric types.** Cross-domain evidence still required within each KBQ answer.
+3. **NOT CONFIRMED hypotheses that are surprising belong in the arc of the KBQ they were testing.** They inform the KBQ's answer — "we expected X but found Y" is part of the answer, not a separate story.
+4. **Aim for 3-5 arcs.** KBQs can merge; not every KBQ needs its own arc. But every KBQ must be addressed.
+5. **Every arc needs a "what's at stake" that connects to the client decision embedded in the KBQ.** The KBQ already names the decision — the "what's at stake" explains what the data means for that decision.
+6. **Every CONFIRMED and PARTIALLY CONFIRMED hypothesis must map to at least one arc.** Orphans allowed only for genuinely isolated findings.
+7. **Additional Questions / cross-cutting hypotheses** attach to whichever KBQ-anchored arc they most directly inform. Segment cuts (Academic vs Community, HII vs non-HII) are evidence within arcs, not arcs themselves.
+
+#### Arc structure
+
+```
+## Thread [N]: [Strategic claim — answers the KBQ, names brands and direction]
+**KBQ anchor:** KBQ [N] — [KBQ title from KBQs.md]. Also addresses: [Additional Q #s if any]
+**Pattern:** CONVERGENCE / TENSION / DIVERGENCE / CLOSURE
+**Urgency:** ACT NOW / MONITOR / CELEBRATE
+**Evidence:**
+- H[x] ([KBQ domain]): [one-line data summary from validated_analysis.md]
+- H[y] ([KBQ domain]): [one-line data summary]
+- H[z] ([Additional Q / cross-cutting]): [one-line data summary]
+**What's at stake:** [What the data means for the decision embedded in the KBQ — 1-2 sentences.
+  Must reference the specific client priority or competitive threat from the KBQ itself,
+  grounded in project_context.md or market_context.md.]
+**Methodology caveats:** [Any ⚠ flags that affect findings in this arc] ← omit if none
+```
+
+#### Example arcs (KBQ-governed)
+
+*KBQ 1 answer — TENSION:*
+> **Thread 1: The promotional engine IS converting — but only when interactions reach high-impact quality**
+> KBQ anchor: KBQ 1 — Prescribing Conversion. Also addresses: Additional Q6 (2x2 segmentation)
+> Pattern: TENSION | Urgency: ACT NOW
+> Evidence:
+> - H2 (Closing): Branded close +7pp to 53%, overtaking TAG (44%) — conversion IS improving
+> - H5 (Intent): HII allocation 4.9/10 vs Others 3.4/10 — but concentrated in HII
+> - H35 (Quality): Call quality declined -6pp to 76% — fewer interactions reaching HII threshold
+> - H40 (Intent): LTIP flat at 70% while TAG+Chemo surged to 79%
+> What's at stake: KBQ 1 asks whether conversion is improving. The answer is "yes, where interactions reach HII quality — but overall quality is declining, so fewer interactions reach that threshold." This is a quality problem, not a conversion problem.
+
+*KBQ 2+3 merged — TENSION:*
+> **Thread 2: The message hierarchy is shifting to address real barriers — but OS is stalling and SubQ differentiation lags**
+> KBQ anchor: KBQ 2 — Message-to-Barrier Mapping + KBQ 3 — FASPRO SubQ Penetration
+> Pattern: TENSION | Urgency: ACT NOW
+> Evidence:
+> - H10 (Recall): COCOON surged +15pp to #1 — safety barrier being addressed
+> - H15 (SubQ): Three SubQ messages debuted at 30-35% — infusion barrier being addressed
+> - H7 (Recall): But OS Headline flat at 36% despite being first VA tab — the strongest differentiator isn't gaining traction
+> - H16 (Topics): Route of Admin +14pp to 25% — but only 1 in 4 interactions, well below "all"
+> What's at stake: KBQ 2 asks whether messages map to barriers. They increasingly do (COCOON → safety, SubQ → infusion). But KBQ 3 asks whether FASPRO is penetrating — at 25% and with low Differentiation scores, the convenience advantage isn't yet a switching reason.
+
+*KBQ 4 answer — CONVERGENCE:*
+> **Thread 3: AZ's restructured force is delivering coordinated gains — quality, effectiveness, and intent all moved in TAG's favor**
+> KBQ anchor: KBQ 4 — Competitive Resilience
+> Pattern: CONVERGENCE | Urgency: ACT NOW
+> Evidence:
+> - H33 (Quality): TAG call quality +11pp to 84%, overtaking RYB 76%
+> - H21/H23 (Recall): TAG NCCN +5pp to #1 at 46%; Tolerability +11pp to 41%
+> - Supplementary: TAG ME +7.1pp to parity; TAG+Chemo LTIP +13pp to 79%
+> What's at stake: KBQ 4 asks whether J&J can withstand AZ's counter-offensive. AZ added 40 reps, split into 3 teams, and the Q1 data shows this investment paying off across every dimension simultaneously.
+
+*KBQ 5 answer — DIVERGENCE + CLOSURE:*
+> **Thread 4: Interaction architecture improvements are landing — but unevenly, with community coaching proving out while academic engagement erodes**
+> KBQ anchor: KBQ 5 — Interaction Architecture. Also addresses: Additional Q1 (Acad vs Comm), Q7 (rep-led narrative)
+> Pattern: DIVERGENCE + CLOSURE | Urgency: ACT NOW
+> Evidence:
+> - H27 (Tactics): VA usage surged +12pp to 56% — Rec 3 "LEVERAGE VAs" actioned [CLOSURE]
+> - H41 (Segment): Community VA +18pp to 59% vs Academic -2pp to 50% [DIVERGENCE]
+> - H11 (Recall): Academic CNS recall dropped -12pp; community held
+> - Supplementary: Academic LTIP collapsed -9pp to 69%; community improved +3pp to 71%
+> What's at stake: KBQ 5 asks whether reps are structuring for impact. In community, yes — the Q4 VA recommendation produced the largest tactical gain this wave. In academic, the architecture is intact but the content isn't converting — possibly because FLAURA-2's intensification narrative resonates more in clinical-trial-aware academic settings.
+
+---
+
+### STEP C — Write Headlines Per Arc
+
+For each arc, write headlines for the slides that will serve it. Each headline is **specific to the data that will appear on one slide** — it does NOT reference data from other slides or other domains.
+
+**The arc's role is to inform framing, not content.** The arc tells the headline writer:
+- What *kind of signal* this data represents (systematic shift? isolated win? coaching proof?)
+- What *tone* to strike (urgent? celebratory? diagnostic?)
+- What *interpretive lens* to apply (competitive threat? field execution? strategic positioning?)
+
+The headline itself talks only about the metrics, brands, and numbers that belong on its slide.
+
+#### Headline Structure
 
 Every headline has two parts:
 
 ```
-[Part 1 — What happened + data anchor: direction, metric, number]
-; [Part 2 — Why it matters / what's at stake / what to do — grounded in context]
+[Part 1 — What happened: brand, direction, metric, data anchor from validated_analysis.md]
+[Part 2 — Why it matters for THIS metric: interpretation informed by the arc, grounded in context]
 ```
 
-Use a **semicolon** for additive or parallel findings. Use an **em-dash (—)** when Part 2 is a sharp contrast or pivot.
+Use a **semicolon (;)** for additive or parallel findings within the slide.
+Use an **em-dash (—)** when Part 2 is a sharp contrast, pivot, or implication.
 
-### Anatomy
+#### Headline Anatomy
 
 ```
-[Brand] [direction verb] [metric] [data anchor from Phase 0]
-; [strategic consequence or action — drawn from project context]
+[Brand] [direction verb] [metric] [data anchor]
+— [interpretation of what this specific metric movement means, informed by arc context]
 ```
 
-**More examples:**
+#### Good vs. Bad Headlines — The Litmus Tests
 
-- *"[Primary Brand] LTIP improved to 78% (+7pp) but the gain is concentrated entirely in HII interactions — the 44pp HII vs. non-HII gap confirms that converting more calls to high-quality interactions is the single highest-leverage field action"*
-- *"[Primary Brand] reps outperformed [Competitor] on 5 of 6 call quality attributes — but competitor knowledge remains the widest gap (−12pp), a vulnerability as [Competitor] expands its OS data narrative with HCPs"*
-- *"[Primary Brand]'s NCCN message recall declined 6pp while [Competitor] gained 5pp — a full reversal in one quarter that threatens [Primary Brand]'s 1L position ahead of the upcoming formulary review"*
+**Litmus test 1 — Data summary vs. strategic insight:**
 
-### Headline Rules
+Same data, two framings:
+
+*Data summary (wrong):*
+> "TAG average ME surged from 62.6% to 69.6% (+7.0pp), nearly closing the effectiveness gap with RYB+LAZ (70.0%)"
+
+*Strategic insight (right — arc-informed, slide-specific):*
+> "TAG ME surged +7pp to near-parity with RYB (69.6% vs 70.0%) — broad-based gains across 9 of 10 messages suggest AZ's restructured messaging playbook is resonating, not just individual messages improving"
+
+The difference: the second headline interprets *what kind of movement this is* (systematic, not random) — informed by the CONVERGENCE arc — while staying within the ME data shown on the slide.
+
+**Litmus test 2 — Arc leakage:**
+
+*Arc leakage (wrong — references data not on this slide):*
+> "TAG's ME surge to parity (+7pp to 69.6%) is the messaging dimension of a broader competitive shift — quality, intent, and now effectiveness all moved in AZ's favor in Q1"
+
+*Arc-informed but slide-specific (right):*
+> "TAG ME surged +7pp to near-parity with RYB (69.6% vs 70.0%) — broad-based gains across 9 of 10 messages suggest AZ's restructured messaging playbook is resonating, not just individual messages improving"
+
+The difference: the first explicitly names quality and intent data that isn't on the ME slide. The second uses the arc's *interpretive lens* (this is systematic, not random) without importing other slides' data.
+
+**Litmus test 3 — Missing "so what":**
+
+*Missing "so what" (wrong — stops at the number):*
+> "RYB+LAZ branded closing improved from 46% to 53% (+7pp) in Q1'26, nearly matching TAG Chemo's 55%"
+
+*Has "so what" (right):*
+> "RYB+LAZ branded closing improved +7pp to 53%, nearly matching TAG Chemo (55%) — the gain was concentrated in HII interactions (65%), confirming that high-quality calls are converting to business outcomes at a significantly higher rate"
+
+#### Context Anchoring
+
+Before writing each headline, look up the relevant context:
+
+| Question | Where to find it |
+|---|---|
+| *Why might this metric be moving?* | `market_context.md` — competitive events, label updates, campaign launches |
+| *What did reps report doing differently?* | `project_context.md` — field intelligence / call notes |
+| *Was this flagged as a risk or priority last wave?* | `project_context.md` — prior wave findings + recommendations |
+| *What is the client trying to decide or act on?* | `project_context.md` — KBQs / client priorities |
+| *What arc does this slide serve?* | Step B output — the pattern type and "what's at stake" |
+
+#### Headline Rules
 
 **Rule 1 — Strategic insight, not data narration**
-- ✅ Use data as evidence for a strategic claim
-- ✅ Connect the movement to something the client cares about: a competitive threat, a commercial decision, a coaching priority, a timing risk
-- ❌ Never write a headline that only describes what the numbers did — that belongs in the chart, not the headline
-- ❌ Never write a prediction or hypothesis as a finding
-- For PARTIALLY CONFIRMED or NOT CONFIRMED hypotheses: write what the data *actually* showed and why it matters, not what was predicted
+- Use data as evidence for an insight about what this metric movement means
+- Connect to something the client cares about: a competitive threat, coaching priority, timing risk
+- Never write a headline that only describes what the numbers did
+- For NOT CONFIRMED hypotheses: write what the data *actually* showed and why it matters
 
 **Rule 1a — Every context claim must be file-sourced, not inferred**
 
-Every strategic assertion beyond what the numbers show must be traceable to one of the input files:
-
 | Claim type | Required source |
 |---|---|
-| A message or metric "drives" prescribing / LTIP | `source_data.json` driver analysis OR `market_context.md` documenting this linkage |
-| A competitive event explains a metric movement | `project_context.md` — field intelligence or call notes |
+| A metric "drives" prescribing / LTIP | `source_data.json` driver analysis OR `market_context.md` |
+| A competitive event explains a movement | `project_context.md` — field intelligence or call notes |
 | A strategic deadline or timing risk | `project_context.md` — project timeline or client priorities |
 | A clinical or label claim | `market_context.md` — documented product/disease context |
-| General pharma inference not in any file | ❌ Not permitted — remove the claim or soften to what the data alone supports |
+| General pharma inference not in any file | Not permitted — remove or soften to what data alone supports |
+
+**Rule 1b — No arc leakage in headlines**
+- A headline must only reference data that will appear on its slide
+- The arc informs *how to interpret* the slide's data, not *what other data to mention*
+- If you find yourself writing "alongside quality gains" or "compounding the LTIP shift" on a messaging slide, you've leaked — rewrite using only the messaging data
 
 **Rule 2 — Direction vocabulary**
 
 | Direction | Preferred words |
 |---|---|
-| Positive | maintained, sustained, strengthened, improved, increased significantly, delivered, exceeded, outperformed, led, held a clear edge |
-| Stable/Parity | remained consistent, remained stable, on par with, in line with, broadly similar |
-| Negative | declined, dropped significantly, lagged, trailed, fell short, showed a downward trend |
-| Opportunity | *"opportunity exists to [verb]"* / *"opportunity remains in [area]"* / *"[metric] remains an area for focus"* |
+| Positive | maintained, sustained, strengthened, improved, delivered, exceeded, outperformed, led |
+| Stable/Parity | remained consistent, remained stable, on par with, broadly similar |
+| Negative | declined, dropped, lagged, trailed, fell short, showed a downward trend |
+| Opportunity | *"opportunity exists to [verb]"* / *"[metric] remains an area for focus"* |
 
 **Rule 3 — Always anchor to wave and brand**
-- Reference the current wave explicitly: *"In Q1'26…"* or *"In the current wave…"*
+- Reference the current wave explicitly: *"In Q1'26…"* or *"in Q1'26"*
 - Name both brands when comparing — never "the competitor"
 
-**Rule 4 — Numbers are mandatory**
+**Rule 4 — Numbers are mandatory but limited**
 - Every headline must include at least one specific % or pp value from validated_analysis.md
-- Use `~` for approximate figures, `%` not "percent", `pp` for percentage points, `vs.` not "versus"
-- Limit to 2 numbers — pick the most telling
+- Limit to 2-3 numbers — pick the most telling; the chart shows the rest
+- Use `~` for approximate, `%` not "percent", `pp` for percentage points
 
-**Rule 5 — "Directionally" for small n or borderline findings**
+**Rule 5 — "Directionally" for small n**
 - When n is small or delta is borderline: *"Directionally, [Brand] [finding]…"*
 
-**Rule 6 — Slide-type patterns**
-
-| Slide type | Headline pattern |
-|---|---|
-| Activity / SOV | *"In [wave], [Brand] [led/trailed/maintained] SOV at ~X% vs. [Competitor] ~Y%; [interaction frequency context]"* |
-| Message Recall | *"[Message X] was recalled by X% of HCPs — [Brand]'s most-recalled message; [weaker message] remains an opportunity at X%"* |
-| Message Effectiveness | *"[Brand]'s [message] motivation score improved +Xpp QoQ; believability held at X% — an area for further reinforcement"* |
-| Rep Performance | *"[Brand] rep performance [remained strong/improved/declined] in [wave] — [X of Y] attributes above benchmark; [specific gap]"* |
-| LTIP / Closing | *"[Brand] LTIP [improved/declined] to X% in [wave] (+/-Xpp); HII interactions drove X% LTIP vs. X% in non-HII"* |
-| Opportunities | *"Opportunities exist to strengthen [Brand] discussions: [action], [action], and [action] each showed <X% performance"* |
-| NPP / Omnichannel | *"[Brand] NPP reach [led/trailed] at X%; NPP-exposed HCPs showed X% higher LTIP — reinforcing the omnichannel impact"* |
-
-**Rule 7 — Anti-patterns to reject**
+**Rule 6 — Anti-patterns to reject**
 
 | Anti-pattern | Fix |
 |---|---|
@@ -250,34 +412,24 @@ Every strategic assertion beyond what the numbers show must be traceable to one 
 | No data anchor | Add a specific % or pp value |
 | "Results were mixed" | Pick the dominant direction; flag the exception |
 | Missing brand or wave reference | Always name both |
+| Headline references data from another slide | Remove — interpret this slide's data through the arc lens instead |
+| Headline is just Part 1 (data) with no Part 2 (meaning) | Add the "so what" — what does this movement mean for the client? |
 
 ---
 
-### Phase 1 Output
+### STEP D — Write Executive Summary
 
-```
-## Slide Headlines — [Wave Label]
+The ES is organized by **KBQ-anchored story arcs**, not by domains or metric types. Each arc becomes a section, pulling cross-domain evidence that answers the KBQ's business question.
 
-### [Domain Name]
-[N]. [Headline]
+This is where cross-domain connection happens. Unlike headlines (which stay slide-specific), the ES explicitly names evidence from multiple metric types under each KBQ-anchored arc.
 
-### [Domain Name]
-[N]. [Headline]
+**The ES is the narrative layer that connects the slides into a coherent story.** A reader who only reads the ES should understand the 3-5 things that matter this wave and why — and should be able to map each section back to the business question it answers.
 
-[etc. — one per domain/slide]
-```
+Open the ES with the **Governing Question** and a 1-2 sentence framing of how the arcs answer it. This orients the reader before the arc sections begin.
 
-Save as `{project}/context/{wave}/slide_headlines.md`.
+Apply the format specified by the user (default: **A**).
 
-**→ Pause after Phase 1.** Ask: *"Do these headlines reflect the data correctly? Confirm to proceed to the Executive Summary."*
-
----
-
-## PHASE 2 — EXECUTIVE SUMMARY
-
-Write the ES from validated findings — not from hypothesis predictions. Apply the format specified (default: **A**).
-
-### Format Menu
+#### Format Menu
 
 | Code | Name | Best used when |
 |------|------|---------------|
@@ -292,164 +444,324 @@ Write the ES from validated findings — not from hypothesis predictions. Apply 
 
 ---
 
-### FORMAT A — Narrative + Recommendations (default)
+#### FORMAT A — Narrative + Recommendations (default)
 
-For each domain (in order: Activity/SOV → Messaging → Rep Performance → Impact/LTIP → NPP → Non-rep roles if applicable):
+For each arc (ordered by urgency: ACT NOW first, then MONITOR, then CELEBRATE):
 
 ```
-**[DOMAIN NAME]**
-• [Primary finding — validated data, specific % and QoQ delta]
-  – [Supporting finding or segment nuance with data]
-  – [Supporting finding or segment nuance with data]
+**[ARC TITLE — the strategic claim, not a domain name]**
+• [Primary evidence — cross-domain finding with specific % and QoQ delta]
+  – [Supporting evidence from a different domain — with data]
+  – [Supporting evidence or segment nuance — with data]
   – [⚠ Methodology flag if applicable — italicized]
-*[IMPLICATION — one interpretive sentence: what this means for field strategy, coaching, or competitive positioning. Not a restatement.]*
+*[IMPLICATION — what this pattern means for field strategy, coaching, or competitive positioning.
+  This is NOT a restatement of the bullets. It answers: "Given this pattern, what should the client
+  prioritize, protect, or change?" Connect to a specific client decision or upcoming event.]*
 ```
+
+**Critical difference from domain-organized ES:** Each section pulls evidence from whichever domain supports the arc. A section titled "AZ's restructured sales force is delivering" would include a quality metric (rep performance domain), an ME metric (messaging domain), and an LTIP metric (intent domain) — because the *story* is the convergence, not the individual metrics.
 
 Close with methodology footnote:
 ```
-*Note: [Primary Brand] [wave] n=[N], [Competitor] [wave] n=[N]. [Caveats: sample directional; SOV screener change; benchmark change; new message baselines.]*
+*Note: [Primary Brand] [wave] n=[N], [Competitor] [wave] n=[N]. [Caveats: sample directional; screener change; benchmark change; new message baselines.]*
 ```
 
 ---
 
-### FORMAT B — Combined Key Findings + Recs
+#### FORMAT B — Combined Key Findings + Recs
 
-Left column — Key Findings (max 4–5, one per domain, bold label + finding with data anchor)
-Right column — Recommendations (numbered, CAPS verb, one sentence each, mirrors domain order)
+Left column — Key Findings (one per arc, bold arc title + cross-domain evidence with data anchor)
+Right column — Recommendations (numbered, CAPS verb, one sentence each, mirrors arc order)
 
 ---
 
-### FORMAT C — Competitive Scorecard
+#### FORMAT C — Competitive Scorecard
 
 Table: Metric | [Primary Brand] [wave] | [Competitor] [wave] | Position
 
 Directional indicator: ▲ improved | ▼ declined | → stable | `[NEW]` first wave
 Position column: **LEADS** / **PARITY** / **TRAILS**
-Bottom row: one-sentence competitive narrative.
+Bottom section: one paragraph per arc explaining the pattern behind the metrics.
 
 ---
 
-### FORMAT D — Findings | Considerations
+#### FORMAT D — Findings | Considerations
 
-| What we found | What this means |
+| What we found (arc-organized) | What this means |
 |---|---|
-| [Specific finding with data] | [Implication or action] |
+| [Cross-domain evidence under arc title] | [Implication or action] |
 
-Max 6–8 rows, 1–2 sentences per cell.
+Max 6–8 rows (one per arc + key orphans), 1–2 sentences per cell.
 
 ---
 
-### FORMAT E — Strategic Questions
+#### FORMAT E — Strategic Questions
 
-3–5 numbered questions:
+3–5 numbered questions (one per arc):
 ```
-**[N]. [Strategic question]**
-Evidence: [2–3 validated data points]
+**[N]. [Strategic question — framed by the arc]**
+Evidence: [2–3 cross-domain validated data points]
 Hypothesis for next wave: [What to watch]
 ```
 
 ---
 
-### FORMAT F — Strengths / Opportunities
+#### FORMAT F — Strengths / Opportunities
 
-**What's working:** CONFIRMED findings where primary brand leads, is stable, or improved
-**Where to improve:** NOT CONFIRMED or PARTIALLY CONFIRMED findings; widening competitor gaps
-
----
-
-### FORMAT G — Three-column
-
-Column 1 — What's working (2–3 bullets with data)
-Column 2 — Opportunities (2–3 bullets with data)
-Column 3 — Recommendations (2–3 bullets, CAPS verb)
+**What's working:** CELEBRATE and positive CLOSURE arcs — where primary brand leads, improved, or coaching landed
+**Where to improve:** ACT NOW arcs — where competitive gaps are widening or quality is declining
 
 ---
 
-### FORMAT H — Key Takeaways
+#### FORMAT G — Three-column
 
-| Domain | Key Takeaway |
-|--------|-------------|
-| [Domain] | [Validated finding + data + implication in one sentence] |
-
----
-
-**→ Pause after Phase 2.** Ask: *"Does the ES capture the right stories? Any findings to add, reorder, or drop before moving to recommendations?"*
+Column 1 — What's working (CELEBRATE arcs, 2–3 bullets with cross-domain data)
+Column 2 — Opportunities (ACT NOW arcs, 2–3 bullets with cross-domain data)
+Column 3 — Recommendations (1 per arc, CAPS verb)
 
 ---
 
-## PHASE 3 — RECOMMENDATIONS
+#### FORMAT H — Key Takeaways
+
+| Arc | Key Takeaway |
+|-----|-------------|
+| [Arc title] | [Cross-domain evidence + implication in one sentence] |
+
+---
+
+### STEP E — Write Recommendations
+
+Recommendations are **arc-driven and KBQ-anchored**. Each rec addresses a story arc (which answers a KBQ), not an individual metric. One rec may span findings from multiple metric types within the same KBQ answer.
 
 ```
 [N]. **[CAPS ACTION VERB]** [what to do — specific, named behavior or output]
-[One sentence: the exact validated metric and delta that motivates this rec.]
+[One sentence: the cross-domain evidence pattern that motivates this rec, with specific metrics and deltas.]
 ```
 
-**Approved CAPS verbs:** RESTORE, PRIORITIZE, EQUIP, ADDRESS, SUSTAIN, CONVERT, DEPLOY, BUILD, CLARIFY, EXTEND, PROTECT, REINFORCE, AMPLIFY, CLOSE, LEVERAGE, SHARPEN, ACCELERATE
+**Approved CAPS verbs:** RESTORE, PRIORITIZE, EQUIP, ADDRESS, SUSTAIN, CONVERT, DEPLOY, BUILD, CLARIFY, EXTEND, PROTECT, REINFORCE, AMPLIFY, CLOSE, LEVERAGE, SHARPEN, ACCELERATE, INVESTIGATE, MONITOR
 
-Order by impact priority: highest-leverage first. 4–6 recommendations.
+**Rules:**
+- One recommendation per arc (occasionally two if the arc has distinct action streams)
+- Order by urgency: ACT NOW arcs first, then MONITOR, then CELEBRATE/EXTEND
+- 4-6 recommendations total
+- The motivating sentence must name evidence from at least 2 domains — this is what makes arc-driven recs sharper than metric-specific recs
+- CELEBRATE arcs get "SUSTAIN" or "EXTEND" recs, not just congratulations
 
-**Example:**
+**Example — arc-driven rec vs. metric-specific rec:**
+
+*Metric-specific (old approach):*
+> 1. **RESTORE** RYB+LAZ call quality to regain competitive parity with TAG
+> TAG surpassed RYB on overall call quality (84% vs 76%, a +11pp swing) and now leads on 8 of 12 attributes.
+
+*Arc-driven (new approach):*
+> 1. **RESTORE** competitive parity before AZ's restructured sales force fully matures
+> TAG gained simultaneously on call quality (+11pp to 84%), messaging effectiveness (+7pp to parity), and prescribing intent (+9pp, narrowing the gap to 6pp) — this is a systematic competitive improvement, not an isolated metric shift, and the response must address quality, messaging, and intent together rather than treating them as separate coaching workstreams.
+
+The difference: the arc-driven rec names the *pattern* and prescribes a *coordinated response*. The metric-specific rec addresses one symptom.
+
+---
+
+### ORPHAN FINDINGS
+
+After mapping all hypotheses to arcs, list any CONFIRMED or PARTIALLY CONFIRMED findings that don't fit any arc:
+
 ```
-1. **RESTORE** [Primary Brand] NCCN message delivery among non-HII reps
-[Competitor] recall reversed a Q4 gap, rising from 41% to 46% while [Primary Brand] declined from 49% to 43% — an 11pp swing in one quarter.
+## Orphan Findings
+These validated findings do not belong to a narrative thread but warrant standalone slide headlines:
+
+### H[N]: [Hypothesis]
+**Data:** [key metric from validated_analysis.md]
+**Headline:** [standalone headline — still follows all headline rules]
+**Note:** [Why this is isolated — e.g., "single metric, no cross-domain echo"]
 ```
 
-Append to `{project}/context/{wave}/exec_summary.md`.
+Orphans are legitimate. Not every finding connects to a bigger story. But if you have more than 5 orphans, revisit your arcs — you may have missed a pattern.
+
+---
+
+## OUTPUT — narrative_threads.md
+
+Assemble all Phase 1 output into a single document:
+
+```
+# Narrative Threads — [Wave Label]
+
+**Generated:** [date]
+**Source:** validated_analysis.md + project_context.md + market_context.md + hypothesis_bank.md
+**ES Format:** [A/B/C/D/E/F/G/H]
+**Arcs:** [N] threads | **Headlines:** [N] total | **Recommendations:** [N]
+
+---
+
+## GOVERNING QUESTION
+
+**[Governing Question — verbatim from KBQs.md]**
+**Arc sequence answer:** [1-2 sentences: how the arcs, in order, answer this question]
+
+---
+
+## STORY ARCS
+
+### Thread [N]: [Strategic claim — answers the KBQ]
+**KBQ anchor:** KBQ [N] — [title]. Also addresses: [Additional Q #s if any]
+**Pattern:** [CONVERGENCE / TENSION / DIVERGENCE / CLOSURE]
+**Urgency:** [ACT NOW / MONITOR / CELEBRATE]
+**Evidence:**
+- H[x] ([domain]): [one-line data summary]
+- H[y] ([domain]): [one-line data summary]
+- H[z] ([domain]): [one-line data summary]
+**What's at stake:** [1-2 sentences — what data means for the KBQ's embedded decision]
+**Methodology caveats:** [⚠ flags if any]
+
+#### Headlines
+[N]. **[Headline text]**
+    Hypotheses: H[x], H[y]
+    Slide data: [which metrics/brands appear on this slide]
+
+[N]. **[Headline text]**
+    Hypotheses: H[z]
+    Slide data: [which metrics/brands appear on this slide]
+
+[repeat for each headline under this arc]
+
+---
+
+[repeat for each thread]
+
+---
+
+## Orphan Findings
+
+### H[N]: [Hypothesis]
+**Data:** [key metric]
+**Headline:** [standalone headline]
+
+---
+
+## Executive Summary
+
+[Full ES in the selected format — arc-organized]
+
+---
+
+## Recommendations
+
+[Numbered recs — arc-driven, impact-ordered]
+
+---
+
+*End of Stage 3 — narrative_threads.md*
+*Ready for /slide-plan (Stage 4)*
+*Outputs: validated_analysis.md + narrative_threads.md*
+```
+
+Save as `{project}/context/{wave}/narrative_threads.md`.
+
+**→ SINGLE HUMAN GATE.** Present to the user:
+
+```
+Narrative Threads — [Wave] summary:
+
+Governing Question: [abbreviated]
+
+Arcs:
+  [N]. [Arc title] ([pattern type] — [urgency])
+       KBQ anchor: KBQ [N] — [title]
+       Evidence: [count] hypotheses across [count] metric types
+       Headlines: [count]
+
+  [repeat]
+
+KBQ coverage: [list each KBQ and which arc addresses it]
+Orphans: [count] standalone findings
+
+ES format: [code] — [name]
+Recommendations: [count]
+
+Hypothesis coverage: [X] of [Y] CONFIRMED/PARTIALLY CONFIRMED hypotheses mapped to arcs
+Unmapped: [list any gaps]
+```
+
+Ask: *"Do these story arcs capture the right narrative? Review the threads, headlines, ES, and recs. Confirm to proceed to /slide-plan, or tell me what to reshape."*
 
 ---
 
 ## WRITING RULES (all phases)
 
-**R1 — Phase 0: data facts only. Phase 1+: strategic insights.**
+**R1 — Phase 0: data facts only. Phase 1: strategic insights.**
 Phase 0 `Data summary` must be a pure numerical statement — no narrative, no "but", no interpretation.
-Phase 1 headlines must answer "so what for the client" — not just "what happened in the data."
+Phase 1 arcs, headlines, ES, and recs must answer "so what for the client" — not just "what happened."
 
-**R2 — Every Phase 1 headline must use project context.**
-Before writing a headline, look up at least one of: competitive event, prior wave recommendation, client priority, strategic timing, or field intelligence from `project_context.md`. A headline with no context hook is incomplete.
+**R2 — Every headline must use project context.**
+Before writing a headline, look up at least one of: competitive event, prior wave recommendation, client priority, strategic timing, or field intelligence from `project_context.md` or `market_context.md`. A headline with no context hook is incomplete.
 
-**R3 — Data-anchored, always.** Every finding (Phase 1+) must include at least one specific % or pp value from validated_analysis.md.
+**R3 — Data-anchored, always.** Every finding must include at least one specific % or pp value from validated_analysis.md.
 
 **R4 — Wave-over-wave language.** Format: `[metric] [direction] from X% to Y% (+/-Npp)`. If no prior baseline: *"Wave 1 baseline — no prior comparison."*
 
 **R5 — CAPS verbs in recs.** Every rec opens with a CAPS verb. Never passive.
 
-**R6 — Recs motivated by data.** Name the specific metric and delta in the motivating sentence.
+**R6 — Recs motivated by cross-domain evidence.** Name evidence from at least 2 domains in the motivating sentence.
 
-**R7 — Methodology flags mandatory.** `⚠` in italics when QoQ comparability is limited. Never buried when it affects a key finding.
+**R7 — Methodology flags mandatory.** `⚠` in italics when QoQ comparability is limited.
 
-**R8 — Always name both brands.** Never "the competitor." Always state both sides when comparing.
+**R8 — Always name both brands.** Never "the competitor."
 
-**R9 — Implications interpret, not restate.** Say what the finding *means* for the field — what's at risk, what decision it informs, what the client should prioritise.
+**R9 — Implications interpret, not restate.** Say what the finding *means* for the field — what's at risk, what decision it informs, what the client should prioritize.
 
-**R10 — Segment splits add specificity.** Include HII/non-HII or Community/Academic splits when the data is there and when they change the strategic reading.
+**R10 — Segment splits add specificity.** Include HII/non-HII or Community/Academic splits when they change the strategic reading.
 
 **R11 — New metrics: "Wave 1 baseline."** State direction vs. external reference only.
 
 **R12 — No filler openers.** Lead with brand, metric, or finding. Never *"It is worth noting…"*, *"Interestingly…"*, *"Looking at…"*
 
+**R13 — Headlines stay on their slide.** No referencing data from other slides. The arc informs interpretation, not content.
+
+**R14 — ES is the cross-domain layer.** The ES is where arcs explicitly pull evidence from multiple domains. Headlines do not do this.
+
 ---
 
-## QUALITY CHECK (run silently before each phase output)
+## QUALITY CHECK (run silently before output)
 
-- [ ] Every finding sourced from validated_analysis.md — not from hypothesis predictions
-- [ ] Every finding has a specific % or pp value
-- [ ] Every QoQ comparison has prior + current + delta
-- [ ] Every new metric labeled "Wave 1 baseline"
-- [ ] Every methodology-affected finding carries ⚠
-- [ ] Every rec opens with CAPS verb and names the motivating metric
-- [ ] No competitor referred to as "the competition" — always named
+**Arcs:**
+- [ ] 3-5 arcs identified
+- [ ] Every arc has a KBQ anchor — no arc exists without naming the KBQ it answers
+- [ ] Every KBQ is addressed by at least one arc (merged or standalone)
+- [ ] Governing Question stated with arc-sequence answer
+- [ ] Each arc has 3+ hypotheses from 2+ metric types
+- [ ] Each arc has a "what's at stake" tied to the client decision embedded in its KBQ
+- [ ] Every CONFIRMED/PARTIALLY CONFIRMED hypothesis maps to an arc or is listed as orphan
+- [ ] No more than 5 orphans (if more, revisit arcs)
+- [ ] Arc titles read as answers to the KBQs, not just data pattern descriptions
+
+**Headlines:**
+- [ ] Every headline has Part 1 (data) + Part 2 (meaning)
+- [ ] No headline references data from another slide (no arc leakage)
+- [ ] Every headline has at least one specific % or pp value
+- [ ] Every headline uses project/market context for interpretation
 - [ ] No filler openers
-- [ ] Every context claim in a headline is traceable to a source file — no unverified causal assertions
+- [ ] Both brands named when comparing
+
+**ES:**
+- [ ] Organized by arcs, not by domains
+- [ ] Each section pulls cross-domain evidence
+- [ ] Implications interpret the *pattern*, not individual metrics
+- [ ] Methodology footnote present
+
+**Recs:**
+- [ ] One rec per arc (4-6 total)
+- [ ] Each rec opens with CAPS verb
+- [ ] Each motivating sentence names evidence from 2+ domains
+- [ ] Ordered by urgency (ACT NOW first)
+- [ ] CELEBRATE arcs have SUSTAIN/EXTEND recs
 
 ---
 
 ## OUTPUT SEQUENCE
 
 ```
-Phase 0 → {project}/context/{wave}/validated_analysis.md    (no user gate)
-Phase 1 → {project}/context/{wave}/slide_headlines.md       ✋ User confirms
-Phase 2 → {project}/context/{wave}/exec_summary.md          ✋ User confirms
-Phase 3 → recs appended to exec_summary.md
+Phase 0 → {project}/context/{wave}/validated_analysis.md       (auto — no gate)
+Phase 1 → {project}/context/{wave}/narrative_threads.md        ✋ SINGLE GATE
         → Signal: ready for /slide-plan (Stage 4)
-           Passes: validated_analysis.md + slide_headlines.md + exec_summary.md
+           Passes: validated_analysis.md + narrative_threads.md
 ```

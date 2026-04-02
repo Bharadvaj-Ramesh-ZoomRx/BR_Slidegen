@@ -531,7 +531,7 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
     color_prior   = parse_color(extra["color_prior"]) if "color_prior" in extra else config.competitor.color_current
 
     n = len(rows)
-    labels      = [r.get("desc", "")[:40] for r in rows]
+    labels      = [r.get("desc", "") for r in rows]
     cur_vals    = [r.get(current_field) or 0 for r in rows]
     pri_vals    = [r.get(prior_field) for r in rows]
     delta_cur   = [r.get(delta_cur_field) for r in rows]

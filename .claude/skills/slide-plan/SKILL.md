@@ -1,11 +1,11 @@
 ---
 name: slide-plan
-description: "Use when building a structured slide plan from validated analysis and a Hypothesis Bank. Trigger when: user says 'build slide plan', 'create ask document', 'plan slides', or Stage 3 (sfea-insight-writer) outputs have been confirmed and Stage 4 is ready. Reads validated_analysis.md, slide_headlines.md, exec_summary.md, hypothesis_bank.md, KBQs.md, and survey_context.md. Always opens with Cover (Slide 1), ES (Slide 2), Recs (Slide 3), then data slides. Per-slide insights are drawn from validated_analysis.md and matched to slide_headlines.md — not written from scratch."
+description: "Use when building a structured slide plan from narrative threads and validated analysis. Trigger when: user says 'build slide plan', 'create ask document', 'plan slides', or Stage 3 (sfea-insight-writer) narrative_threads.md has been confirmed and Stage 4 is ready. Reads narrative_threads.md, validated_analysis.md, hypothesis_bank.md, KBQs.md, and survey_context.md. Always opens with Cover (Slide 1), ES (Slide 2), Recs (Slide 3), then data slides. Headlines and ES/Recs content come from narrative_threads.md — not written from scratch."
 ---
 
 # Slide Plan Builder
 
-You are a senior market research analyst. Your job is to read the validated analysis and hypothesis bank, then build a structured slide plan for a PET SFEA report. Each data slide answers one analytical question. Insights per slide are sourced from the validated analysis — not written from scratch. The deck always opens with Cover → ES → Recs before any data slides.
+You are a senior market research analyst. Your job is to read the narrative threads and validated analysis, then build a structured slide plan for a PET SFEA report. Each data slide answers one analytical question. Headlines per slide come from narrative_threads.md — not written from scratch. The deck always opens with Cover → ES → Recs before any data slides.
 
 ---
 
@@ -15,9 +15,8 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 
 | File | Path | Required? |
 |------|------|-----------|
+| **Narrative Threads** | `{project}/context/{wave}/narrative_threads.md` | Required |
 | **Validated Analysis** | `{project}/context/{wave}/validated_analysis.md` | Required |
-| **Slide Headlines** | `{project}/context/{wave}/slide_headlines.md` | Required |
-| **Executive Summary** | `{project}/context/{wave}/exec_summary.md` | Required |
 | **Hypothesis Bank** | `{project}/context/{wave}/hypothesis_bank.md` | Required |
 | **KBQs** | `{project}/input/Wave/{wave}/KBQs.md` | Required |
 | **Survey Context** | `{project}/context/{wave}/survey_context.md` | Strongly recommended |
@@ -25,11 +24,10 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 Report status before reading:
 ```
 Input files:
+  ✓ narrative_threads.md    (story arcs + headlines + ES + recs — confirmed)
   ✓ validated_analysis.md   (data-validated findings per hypothesis)
-  ✓ slide_headlines.md      (confirmed talking headlines per domain)
-  ✓ exec_summary.md         (ES + Recs — content for Slides 2–3)
   ✓ hypothesis_bank.md      (question codes, segment cuts, flags)
-  ✓ KBQs.md                 (domain structure for narrative sequencing)
+  ✓ KBQs.md                 (domain structure for section grouping)
   ✓ survey_context.md       (question text for chart descriptions)
 ```
 
@@ -41,12 +39,11 @@ If any required file is missing, stop and tell the user which is absent.
 
 Read every available file completely before doing anything else.
 
-- **Validated Analysis** — Phase 0 output from sfea-insight-writer: per-hypothesis validation status (CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED / INSUFFICIENT DATA), extracted prior/current/delta values, segment data, methodology flags
-- **Slide Headlines** — Phase 1 output: one confirmed talking headline per domain; these are the slide-level insights to carry into the plan — do not rewrite them
-- **Executive Summary** — Phase 2–3 output: the ES and Recommendations content that populates Slides 2 and 3
+- **Narrative Threads** — Stage 3 Phase 1 output: story arcs (with pattern type and urgency), per-slide headlines (with hypothesis mappings), executive summary (arc-organized), and recommendations. **This is the editorial brief — headlines are copied verbatim, not rewritten.**
+- **Validated Analysis** — Phase 0 output: per-hypothesis validation status, extracted data values, segment data, methodology flags
 - **Hypothesis Bank** — all hypotheses with "Test with:" question codes, segment cuts, METHODOLOGY ARTIFACT and [ACTION ITEM] flags
-- **KBQs** — domain structure; use to sequence data slides into narrative sections
-- **Survey Context** — question codes + question text; use to write precise chart descriptions
+- **KBQs** — domain structure; used for section grouping within the narrative sequence
+- **Survey Context** — question codes + question text; used to write precise chart descriptions
 
 ---
 
@@ -57,9 +54,10 @@ Before clustering, tag every hypothesis in the bank with:
 | Tag | What to extract |
 |-----|----------------|
 | **Primary Q** | The main question code(s) driving the measurement — from "Test with:" line only |
-| **Story theme** | A 3–5 word label for what this hypothesis is about (e.g., "message recall by setting", "close rate vs TAG") |
+| **Story theme** | A 3-5 word label for what this hypothesis is about |
 | **Segment cuts** | Which splits are needed — read ONLY from the "Test with:" line, not from rationale prose |
 | **Validation status** | CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED / INSUFFICIENT DATA — from validated_analysis.md |
+| **Arc** | Which narrative thread this hypothesis belongs to — from narrative_threads.md |
 | **Flags** | METHODOLOGY ARTIFACT and/or [ACTION ITEM] if present |
 
 **Critical tagging rule — rationale is not instruction:** The rationale paragraph explains *why* the hypothesis is directional. Segment cuts, question codes, and chart design come exclusively from the **"Test with:"** line. If Practice Setting, HII, or any other segment is mentioned only in the rationale prose and not in the "Test with:" line, do NOT add it as a cut on the slide.
@@ -75,28 +73,36 @@ Before clustering any data slides, lock in the opening:
 | Slide | Type | Content source |
 |-------|------|---------------|
 | **Slide 1** | `cover` | Brand name, wave label, study type — from project_context.md |
-| **Slide 2** | `executive_summary` | ES content from exec_summary.md |
-| **Slide 3** | `executive_summary` | Recommendations from exec_summary.md |
+| **Slide 2** | `executive_summary` | ES content from narrative_threads.md — Executive Summary section |
+| **Slide 3** | `executive_summary` | Recommendations from narrative_threads.md — Recommendations section |
 
 These are fixed. Data slides begin at Slide 4.
 
 ---
 
-## STEP 5 — Cluster into data slides
+## STEP 5 — Cluster into data slides (arc-informed)
 
-**Grouping rule:** Hypotheses that share the same primary question code AND the same story theme belong on the same slide.
+**Primary grouping rule:** Hypotheses that share the same primary question code AND the same story theme belong on the same slide.
+
+**Arc-informed composition:** When clustering, consult narrative_threads.md to understand what story each hypothesis serves. This may influence composition:
+
+- **Hypotheses in the same arc that share data** should be on the same slide (standard clustering)
+- **Hypotheses in different arcs that share a question code** — consider whether the slide serves one arc primarily, or whether a competitive comparison slide better serves the narrative (e.g., a side-by-side RYB vs TAG recall slide may serve the "AZ gaining ground" arc better than separate brand slides)
+- **Each slide should serve primarily one arc.** If a slide contains hypotheses from two arcs, it will have a confused headline. Split it or assign it to the dominant arc.
 
 For each cluster:
 
-- Assign a **slide title** — a short, declarative topic label (not a question, not a finding — e.g., "Message Recall by Practice Setting")
+- Assign a **slide title** — a short, declarative topic label (not a question, not a finding)
 - Identify the **driving question** — the single analytical question this slide must answer
 - List the **hypotheses tested** (e.g., H6, H11)
-- Pull the **insight** — find the matching headline from slide_headlines.md for this domain/topic; copy it verbatim. Do not rewrite it.
-- Note the **validation status** — the dominant status across hypotheses on this slide (e.g., "CONFIRMED", "PARTIALLY CONFIRMED — see note")
+- **Arc** — which narrative thread this slide serves, from narrative_threads.md
+- **Role in arc** — one sentence: what this slide contributes to the arc's argument (e.g., "Shows the messaging dimension of the competitive convergence")
+- Pull the **headline** — find the matching headline from narrative_threads.md; copy it verbatim. Do not rewrite it.
+- Note the **validation status** — the dominant status across hypotheses on this slide
 - Assign the **slide_type** — use the exact value from the Chart Type → slide_type Mapping table below
+- Write a **chart description** — specific layout details: sorted by what, delta column, segment splits, etc.
 - List **question codes with text** — from Survey Context
 - List **segment cuts** needed
-- Write a **narrative arc** — one sentence: what this slide shows given the actual validated data (not the prediction)
 - Flag any **methodology artifacts** or **action items**
 
 If a hypothesis cluster is too large for one slide, split it. If two clusters tell the same story with the same chart, merge them.
@@ -121,6 +127,10 @@ If a hypothesis cluster is too large for one slide, split it. If two clusters te
 | `hii_scorecard` | Multi-section clustered column chart with section headers + callout boxes | Multiple metrics grouped into sections (e.g. HII drivers) |
 | `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand | Two segments, each with two brand doughnuts showing QoQ rings |
 | `message_mbd` | Multi-column abacus for MBD (Motivation, Believability, Differentiation) | ME question with sub-dimensions (M/B/D), plus composite effectiveness |
+| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) | Multiple metrics tracked over 3+ waves |
+| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) | Activity metrics over time |
+| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) | Two continuous variables per item |
+| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns | Many items × few metrics, color-coded by magnitude |
 
 **Selection decision tree:**
 ```
@@ -190,9 +200,21 @@ If the same outcome question (e.g., LTIP, derived HII) is the dependent variable
 
 ---
 
-## STEP 6 — Sequence data slides
+## STEP 6 — Sequence data slides (arc-informed)
 
-Data slides begin at Slide 4. Order into narrative flow using KBQ domain sequence as the backbone:
+Data slides begin at Slide 4. Sequencing uses **two organizing principles**:
+
+### Primary: Arc urgency drives section order
+
+The lead arc (highest urgency) gets its slides presented first. Within the deck, arrange by:
+
+1. **ACT NOW arcs** — slides for these arcs come first (after opening)
+2. **MONITOR arcs** — middle of the deck
+3. **CELEBRATE / CLOSURE arcs** — later in the deck (positive closure validates prior work)
+
+### Secondary: Domain grouping within arcs
+
+Within each arc's slides, group by KBQ domain to maintain analytical coherence:
 
 1. Sales Activity
 2. Messaging — Recall & Delivery
@@ -202,10 +224,19 @@ Data slides begin at Slide 4. Order into narrative flow using KBQ domain sequenc
 6. Prescription Intent / LTIP
 7. Branded Close / CTA
 8. Drivers of High Impact
+9. NPP / Omnichannel
+
+### Handling cross-arc slides
+
+Some arcs share domain slides (e.g., a LTIP slide may serve both a CONVERGENCE arc and a DIVERGENCE arc). Place the slide under its **primary arc** — the one listed in its Arc field.
+
+### Orphan slides
+
+Slides for orphan findings (from narrative_threads.md → Orphan Findings section) are placed at the end of the most relevant domain section.
 
 Within each section, order slides from most structural (overall comparison, QoQ) to most diagnostic (segment splits, driver analysis).
 
-Place methodology artifact slides adjacent to the substantive slide they affect — not in an appendix. Flag them clearly.
+Place methodology artifact slides adjacent to the substantive slide they affect — not in an appendix.
 
 ---
 
@@ -213,50 +244,54 @@ Place methodology artifact slides adjacent to the substantive slide they affect 
 
 ```
 # Slide Plan — [Wave]
-**Generated from:** validated_analysis.md + slide_headlines.md + exec_summary.md + hypothesis_bank.md + KBQs.md + survey_context.md
+**Generated from:** narrative_threads.md + validated_analysis.md + hypothesis_bank.md + KBQs.md + survey_context.md
 **Date:** [today's date]
 **Total slides:** [N] (Cover + ES + Recs + [N-3] data slides)
+**Narrative arcs:** [list arc titles with urgency]
 
 ---
 
-## SECTION: Opening
+## METHODOLOGY FOOTNOTES (apply to adjacent slides)
+- **MF[N] — [title]:** [description] *Adjacent to: Slides [X, Y, Z].*
 
 ---
 
-### Slide 1 — Cover
+## Slide 1 — Cover
 **slide_type:** `cover`
 **Content:** [Brand name], [Wave label], [Study type]
 
 ---
 
-### Slide 2 — Executive Summary
+## Slide 2 — Executive Summary
 **slide_type:** `executive_summary`
-**Content:** From exec_summary.md — ES section (Format [A/B/C…])
+**Content:** From narrative_threads.md — Executive Summary section (Format [A/B/C…])
+**Note:** ES is organized by story arcs, not by domains.
 
 ---
 
-### Slide 3 — Recommendations
+## Slide 3 — Recommendations
 **slide_type:** `executive_summary`
-**Content:** From exec_summary.md — Recommendations section
+**Content:** From narrative_threads.md — Recommendations section
 
 ---
 
-## SECTION: [Domain Name]
+## SECTION: [Arc Title] ([Pattern] — [Urgency])
 
 ---
 
 ### Slide [N] — [Slide Title]
+**Arc:** [Thread N — Arc title]
+**Role in arc:** [One sentence: what this slide contributes to the arc's argument]
 **Driving question:** [The single analytical question this slide must answer]
 **Hypotheses tested:** H[x], H[y], H[z]
 **Validation status:** CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED
-**Insight:** [Verbatim from slide_headlines.md for this domain/topic]
-**slide_type:** [exact value, e.g., `single_bar_with_delta`]
+**Headline:** [Verbatim from narrative_threads.md — do not rewrite]
+**slide_type:** [exact value]
 **Chart description:** [Specific layout: sorted by what, delta column, segment splits, etc.]
 **Primary questions:**
 - [Q code] — "[Question text from Survey Context]"
 - [Q code] — "[Question text from Survey Context]"
 **Cuts needed:** [QoQ / Practice Setting / HII vs Others / etc.]
-**Narrative arc:** [One sentence: what this slide shows given the actual validated data]
 METHODOLOGY ARTIFACT — [brief description] [only if applicable]
 [ACTION ITEM] — [brief description] [only if applicable]
 ```
@@ -273,17 +308,19 @@ Write the completed slide plan to `{project}/context/{wave}/slide_plan.md`. Ask 
 
 ## RULES
 
-1. **Slides 1–3 are always Cover, ES, Recs.** Data slides begin at Slide 4. No exceptions.
-2. **Insights come from slide_headlines.md — copy verbatim.** Do not rewrite, paraphrase, or improve them. They were confirmed in Phase 1.
-3. **Narrative arc reflects actual data, not predictions.** Use the validation status and validated values. A NOT CONFIRMED finding still gets a narrative arc — it describes what the data actually showed.
-4. **One driving question per slide.** If a slide is trying to answer two unrelated questions, split it.
-5. **Every hypothesis must appear on at least one slide.** If a hypothesis has no cluster match, create a standalone slide for it.
-6. **Methodology artifact slides stay adjacent** to the substantive slide they affect — not hidden in appendix.
-7. **Slide titles are topic labels, not findings.** Findings go in the insight and narrative arc.
-8. **slide_type must be a valid renderer key.** Use the exact value from the mapping table. Add specifics in the Chart description field.
-9. **Action items surface visibly.** Any slide derived from a client action item gets the [ACTION ITEM] flag.
-10. **No question code appears on two slides serving the same analytical purpose.** Merge if same question + same cut + same analytical role.
-11. **No context stored in this skill.** Everything comes from reading the files at runtime.
-12. **Rationale prose does not define chart design.** Segment cuts and question codes come exclusively from the "Test with:" line.
-13. **Show all dimensions of a multi-part question.** If a question has sub-dimensions (e.g., ME Q2.20 has A=Differentiation, B=Believability, C=Motivation), include all in the spec unless the hypothesis bank explicitly restricts to a specific sub-dimension.
-14. **Use exact question text.** In Primary questions, always write the full question text from Survey Context alongside the code — never shorthand or paraphrase.
+1. **Slides 1-3 are always Cover, ES, Recs.** Data slides begin at Slide 4. No exceptions.
+2. **Headlines come from narrative_threads.md — copy verbatim.** Do not rewrite, paraphrase, or improve them. They were confirmed in Stage 3.
+3. **ES and Recs come from narrative_threads.md.** Copy the Executive Summary and Recommendations sections verbatim for Slides 2-3.
+4. **Each slide serves primarily one arc.** The Arc and Role in arc fields are required for every data slide. If a slide serves two arcs, assign the dominant one.
+5. **One driving question per slide.** If a slide tries to answer two unrelated questions, split it.
+6. **Every hypothesis must appear on at least one slide.** If a hypothesis has no cluster match, create a standalone slide.
+7. **Methodology artifact slides stay adjacent** to the substantive slide they affect.
+8. **Slide titles are topic labels, not findings.** Findings go in the headline.
+9. **slide_type must be a valid renderer key.** Use the exact value from the mapping table.
+10. **Action items surface visibly.** Any slide from a client action item gets the [ACTION ITEM] flag.
+11. **No question code on two slides serving the same analytical purpose.** Merge if same question + same cut + same role.
+12. **No context stored in this skill.** Everything comes from reading the files at runtime.
+13. **Rationale prose does not define chart design.** Segment cuts and question codes come exclusively from the "Test with:" line.
+14. **Show all dimensions of a multi-part question.** If a question has sub-dimensions (e.g., ME Q2.20 has A=Differentiation, B=Believability, C=Motivation), include all unless the hypothesis bank explicitly restricts.
+15. **Use exact question text.** In Primary questions, always write the full question text from Survey Context — never shorthand or paraphrase.
+16. **Arc-informed sequencing.** Sections are ordered by arc urgency (ACT NOW → MONITOR → CELEBRATE), not by domain convention. Domain grouping applies within arcs.
