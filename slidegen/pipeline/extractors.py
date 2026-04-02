@@ -108,14 +108,29 @@ def extract_by_question_code(
     max_rows: int = 20,
     label_fn: Optional[Callable[[str], str]] = None,
     converter: Callable = pct,
+    occurrence: int = 1,
+    dim_col: Optional[int] = None,
 ) -> list[dict]:
     """Find a question code row, walk sub-rows, extract prior/current values.
 
     Returns list of: {"desc": str, "prior": float, "current": float, "code": str}
+    The question code header row's values are captured as _base (sample size).
+    ``occurrence`` selects the Nth match when a code appears multiple times.
+    ``dim_col`` adds a "dimension" field from the specified column.
     """
     results = []
+    match_count = 0
     for i in range(len(sheet)):
         if sheet.iloc[i, code_col] == code:
+            match_count += 1
+            if match_count < occurrence:
+                continue
+            # Capture base/sample size from the question code row itself
+            base_prior = sheet.iloc[i, q_prior_col]
+            base_current = sheet.iloc[i, q_current_col]
+            base_prior = int(base_prior) if pd.notna(base_prior) and base_prior else None
+            base_current = int(base_current) if pd.notna(base_current) and base_current else None
+
             j = i + 1
             while j < len(sheet) and pd.notna(sheet.iloc[j, desc_col]):
                 desc = str(sheet.iloc[j, desc_col]).strip()
@@ -131,17 +146,32 @@ def extract_by_question_code(
                         j += 1
                         continue
                     label = label_fn(desc) if label_fn else desc
-                    results.append({
+                    row_dict = {
                         "desc": label,
                         "code": str(row_code),
                         "prior": prior_val,
                         "current": current_val,
-                    })
+                    }
+                    if dim_col is not None:
+                        dim_val = sheet.iloc[j, dim_col] if dim_col < sheet.shape[1] else None
+                        if pd.notna(dim_val):
+                            row_dict["dimension"] = str(dim_val).strip()
+                    results.append(row_dict)
                 j += 1
                 if j - i > max_rows:
                     break
+            results = _attach_base(results, base_prior, base_current)
             break
     return results
+
+
+def _attach_base(rows: list[dict], base_prior, base_current) -> list[dict]:
+    """Attach _base metadata to a results list (stored as list attribute)."""
+    class _ResultsWithBase(list):
+        pass
+    out = _ResultsWithBase(rows)
+    out._base = {"prior": base_prior, "current": base_current}
+    return out
 
 
 def extract_multi_question_code(

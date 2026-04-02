@@ -19,7 +19,7 @@ from ._shared import (
     ELEMENT_GAP, SIDE_MARGIN, FOOTER_BUFFER, ROW_H_MIN, ROW_H_MAX, HDR_H_STD,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _cap_chart_h, _auto_label_width, _prepare_rows,
+    _cap_chart_h, _auto_label_width, _vcenter_top, _prepare_rows,
     _alt_row_bg, _no_data_placeholder, _layout_blocks, _build_label_table,
     FONT_HDR, FONT_BODY,
     # pptx_utils
@@ -61,12 +61,13 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     label_w = _auto_label_width(labels)
     chart_w = SLIDE_W - SIDE_MARGIN * 2 - label_w - delta_w - ELEMENT_GAP * 2
     hdr_h = HDR_H_STD
-    chart_top = CHART_TOP_STD + 0.05
-    max_body_h = FOOTER_TOP - chart_top - FOOTER_BUFFER
+    max_body_h = FOOTER_TOP - CHART_TOP_STD - FOOTER_BUFFER
     row_h = min(ROW_H_MAX, max(ROW_H_MIN, max_body_h / max(n, 1)))
     body_h = n * row_h
+    content_h = hdr_h + body_h
+    chart_top = _vcenter_top(content_h)
 
-    # Center
+    # Center horizontally
     block_w = label_w + ELEMENT_GAP + chart_w + ELEMENT_GAP + delta_w
     _, (label_l, chart_l, delta_l) = _layout_blocks(SLIDE_W, label_w, chart_w, delta_w)
 
@@ -119,11 +120,11 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     prior_vals = [r.get("prior") or 0 for r in rows]
 
     n = len(labels)
-    chart_top = CHART_TOP_STD
     chart_h = max(MIN_CHART_HEIGHT, min(MAX_QOQ_HEIGHT, n * 0.50))
     row_h = chart_h / max(n, 1)
+    chart_top = _vcenter_top(chart_h)
 
-    # Center the chart + delta block
+    # Center the chart + delta block horizontally
     qoq_chart_w = 8.0
     block_w = qoq_chart_w + CHART_DELTA_GAP + DELTA_COL_WIDTH
     _, (chart_left, delta_left) = _layout_blocks(SLIDE_W, qoq_chart_w, DELTA_COL_WIDTH, gap=CHART_DELTA_GAP)
@@ -179,7 +180,13 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
 
     extra = ask.extra
     font = config.font_body
-    chart_top = CHART_TOP_STD
+
+    # Estimate total content height for vertical centering
+    _total_h = 0
+    for _, sc in [("top", extra.get("top", {})), ("bottom", extra.get("bottom", {}))]:
+        sr = data.get(sc.get("data_key", ""), [])
+        _total_h += (max(1.5, len(sr) * 0.55) if sr else 1.7) + 0.50 + 0.15
+    chart_top = _vcenter_top(_total_h, has_legend=False)
 
     sections = [("top", extra.get("top", {})), ("bottom", extra.get("bottom", {}))]
     y_offset = chart_top

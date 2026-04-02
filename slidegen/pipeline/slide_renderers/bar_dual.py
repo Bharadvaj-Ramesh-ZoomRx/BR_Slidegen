@@ -28,7 +28,7 @@ from ._shared import (
     HEADER_ROW_HEIGHT_IN,
     LABEL_MAX_DUAL,
     # helpers
-    _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _prepare_rows,
+    _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _prepare_rows, _vcenter_top,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h,
     _alt_row_bg, _no_data_placeholder,
     # pptx_utils
@@ -101,11 +101,24 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     callouts = extra.get("callouts", [])
     narrow = bool(callouts)
 
+    # ── right_data_key: two independent data sources for left / right panels ──
+    right_data_key = extra.get("right_data_key")
+    if right_data_key:
+        right_rows_src = _sort_data(data.get(right_data_key, []),
+                                     ask.sort_by, ask.sort_desc)
+
     labels = [r.get("short") or r.get("desc", "") for r in rows]
-    n = len(labels)
-    chart_top = DUAL_CHART_TOP
+    if right_data_key:
+        right_labels = [r.get("short") or r.get("desc", "") for r in right_rows_src]
+        n = max(len(labels), len(right_labels))
+    else:
+        right_labels = labels
+        n = len(labels)
     has_ax = bool(extra.get("left", {}).get("axis_label") or extra.get("right", {}).get("axis_label"))
-    chart_h = _cap_chart_h(min(DUAL_MAX_CHART_HEIGHT, n * 0.42), chart_top, has_ax)
+    chart_h = _cap_chart_h(min(DUAL_MAX_CHART_HEIGHT, n * 0.42), DUAL_CHART_TOP, has_ax)
+    hdr_row_h = DUAL_HEADER_ROW_H
+    content_h = hdr_row_h + chart_h + (0.24 if has_ax else 0.0)
+    chart_top = _vcenter_top(content_h, extra_below=(0.24 if has_ax else 0.0))
     row_h = chart_h / max(n, 1)
 
     # ── Common data extraction ────────────────────────────────────────
@@ -117,13 +130,21 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     left_axis_label = left_cfg.get("axis_label", "")
     right_axis_label = right_cfg.get("axis_label", "")
 
-    # Left data
-    left_current = [r.get(f"{left_prefix}_current") or 0 for r in rows]
-    left_prior = [r.get(f"{left_prefix}_prior") for r in rows]
+    # Left data — use prior/current directly when right_data_key is set
+    if right_data_key:
+        left_current = [r.get("current") or 0 for r in rows]
+        left_prior = [r.get("prior") for r in rows]
+    else:
+        left_current = [r.get(f"{left_prefix}_current") or 0 for r in rows]
+        left_prior = [r.get(f"{left_prefix}_prior") for r in rows]
 
-    # Right data
-    right_current = [r.get(f"{right_prefix}_current") or 0 for r in rows]
-    right_prior = [r.get(f"{right_prefix}_prior") for r in rows]
+    # Right data — independent rows when right_data_key is set
+    if right_data_key:
+        right_current = [r.get("current") or 0 for r in right_rows_src]
+        right_prior = [r.get("prior") for r in right_rows_src]
+    else:
+        right_current = [r.get(f"{right_prefix}_current") or 0 for r in rows]
+        right_prior = [r.get(f"{right_prefix}_prior") for r in rows]
 
     # Shared axis scale
     all_vals = left_current + right_current
@@ -197,7 +218,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
 
         # 5. Effectiveness chart (overlaid, no category labels)
         cf2, ch2 = _add_secondary_bar_chart(
-            slide, labels, right_current,
+            slide, right_labels, right_current,
             DUAL_T_ME_CHART_L, chart_top_n, DUAL_T_ME_CHART_W, chart_h_n,
             color_current, axis_max, BAR_GAP_STD, font)
 
@@ -261,13 +282,15 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
              "left": DUAL_ME_LEFT,
              "width": DUAL_ME_WIDTH + DUAL_DELTA_WIDTH},
         ]
-        chart_header_row(slide, header_columns, top=DUAL_HEADER_ROW_TOP,
+        hdr_top = chart_top
+        chart_body_top = hdr_top + hdr_row_h + 0.02
+        chart_header_row(slide, header_columns, top=hdr_top,
                          height=DUAL_HEADER_ROW_H, font=font)
 
         # Left chart (with category labels)
         cf1, ch1 = add_single_bar_chart(
             slide, labels, left_current,
-            left=DUAL_MR_LEFT, top=chart_top, width=DUAL_MR_WIDTH, height=chart_h,
+            left=DUAL_MR_LEFT, top=chart_body_top, width=DUAL_MR_WIDTH, height=chart_h,
             fill_color=color_current, font_name=font,
         )
         ch1.has_title = False
@@ -276,29 +299,29 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
 
         add_delta_table(
             slide, left_deltas,
-            left=DUAL_MR_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
+            left=DUAL_MR_DELTA_LEFT, top=chart_body_top, width=DUAL_DELTA_WIDTH,
             row_height=delta_row_h,
             header_text=left_delta_header, font_name=font,
         )
 
-        sep_h = chart_h + DUAL_HEADER_ROW_H
-        dashed_separator(slide, DUAL_SEPARATOR_X, DUAL_HEADER_ROW_TOP,
+        sep_h = chart_h + hdr_row_h
+        dashed_separator(slide, DUAL_SEPARATOR_X, hdr_top,
                          sep_h, color=C_FTGREY, width_pt=0.5, vertical=True)
 
         cf2, ch2 = _add_secondary_bar_chart(
-            slide, labels, right_current,
-            DUAL_ME_LEFT, chart_top, DUAL_ME_WIDTH, chart_h,
+            slide, right_labels, right_current,
+            DUAL_ME_LEFT, chart_body_top, DUAL_ME_WIDTH, chart_h,
             color_current, axis_max, BAR_GAP_STD, font,
             plot_x=0.02, plot_y=0.04, plot_w=0.94, plot_h=0.90)
 
         add_delta_table(
             slide, right_deltas,
-            left=DUAL_ME_DELTA_LEFT, top=chart_top, width=DUAL_DELTA_WIDTH,
+            left=DUAL_ME_DELTA_LEFT, top=chart_body_top, width=DUAL_DELTA_WIDTH,
             row_height=delta_row_h,
             header_text=right_delta_header, font_name=font,
         )
 
-        ax_y = chart_top + chart_h + 0.04
+        ax_y = chart_body_top + chart_h + 0.04
         if left_axis_label:
             textbox(slide, left_axis_label,
                     DUAL_MR_LEFT, ax_y, DUAL_MR_WIDTH + DUAL_DELTA_WIDTH, 0.20,
@@ -335,23 +358,52 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     left_prefix = left_cfg.get("field_prefix", "believ")
     right_prefix = right_cfg.get("field_prefix", "me")
 
+    # ── right_data_key: merge two separate data sources by desc index ──
+    right_data_key = extra.get("right_data_key")
+    if right_data_key:
+        right_rows_src = data.get(right_data_key, [])
+        right_idx = {r.get("desc"): r for r in right_rows_src}
+
     labels = [r.get("short") or r.get("desc", "") for r in rows]
     n = len(labels)
-    chart_top = CHART_TOP_DUAL
     chart_h = max(MIN_CHART_HEIGHT, min(MAX_DUAL_CHART_HEIGHT, n * 0.42))
     row_h = chart_h / max(n, 1)
+    label_h = 0.25
+    content_h = label_h + chart_h
+    chart_top = _vcenter_top(content_h)
+    label_top = chart_top
+    chart_top = chart_top + label_h
 
-    # Left data
-    left_current = [r.get(f"{left_prefix}_current") or 0 for r in rows]
-    left_prior = [r.get(f"{left_prefix}_prior") or 0 for r in rows]
+    # Center horizontally: two charts (4.8" each) + two deltas (0.55" each) + gaps
+    _qoq_chart_w = 4.8
+    _qoq_delta_w = DELTA_COL_NARROW
+    _qoq_gap = 0.55
+    _qoq_total_w = _qoq_chart_w * 2 + _qoq_delta_w * 2 + _qoq_gap * 2
+    _qoq_origin = (SLIDE_W - _qoq_total_w) / 2
+    _left_chart_l = _qoq_origin
+    _left_delta_l = _left_chart_l + _qoq_chart_w + 0.05
+    _right_chart_l = _left_delta_l + _qoq_delta_w + _qoq_gap
+    _right_delta_l = _right_chart_l + _qoq_chart_w + 0.05
 
-    # Right data
-    right_current = [r.get(f"{right_prefix}_current") or 0 for r in rows]
-    right_prior = [r.get(f"{right_prefix}_prior") or 0 for r in rows]
+    # Left data — use prior/current directly when right_data_key is set
+    if right_data_key:
+        left_current = [r.get("current") or 0 for r in rows]
+        left_prior = [r.get("prior") or 0 for r in rows]
+    else:
+        left_current = [r.get(f"{left_prefix}_current") or 0 for r in rows]
+        left_prior = [r.get(f"{left_prefix}_prior") or 0 for r in rows]
+
+    # Right data — from separate source when right_data_key is set
+    if right_data_key:
+        right_current = [right_idx.get(r.get("desc"), {}).get("current") or 0 for r in rows]
+        right_prior = [right_idx.get(r.get("desc"), {}).get("prior") or 0 for r in rows]
+    else:
+        right_current = [r.get(f"{right_prefix}_current") or 0 for r in rows]
+        right_prior = [r.get(f"{right_prefix}_prior") or 0 for r in rows]
 
     # Left chart label
     left_label = left_cfg.get("label", "Left (%)")
-    textbox(slide, left_label, 0.30, 1.72, 3.0, 0.25,
+    textbox(slide, left_label, _left_chart_l, label_top, 3.0, label_h,
             fsize=9, bold=True, color=C_GREY, font=config.font_display)
 
     # Left clustered bar (Q4 vs Q3)
@@ -362,7 +414,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
 
     cf1 = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(0.30), Inches(chart_top), Inches(4.8), Inches(chart_h), cd1)
+        Inches(_left_chart_l), Inches(chart_top), Inches(_qoq_chart_w), Inches(chart_h), cd1)
     ch1 = cf1.chart
     ch1.has_legend = False
     set_series_color(ch1.series[0], color_current)
@@ -385,13 +437,13 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
                                      left_prefix[0].upper() + " Δ")
     add_delta_table(
         slide, left_deltas,
-        left=5.15, top=chart_top, width=DELTA_COL_NARROW, row_height=row_h * ROW_SCALE_FACTOR,
+        left=_left_delta_l, top=chart_top, width=_qoq_delta_w, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=left_delta_header, font_name=font,
     )
 
     # Right chart label
     right_label = right_cfg.get("label", "Right (%)")
-    textbox(slide, right_label, 5.90, 1.72, 3.5, 0.25,
+    textbox(slide, right_label, _right_chart_l, label_top, 3.5, label_h,
             fsize=9, bold=True, color=C_GREY, font=config.font_display)
 
     # Right clustered bar (Q4 vs Q3)
@@ -402,7 +454,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
 
     cf2 = slide.shapes.add_chart(
         XL_CHART_TYPE.BAR_CLUSTERED,
-        Inches(5.90), Inches(chart_top), Inches(4.8), Inches(chart_h), cd2)
+        Inches(_right_chart_l), Inches(chart_top), Inches(_qoq_chart_w), Inches(chart_h), cd2)
     ch2 = cf2.chart
     ch2.has_legend = False
     set_series_color(ch2.series[0], color_current)
@@ -423,7 +475,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
                                        right_prefix.upper() + " Δ")
     add_delta_table(
         slide, right_deltas,
-        left=10.75, top=chart_top, width=DELTA_COL_NARROW, row_height=row_h * ROW_SCALE_FACTOR,
+        left=_right_delta_l, top=chart_top, width=_qoq_delta_w, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=right_delta_header, font_name=font,
     )
 

@@ -303,8 +303,9 @@ def scaffold_config_from_plan(
     with open(plan_path, "r", encoding="utf-8") as f:
         plan_text = f.read()
 
-    # Read _codes index from source_data.json
+    # Read source_data.json — need _codes, _column_layouts, and _sheets
     codes_index = {}
+    column_layouts = {}
     sheets_in_json = {}
     if json_path and os.path.exists(json_path):
         try:
@@ -314,7 +315,40 @@ def scaffold_config_from_plan(
             logger.warning("Corrupt %s — skipping code index: %s", json_path, e)
             source_data = {}
         codes_index = source_data.get("_codes", {})
+        column_layouts = source_data.get("_column_layouts", {})
         sheets_in_json = source_data.get("_sheets", {})
+
+    # If _codes is empty, the JSON has only the index (Stage 0 ran but
+    # without _codes). Re-run index_excel() to populate _codes and _column_layouts.
+    if not codes_index and sheets_in_json:
+        excel_path = source_data.get("_meta", {}).get("excel_file", "")
+        if excel_path:
+            # Try to find the Excel file relative to the JSON path
+            json_dir = os.path.dirname(os.path.abspath(json_path))
+            # Walk up to find input/wave/{wave}/source_data.xlsx
+            project_dir = json_dir
+            for _ in range(4):
+                parent = os.path.dirname(project_dir)
+                if parent == project_dir:
+                    break
+                project_dir = parent
+            candidate = os.path.join(project_dir, "input", "wave",
+                                     source_data.get("_meta", {}).get("wave", ""),
+                                     excel_path)
+            if not os.path.exists(candidate):
+                # Try direct relative to json dir
+                candidate = os.path.join(json_dir, excel_path)
+            if os.path.exists(candidate):
+                logger.info("_codes empty — re-indexing Excel to populate codes + column layouts")
+                from slidegen.pipeline.data_loaders import index_excel
+                reindexed = index_excel(candidate, json_path)
+                codes_index = reindexed.get("_codes", {})
+                column_layouts = reindexed.get("_column_layouts", {})
+            else:
+                logger.warning(
+                    "_codes empty and Excel not found at %s — "
+                    "code lookups will fail. Run index_excel() first.", candidate
+                )
 
     # Parse slides from the plan
     slides = _parse_slide_plan(plan_text)
@@ -359,7 +393,7 @@ def scaffold_config_from_plan(
     if base_config_path and os.path.exists(base_config_path):
         yaml_str = _merge_into_base_config(base_config_path, extractions, asks)
     else:
-        yaml_str = _standalone_scaffold(extractions, asks)
+        yaml_str = _standalone_scaffold(extractions, asks, column_layouts)
 
     # Append warnings as comments
     if warnings:
@@ -516,6 +550,34 @@ def _build_extractions(
 
     # Multi-code slides: strategy depends on slide_type
     extra = {}
+
+    # Validate: complex renderers that truly need multiple brand sheets with
+    # separate codes (dual_bar_compare, dual_abacus, dual_doughnut).
+    # Note: clustered_compare works with EITHER two-extraction merge (primary_key/comp_key)
+    # OR single extraction with multi-col fields (hii, comm/acad from question_code_multi_col).
+    _NEEDS_TWO_EXTRACTIONS = {
+        "dual_bar_compare", "dual_abacus", "dual_doughnut",
+    }
+    _NEEDS_EXTRA = {"hii_scorecard", "heatmap_table"}
+    found_codes = [cl for cl in code_lookups if cl.get("sheet")]
+
+    if slide_type in _NEEDS_TWO_EXTRACTIONS and len(found_codes) < 2:
+        old_type = slide_type
+        slide_type = "single_bar_with_delta"
+        slide["slide_type"] = slide_type
+        warnings.append(
+            f"Slide {slide['number']}: downgraded '{old_type}' → '{slide_type}' "
+            f"(only {len(found_codes)} code(s) found; {old_type} needs 2 codes on separate brand sheets)"
+        )
+
+    if slide_type in _NEEDS_EXTRA:
+        old_type = slide_type
+        slide_type = "executive_summary"
+        slide["slide_type"] = slide_type
+        warnings.append(
+            f"Slide {slide['number']}: downgraded '{old_type}' → 'executive_summary' "
+            f"(renderer needs extra config params not auto-generated)"
+        )
 
     if slide_type in ("dual_bar_with_delta", "dual_bar_qoq", "dual_bar_compare"):
         # Two codes → left/right or primary/comp extractions
@@ -734,12 +796,53 @@ def _merge_into_base_config(
                      allow_unicode=True)
 
 
-def _standalone_scaffold(extractions: list[dict], asks: list[dict]) -> str:
-    """Generate a minimal YAML with just extractions and asks."""
-    content = {
-        "extractions": extractions,
-        "asks": asks,
-    }
+def _standalone_scaffold(extractions: list[dict], asks: list[dict],
+                         column_layouts: dict = None) -> str:
+    """Generate a minimal YAML with just extractions and asks.
+
+    If column_layouts is provided (from _column_layouts in source_data.json),
+    auto-generates the sheets section with correct column positions.
+    """
+    content = {}
+
+    # Auto-generate sheets section from _column_layouts
+    if column_layouts:
+        sheets = {}
+        for sheet_name, layout in column_layouts.items():
+            # Determine role: primary (RYB/brand), competitor (TAG), npp, tp2
+            sheet_lower = sheet_name.lower()
+            if any(k in sheet_lower for k in ("rybrevant", "amivantamab", "primary")):
+                role = "primary"
+            elif any(k in sheet_lower for k in ("tagrisso", "osimertinib", "competitor")):
+                role = "competitor"
+            elif "npp" in sheet_lower or "non" in sheet_lower:
+                role = "npp"
+            elif "tp2" in sheet_lower or "ms module" in sheet_lower or "retention" in sheet_lower:
+                role = "tp2"
+            else:
+                role = sheet_name.lower().replace(" ", "_").replace("&", "and")
+
+            sheets[role] = {
+                "name": sheet_name,
+                "q_prior_col": layout.get("prior_col", 7),
+                "q_current_col": layout.get("current_col", 17),
+                "code_col": 0,
+                "desc_col": 1,
+            }
+
+        content["sheets"] = sheets
+        content["# _column_layouts auto-detected"] = {
+            sheet: {
+                "prior": f"{l.get('prior_label', '')}",
+                "current": f"{l.get('current_label', '')}",
+                "segments": [s["name"] for s in l.get("segments", [])],
+            }
+            for sheet, l in column_layouts.items()
+        }
+
+    content["extractions"] = extractions
+    content["asks"] = asks
+
     yaml_str = yaml.dump(content, default_flow_style=False, sort_keys=False,
                          allow_unicode=True)
     header = (

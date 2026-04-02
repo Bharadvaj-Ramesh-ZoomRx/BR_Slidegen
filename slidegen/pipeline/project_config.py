@@ -281,9 +281,7 @@ class ProjectConfig:
                     )
             # Validate renderer-specific required extra fields
             _RENDERER_REQUIRED_EXTRA = {
-                "dual_bar_with_delta": ["left", "right"],
                 "dual_bar_compare": ["left", "right"],
-                "dual_bar_qoq": ["left", "right"],
                 "dual_abacus": ["left", "right"],
                 "hii_scorecard": ["categories"],
                 "heatmap_table": ["columns"],

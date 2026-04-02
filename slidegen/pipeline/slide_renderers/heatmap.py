@@ -12,7 +12,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 from ._shared import (
-    SLIDE_W, CHART_TOP_STD, FOOTER_TOP,
+    SLIDE_W, CHART_TOP_STD, FOOTER_TOP, _vcenter_top,
     C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_GREEN, C_RED,
     FONT_TEXT,
     _resolve_template, _slide_chrome,
@@ -81,19 +81,59 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
     _slide_chrome(slide, config, ask)
     extra = ask.extra or {}
 
-    rows = data.get(ask.data_key, [])
-    if not rows:
+    raw_rows = data.get(ask.data_key, [])
+    if not raw_rows:
         logger.warning("heatmap_table: no data for key=%s", ask.data_key)
         return
 
-    columns = extra.get("columns", [])
-    if not columns:
+    columns_cfg = extra.get("columns", [])
+    if not columns_cfg:
         logger.warning("heatmap_table: no columns specified in extra")
         return
 
+    # columns can be list of strings (legacy) or list of dicts with field/label
+    if columns_cfg and isinstance(columns_cfg[0], dict):
+        col_fields = [c["field"] for c in columns_cfg]
+        columns = [c.get("label", c["field"]) for c in columns_cfg]
+    else:
+        col_fields = columns_cfg
+        columns = columns_cfg
+
+    # Auto-convert flat data ({desc, field1, field2, ...}) to heatmap format
+    # ({label, values: {col: val}, deltas: {col: delta}})
+    rows = []
+    if raw_rows and "values" not in raw_rows[0]:
+        for r in raw_rows:
+            vals = {}
+            for cf, cn in zip(col_fields, columns):
+                v = r.get(cf)
+                if v is not None:
+                    vals[cn] = v
+            rows.append({"label": r.get("desc", ""), "values": vals, "deltas": {}})
+    else:
+        rows = raw_rows
+
     sample_sizes = extra.get("sample_sizes", {})
+    # Auto-derive sample sizes: _bases (from Excel) → sample_size_key (config) → sample_n (explicit)
+    if not sample_sizes:
+        _bases = data.get("_bases", {})
+        _base = _bases.get(ask.data_key, {})
+        _ss_key = extra.get("sample_size_key")  # e.g. "impact", "primary"
+        _ss_n = extra.get("sample_n")            # e.g. 60 (explicit override)
+        if _base and _base.get("current"):
+            # From extraction's question code header row (most authoritative)
+            sample_sizes = {col: f"n={_base['current']}" for col in columns}
+        elif _ss_n:
+            # Explicit N from config (for mock data where Excel base isn't available)
+            sample_sizes = {col: f"n={_ss_n}" for col in columns}
+        elif _ss_key and hasattr(config, 'sample_sizes'):
+            _ss = config.sample_sizes.get(_ss_key)
+            if _ss is not None:
+                n_val = _ss.current if hasattr(_ss, 'current') else _ss.get('current')
+                if n_val:
+                    sample_sizes = {col: f"n={n_val}" for col in columns}
     label_header = extra.get("label_header", "Tag^")
-    sample_header = extra.get("sample_header", "s")
+    sample_header = extra.get("sample_header", "N" if sample_sizes else "s")
     show_deltas = extra.get("show_deltas", True)
     value_suffix = extra.get("value_suffix", "%")
     delta_suffix = extra.get("delta_suffix", "%")
@@ -108,15 +148,18 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
     n_cols = len(columns)
     n_rows = len(rows)
 
-    # ── Layout — template-matched dimensions ──
-    # Template: label col 1.54" + 5 value cols × 1.54" = 9.25" total at x=2.20
-    # Delta cols: 0.63" each, overlaid after each value col
-    label_col_w = 1.54
+    # ── Layout — dynamic dimensions based on row count ──
+    label_col_w = extra.get("label_col_w", 3.00)
     value_col_w = 1.54
     delta_col_w = 0.63
-    hdr_h = 0.42
-    sample_h = 0.41
-    row_h = 0.41
+    hdr_h = 0.34
+    has_sample = bool(sample_sizes)
+    sample_h = 0.24 if has_sample else 0.0
+
+    # Dynamic row height: scale down for many rows to fit within slide
+    available_h = FOOTER_TOP - CHART_TOP_STD - 0.60  # usable vertical space
+    max_body_h = available_h - hdr_h - sample_h
+    row_h = min(0.35, max(0.18, max_body_h / max(n_rows, 1)))
 
     # Total width of unified table: label + n_cols × (value + delta)
     if show_deltas:
@@ -124,9 +167,10 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
     else:
         total_w = label_col_w + n_cols * value_col_w
 
-    # Center horizontally on slide
+    # Center horizontally and vertically on slide
     table_left = (SLIDE_W - total_w) / 2
-    table_top = CHART_TOP_STD - 0.10
+    content_h = hdr_h + sample_h + n_rows * row_h
+    table_top = _vcenter_top(content_h, has_legend=False)
 
     # ── Build column widths list ──
     col_widths = [label_col_w]
@@ -136,38 +180,45 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
             col_widths.append(delta_col_w)
     total_cols = len(col_widths)
 
-    # ── Header table (header row + sample row) ──
+    # ── Header table (header row + optional sample row) ──
+    hdr_rows = [hdr_h] + ([sample_h] if has_sample else [])
     hdr_shape, hdr_tbl = _pptx_table(
-        slide, col_widths, [hdr_h, sample_h],
+        slide, col_widths, hdr_rows,
         table_left, table_top)
+
+    # Adaptive font size for header based on column count
+    hdr_fsize = 8 if n_cols <= 4 else 7
 
     # Header row
     _style_tbl_cell(hdr_tbl.cell(0, 0), label_header,
-                    bg=C_HDRGREY, fg=C_WHITE, fsize=8, bold=True,
+                    bg=C_HDRGREY, fg=C_WHITE, fsize=hdr_fsize, bold=True,
                     align=PP_ALIGN.CENTER, font=font)
-    _style_tbl_cell(hdr_tbl.cell(1, 0), sample_header,
-                    bg=C_WHITE, fg=C_FTGREY, fsize=7, bold=True,
-                    align=PP_ALIGN.CENTER, font=font)
+
+    if has_sample:
+        _style_tbl_cell(hdr_tbl.cell(1, 0), sample_header,
+                        bg=C_WHITE, fg=C_FTGREY, fsize=hdr_fsize, bold=True,
+                        align=PP_ALIGN.CENTER, font=font)
 
     for ci, col_name in enumerate(columns):
         val_ci = 1 + ci * (2 if show_deltas else 1)
         _style_tbl_cell(hdr_tbl.cell(0, val_ci), col_name,
-                        bg=C_HDRGREY, fg=C_WHITE, fsize=8, bold=True,
+                        bg=C_HDRGREY, fg=C_WHITE, fsize=hdr_fsize, bold=True,
                         align=PP_ALIGN.CENTER, font=font)
-        ss = sample_sizes.get(col_name, "")
-        _style_tbl_cell(hdr_tbl.cell(1, val_ci), str(ss),
-                        bg=C_WHITE, fg=C_FTGREY, fsize=7, bold=False,
-                        align=PP_ALIGN.CENTER, font=font)
+        if has_sample:
+            ss = sample_sizes.get(col_name, "")
+            _style_tbl_cell(hdr_tbl.cell(1, val_ci), str(ss),
+                            bg=C_WHITE, fg=C_FTGREY, fsize=hdr_fsize, bold=False,
+                            align=PP_ALIGN.CENTER, font=font)
 
         if show_deltas:
             delta_ci = val_ci + 1
-            # Empty header for delta column
             _style_tbl_cell(hdr_tbl.cell(0, delta_ci), "",
                             bg=C_HDRGREY, fg=C_WHITE, fsize=7, bold=False,
                             align=PP_ALIGN.CENTER, font=font)
-            _style_tbl_cell(hdr_tbl.cell(1, delta_ci), "",
-                            bg=C_WHITE, fg=C_FTGREY, fsize=7, bold=False,
-                            align=PP_ALIGN.CENTER, font=font)
+            if has_sample:
+                _style_tbl_cell(hdr_tbl.cell(1, delta_ci), "",
+                                bg=C_WHITE, fg=C_FTGREY, fsize=7, bold=False,
+                                align=PP_ALIGN.CENTER, font=font)
 
     # ── Data table ──
     data_top = table_top + hdr_h + sample_h
@@ -175,6 +226,10 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
     data_shape, data_tbl = _pptx_table(
         slide, col_widths, row_heights,
         table_left, data_top)
+
+    # Adaptive font sizes based on row count (dense tables get smaller text)
+    label_fsize = 9 if n_rows <= 25 else (8 if n_rows <= 35 else 7)
+    val_fsize = 9 if n_rows <= 25 else (8 if n_rows <= 35 else 7)
 
     # Collect all values for heatmap range
     all_values = []
@@ -200,7 +255,7 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
 
         # Label cell
         _style_tbl_cell(data_tbl.cell(ri, 0), label,
-                        bg=row_bg, fg=fc, fsize=7.5, bold=False,
+                        bg=row_bg, fg=fc, fsize=label_fsize, bold=False,
                         align=PP_ALIGN.LEFT, font=font, ml=0.08)
 
         for ci, col in enumerate(columns):
@@ -215,7 +270,7 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
                 fill = row_bg
                 text = "-"
             _style_tbl_cell(data_tbl.cell(ri, val_ci), text,
-                            bg=fill, fg=fc, fsize=8, bold=False,
+                            bg=fill, fg=fc, fsize=val_fsize, bold=False,
                             align=PP_ALIGN.CENTER, font=font)
 
             # Delta cell
@@ -234,7 +289,7 @@ def render_heatmap_table(slide, config: ProjectConfig, ask: AskConfig,
                     d_color = C_GREY
 
                 _style_tbl_cell(data_tbl.cell(ri, delta_ci), d_text,
-                                bg=None, fg=d_color, fsize=7, bold=False,
+                                bg=None, fg=d_color, fsize=val_fsize - 1, bold=False,
                                 align=PP_ALIGN.CENTER, font=font)
 
 

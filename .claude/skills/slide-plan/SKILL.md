@@ -345,13 +345,14 @@ Write the completed slide plan to `{project}/context/{wave}/slide_plan.md`. Ask 
 4. **Each slide serves primarily one arc.** The Arc and Role in arc fields are required for every data slide. If a slide serves two arcs, assign the dominant one.
 5. **One driving question per slide.** If a slide tries to answer two unrelated questions, split it.
 6. **Every hypothesis must appear on at least one slide.** If a hypothesis has no cluster match, create a standalone slide.
-7. **Methodology artifact slides stay adjacent** to the substantive slide they affect.
+7. **Methodology artifact slides stay adjacent** to the substantive slide they affect — not hidden in appendix.
 8. **Slide titles are topic labels, not findings.** Findings go in the headline.
-9. **slide_type must be a valid renderer key.** Use the exact value from the mapping table.
+9. **slide_type must be a valid renderer key.** Use the exact value from the mapping table. Add specifics in the Chart description field.
 10. **Action items surface visibly.** Any slide from a client action item gets the [ACTION ITEM] flag.
 11. **No question code on two slides serving the same analytical purpose.** Merge if same question + same cut + same role.
 12. **No context stored in this skill.** Everything comes from reading the files at runtime.
 13. **Rationale prose does not define chart design.** Segment cuts and question codes come exclusively from the "Test with:" line.
 14. **Show all dimensions of a multi-part question.** If a question has sub-dimensions (e.g., ME Q2.20 has A=Differentiation, B=Believability, C=Motivation), include all unless the hypothesis bank explicitly restricts.
-15. **Use exact question text.** In Primary questions, always write the full question text from Survey Context — never shorthand or paraphrase.
+15. **Use exact question text.** In Primary questions, always write the full question text from Survey Context alongside the code — never shorthand or paraphrase.
 16. **Arc-informed sequencing.** Sections are ordered by arc urgency (ACT NOW → MONITOR → CELEBRATE), not by domain convention. Domain grouping applies within arcs.
+17. **Slide plan and config.yaml must stay in sync.** If Stage 5 downgrades a slide_type because data format does not match (e.g. clustered_compare to single_bar_with_delta), update slide_plan.md to reflect the final type. Discrepancies between plan and config cause confusion during review.

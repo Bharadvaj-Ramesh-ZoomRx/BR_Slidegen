@@ -28,7 +28,14 @@ from slidegen.pipeline.extractors import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
-# ── Excel → JSON indexing (Stage 0) ─────────────────────────────────────────
+# Extractors moved to extractors.py — import for backward compat
+from slidegen.pipeline.extractors import (  # noqa: F401, E402
+    pct, straight, delta,
+    extract_by_question_code, extract_multi_question_code,
+    extract_row_range, extract_question_code_multi_col,
+    extract_nested_ordinal, make_label_shortener,
+)
+
 
 def _is_zero(v) -> bool:
     """Check if a cell value is effectively zero (0, 0.0, '0', '0%', etc.)."""
@@ -475,6 +482,7 @@ def _extract_all_from_excel(config) -> dict:
         global_shortener = make_label_shortener(shortcuts, brand_replacements=brand_replacements)
 
     data = {}
+    bases = {}  # extraction_id → {prior: int, current: int}
 
     for ex in config.extractions:
         params = ex.params
@@ -526,6 +534,12 @@ def _extract_all_from_excel(config) -> dict:
                 occurrence=params.get("occurrence", 1),
                 dim_col=params.get("dim_col"),
             )
+
+            # Capture base sizes if available
+            rows = data[ex.id]
+            if hasattr(rows, '_base'):
+                bases[ex.id] = rows._base
+                data[ex.id] = list(rows)  # convert to plain list for JSON
 
             # Post-extraction aggregation
             aggregate = params.get("aggregate")
@@ -600,6 +614,10 @@ def _extract_all_from_excel(config) -> dict:
 
     # Attach raw sheet index for discovery by Stage 4 / config generation
     data["_sheets"] = raw_index
+
+    # Attach base sizes extracted from question code header rows
+    if bases:
+        data["_bases"] = bases
 
     return data
 

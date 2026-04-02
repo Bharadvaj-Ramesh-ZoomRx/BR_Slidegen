@@ -20,7 +20,7 @@ from ._shared import (
     _ABS_LABEL_W, _ABS_VAL_W, _ABS_CHART_W, _ABS_DELTA_W, _ABS_GAP, _ABS_SLIDE_W,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _add_dot,
-    _pptx_table, _style_tbl_cell, _prepare_rows,
+    _pptx_table, _style_tbl_cell, _vcenter_top, _prepare_rows,
     _alt_row_bg, _no_data_placeholder,
     # pptx_utils
     C_GREEN, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_WHITE, C_RED,
@@ -104,7 +104,8 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         curr_l   = (prior_l + _ABS_VAL_W) if has_prior else prior_l
         chart_l  = curr_l + _ABS_VAL_W + _ABS_GAP
     delta_l  = chart_l + chart_w + _ABS_GAP
-    chart_top = _ABS_TOP + _ABS_HDR_H
+    abs_top  = _vcenter_top(total_h)
+    chart_top = abs_top + _ABS_HDR_H
     scale_min  = int(extra.get("scale_min", 0))
     scale_max  = int(extra.get("scale_max", 100))
     scale_sfx  = extra.get("scale_suffix", "%")
@@ -132,7 +133,7 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
                              color=C_LBGREY, width_pt=0.5, vertical=True)
 
     # 1. Attribute labels table
-    _abs_label_tbl(slide, labels, label_l, _ABS_TOP, _ABS_LABEL_W,
+    _abs_label_tbl(slide, labels, label_l, abs_top, _ABS_LABEL_W,
                    _ABS_HDR_H, row_h, "Attribute", font)
 
     # 2–3. Value columns (skip if hide_val_cols)
@@ -140,9 +141,9 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         current_header = extra.get("current_label", config.period_current)
         prior_header   = extra.get("prior_label", config.period_prior)
         if has_prior:
-            _abs_val_col(slide, prior_vals, prior_l, _ABS_TOP, _ABS_VAL_W,
+            _abs_val_col(slide, prior_vals, prior_l, abs_top, _ABS_VAL_W,
                          _ABS_HDR_H, row_h, prior_header, color_prior, font)
-        _abs_val_col(slide, current_vals, curr_l, _ABS_TOP, _ABS_VAL_W,
+        _abs_val_col(slide, current_vals, curr_l, abs_top, _ABS_VAL_W,
                      _ABS_HDR_H, row_h, current_header, color_current, font)
 
     # 4. XY scatter chart (transparent bg so background shapes show through)
@@ -167,7 +168,7 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         (current_vals[i] - prior_vals[i]) if prior_vals[i] is not None else None
         for i in range(n)
     ]
-    add_delta_table(slide, deltas, delta_l, _ABS_TOP, _ABS_DELTA_W, row_h,
+    add_delta_table(slide, deltas, delta_l, abs_top, _ABS_DELTA_W, row_h,
                     header_text=delta_header, font_name=font)
 
     # Legend — use custom labels from extra if provided
@@ -186,7 +187,7 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         if has_prior:
             n_prior = f" (n={sample.prior})" if sample else ""
             legend_items.append((color_prior, f"{config.period_prior}{n_prior}"))
-    _make_legend(slide, legend_items, 0, _ABS_TOP + total_h + LEGEND_GAP, font,
+    _make_legend(slide, legend_items, 0, abs_top + total_h + LEGEND_GAP, font,
                  center_over=(0, _ABS_SLIDE_W))
 
 
@@ -475,3 +476,4 @@ def _abs_scatter(slide, prior_vals, current_vals, n,
 
 
 # Follow-up rep, dual abacus, and message MBD renderers moved to dot_special.py
+

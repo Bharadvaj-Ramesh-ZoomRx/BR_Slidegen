@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 # ── Layout constants ─────────────────────────────────────────────────────────
 # Y-axis positions (inches)
 SECTION_BAR_TOP = 1.40
+SECTION_BAR_H = 0.28
+SECTION_BAR_BOTTOM = SECTION_BAR_TOP + SECTION_BAR_H
 CHART_TOP_STD = 1.85       # standard chart top below section bar
 LEGEND_GAP = 0.15           # gap below chart before legend
 FOOTER_TOP = 6.93           # footer Y position (spec)
@@ -395,6 +397,28 @@ def _cap_chart_h(chart_h: float, chart_top: float, has_axis_label: bool = False)
     if has_axis_label:
         budget -= 0.24          # axis sub-label height
     return max(MIN_CHART_HEIGHT, min(chart_h, budget))
+
+
+def _vcenter_top(content_h: float, has_legend: bool = True,
+                 extra_below: float = 0.0) -> float:
+    """Return the Y position to vertically center content between section bar and footer.
+
+    Args:
+        content_h: total height of the content block (chart + header + tables)
+        has_legend: whether a legend row sits below the content
+        extra_below: additional space needed below content (axis labels, etc.)
+    Returns:
+        top Y position (inches) for the content block
+    """
+    top_boundary = SECTION_BAR_BOTTOM + 0.10  # small padding below section bar
+    bottom_boundary = FOOTER_TOP - 0.10       # small padding above footer
+    if has_legend:
+        bottom_boundary -= (LEGEND_H + LEGEND_GAP)
+    bottom_boundary -= extra_below
+    available = bottom_boundary - top_boundary
+    centered = top_boundary + (available - content_h) / 2
+    # Clamp: never go above section bar bottom or so low content overlaps footer
+    return max(top_boundary, min(centered, FOOTER_TOP - content_h - 0.80))
 
 
 def _make_legend(slide, items: list[tuple], left: float, top: float, font_name: str = None,

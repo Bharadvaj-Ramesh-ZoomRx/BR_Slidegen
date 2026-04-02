@@ -26,7 +26,7 @@ from ._shared import (
     DUAL_BC_R_CHART_L, DUAL_BC_R_CHART_W, DUAL_BC_R_DELTA_L, DUAL_BC_R_DELTA_W,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h, _auto_label_width,
+    _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h, _auto_label_width, _vcenter_top,
     _alt_row_bg, _no_data_placeholder, _prepare_rows, _layout_blocks, _build_label_table,
     FONT_HDR, FONT_BODY,
     # pptx_utils
@@ -58,8 +58,32 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
     # Support combined data keys (CTA merges ryb_cta + tag_cta)
     rows = data.get(ask.data_key, [])
 
+    # second_data_key: two modes depending on whether group_a_field is set
+    #   - With group_a_field: CONCATENATE rows (both sources share the same fields)
+    #   - Without group_a_field: MERGE by desc into primary_current/comp_current
+    if rows and extra.get("second_data_key"):
+        comp_rows = data.get(extra["second_data_key"], [])
+        if extra.get("group_a_field"):
+            # Concatenation mode: append second source's rows
+            rows = list(rows) + list(comp_rows)
+        else:
+            # Merge mode: align by desc, prefix fields
+            comp_idx = {r.get("desc"): r for r in comp_rows}
+            merged = []
+            for pr in rows:
+                label = pr.get("desc", "")
+                cr = comp_idx.get(label, {})
+                merged.append({
+                    "desc": label,
+                    "primary_current": pr.get("current"),
+                    "primary_prior": pr.get("prior"),
+                    "comp_current": cr.get("current"),
+                    "comp_prior": cr.get("prior"),
+                })
+            rows = merged
+
     # If data_key not found, check for primary_key + comp_key pattern
-    if not rows and "primary_key" in extra:
+    elif not rows and "primary_key" in extra:
         logger.warning(
             "clustered_compare '%s': data_key '%s' not found, merging "
             "primary_key '%s' + comp_key '%s' instead",
@@ -89,7 +113,10 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     font = config.font_body
 
-    # Determine series fields and colors
+    # Determine series fields and colors — three config patterns supported:
+    #   1. extra.series: [{field, label, color}, ...] — explicit series config
+    #   2. extra.group_a_field / group_b_field — shorthand (field is the full data key)
+    #   3. Default: primary / comp (for two-extraction merge)
     if len(series_cfgs) >= 2:
         s1_field = series_cfgs[0].get("field", "primary")
         s2_field = series_cfgs[1].get("field", "comp")
@@ -97,6 +124,15 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         s2_label = _resolve_template(series_cfgs[1].get("label", "Series 2"), config)
         s1_color = parse_color(series_cfgs[0]["color"]) if "color" in series_cfgs[0] else config.primary.color_current
         s2_color = parse_color(series_cfgs[1]["color"]) if "color" in series_cfgs[1] else config.competitor.color_current
+    elif extra.get("group_a_field"):
+        # Shorthand: group_a_field/group_b_field are full data key names
+        # e.g. group_a_field: "hii_current" → extract directly from r["hii_current"]
+        s1_field = extra["group_a_field"]
+        s2_field = extra.get("group_b_field", "")
+        s1_label = _resolve_template(extra.get("group_a_label", "Group A"), config)
+        s2_label = _resolve_template(extra.get("group_b_label", "Group B"), config)
+        s1_color = parse_color(extra["color_a"]) if "color_a" in extra else config.primary.color_current
+        s2_color = parse_color(extra["color_b"]) if "color_b" in extra else config.competitor.color_current
     else:
         s1_field, s2_field = "primary", "comp"
         s1_label, s2_label = config.primary.name, config.competitor.name
@@ -104,27 +140,37 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     labels = [r.get("desc", "") for r in rows]
 
-    # Extract values — support both flat (hi_current, other_current) and
-    # prefixed (primary_current, comp_current) naming
+    # Extract values — two resolution strategies:
+    #   Pattern A (series/default): field is a prefix → look up {field}_current, {field}_prior
+    #   Pattern B (group_a/b): field is a full key name → look up r[field] directly,
+    #     derive prior by replacing "current" with "prior" in the key name
     s1_current = []
     s1_prior = []
     s2_current = []
     s2_prior = []
+    _is_direct = bool(extra.get("group_a_field"))  # Pattern B
     for r in rows:
-        s1_current.append(r.get(f"{s1_field}_current") or r.get(s1_field) or 0)
-        s1_prior.append(r.get(f"{s1_field}_prior"))
-        s2_current.append(r.get(f"{s2_field}_current") or r.get(s2_field) or 0)
-        s2_prior.append(r.get(f"{s2_field}_prior"))
+        if _is_direct:
+            s1_current.append(r.get(s1_field) or 0)
+            s1_prior.append(r.get(s1_field.replace("current", "prior")) if s1_field else None)
+            s2_current.append(r.get(s2_field) or 0)
+            s2_prior.append(r.get(s2_field.replace("current", "prior")) if s2_field else None)
+        else:
+            s1_current.append(r.get(f"{s1_field}_current") or r.get(s1_field) or 0)
+            s1_prior.append(r.get(f"{s1_field}_prior"))
+            s2_current.append(r.get(f"{s2_field}_current") or r.get(s2_field) or 0)
+            s2_prior.append(r.get(f"{s2_field}_prior"))
 
     n = len(labels)
 
     # Layout: [Label table] [Clustered bar (no cat labels)] [Delta col(s)]
     gap = 0.08
     hdr_h = 0.30
-    chart_top = CHART_TOP_STD + 0.05
-    max_body_h = FOOTER_TOP - chart_top - 0.55
+    max_body_h = FOOTER_TOP - CHART_TOP_STD - 0.55
     row_h = min(0.42, max(0.28, max_body_h / max(n, 1)))
     body_h = n * row_h
+    content_h = hdr_h + body_h
+    chart_top = _vcenter_top(content_h)
 
     # Delta columns
     has_prior_1 = any(p is not None for p in s1_prior)
@@ -413,7 +459,8 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
     max_chart_h = FOOTER_TOP - DUAL_BC_TOP - below_budget
     row_h    = min(DUAL_BC_ROW_H, max_chart_h / max(n, 1))
     chart_h  = n * row_h
-    chart_top = DUAL_BC_TOP
+    content_h = 0.44 + chart_h  # brand labels + chart body
+    chart_top = _vcenter_top(content_h, extra_below=below_budget)
     label_top = chart_top - 0.44   # brand header labels just above chart area
 
     # Equal-width charts — both sides get the same width (min of available space)

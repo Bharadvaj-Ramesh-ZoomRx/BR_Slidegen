@@ -16,7 +16,7 @@ from ._shared import (
     _ABS_HDR_H, _ABS_ROW_H_MIN, _ABS_ROW_H_MAX, _ABS_SLIDE_W,
     LABEL_MAX_DUAL,
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _pptx_table, _style_tbl_cell, _prepare_rows,
+    _pptx_table, _style_tbl_cell, _prepare_rows, _vcenter_top,
     _alt_row_bg, _no_data_placeholder,
     C_GREEN, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_WHITE, C_RED,
     FONT_TEXT,
@@ -24,6 +24,7 @@ from ._shared import (
     add_delta_table,
     ProjectConfig, AskConfig, parse_color,
 )
+from slidegen.pipeline.data_loaders import delta
 from .dot import (
     _abs_x_range, _abs_scatter, _abs_label_tbl, _abs_val_col,
 )
@@ -75,6 +76,35 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
 
     rows = data.get(ask.data_key, [])
     rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
+
+    # second_data_key: merge two brand datasets into one
+    # Brand 1 (data_key): current → cur_vals, QoQ delta auto-computed
+    # Brand 2 (second_data_key): current → pri_vals, QoQ delta auto-computed
+    second_key = extra.get("second_data_key")
+    if second_key:
+        import re
+        second_rows = data.get(second_key, [])
+        def _norm(s):
+            s = re.sub(r'(?:Johnson & Johnson \(Formerly Janssen\)|AstraZeneca|J&J|AZ)\s*', '', s)
+            return re.sub(r'\s+', ' ', s).strip().lower()
+        second_idx = {_norm(r.get("desc", "")): r for r in second_rows}
+        merged = []
+        for r in rows:
+            desc = r.get("desc", "")
+            s2 = second_idx.get(_norm(desc), {})
+            jnj_cur = r.get("current")
+            jnj_pri = r.get("prior")
+            az_cur = s2.get("current")
+            az_pri = s2.get("prior")
+            merged.append({
+                "desc": desc,
+                "current": jnj_cur,
+                "prior": az_cur,
+                "jnj_delta": delta(jnj_cur, jnj_pri) if jnj_cur is not None and jnj_pri is not None else None,
+                "az_delta": delta(az_cur, az_pri) if az_cur is not None and az_pri is not None else None,
+            })
+        rows = merged
+
     rows = [r for r in rows if r.get(current_field) not in (None, 0) or r.get(prior_field) not in (None, 0)]
     if not rows:
         _no_data_placeholder(slide, ask.id)
@@ -92,7 +122,10 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
     delta_pri   = [r.get(delta_pri_field) for r in rows]
     has_prior   = any(p is not None for p in pri_vals)
 
-    body_h = n * _FR_ROW_H
+    # Dynamic row height: scale down for many rows
+    max_body_h = 4.50
+    fr_row_h = min(_FR_ROW_H, max(0.28, max_body_h / max(n, 1)))
+    body_h = n * fr_row_h
     chart_h = body_h
 
     # Scale
@@ -104,14 +137,21 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
     all_vals = [v for v in cur_vals + (pri_vals if has_prior else []) if v is not None and v != 0]
     x_min, x_max = _abs_x_range(all_vals, scale_min, scale_max)
 
+    # Vertical centering
+    hdr_h = 0.45
+    content_h = hdr_h + body_h
+    fr_top = _vcenter_top(content_h)
+    fr_hdr_top = fr_top
+    fr_body_top = fr_top + hdr_h
+
     # 1. "Representative Types" header
     textbox(slide, "Representative Types",
-            _FR_LABEL_L + 0.15, _FR_HDR_TOP, _FR_LABEL_W - 0.30, 0.28,
+            _FR_LABEL_L + 0.15, fr_hdr_top, _FR_LABEL_W - 0.30, 0.28,
             fsize=9, bold=True, color=C_GREY, font=font)
 
     # 2. Label table (10pt font, matching template)
-    _, tbl = _pptx_table(slide, [_FR_LABEL_W], [_FR_ROW_H] * n,
-                              _FR_LABEL_L, _FR_TOP)
+    _, tbl = _pptx_table(slide, [_FR_LABEL_W], [fr_row_h] * n,
+                              _FR_LABEL_L, fr_body_top)
     for i, label in enumerate(labels):
         cell = tbl.cell(i, 0)
         _style_tbl_cell(cell, label,
@@ -120,7 +160,7 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
                         ml=0.10, mr=0.05)
 
     # 3. Scatter chart (larger markers, matching template marker_size=7)
-    chart_top = _FR_TOP + 0.02  # slight offset matching template
+    chart_top = fr_body_top + 0.02  # slight offset matching template
 
     # Vertical tick lines behind chart
     for tick in ticks:
@@ -140,12 +180,12 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
     cur_label = extra.get("current_label", "J&J")
     pri_label = extra.get("prior_label", "AZ")
     textbox(slide, delta_header,
-            _FR_DELTA_L - 0.20, _FR_VS_HDR_TOP, _FR_DELTA_W + 0.40, 0.28,
+            _FR_DELTA_L - 0.20, fr_hdr_top, _FR_DELTA_W + 0.40, 0.28,
             fsize=11, bold=True, color=C_GREY, align=PP_ALIGN.CENTER, font=font)
 
     # 5. Delta table (2 columns: J&J delta, AZ delta — 9pt, color-coded)
-    _, dtbl = _pptx_table(slide, [_FR_DELTA_COL, _FR_DELTA_COL], [0.28] + [_FR_ROW_H] * n,
-                                _FR_DELTA_L, _FR_TOP - 0.28)
+    _, dtbl = _pptx_table(slide, [_FR_DELTA_COL, _FR_DELTA_COL], [0.28] + [fr_row_h] * n,
+                                _FR_DELTA_L, fr_body_top - 0.28)
     # Headers
     _style_tbl_cell(dtbl.cell(0, 0), cur_label, bg=C_HDRGREY, fg=C_WHITE,
                     fsize=8, bold=True, align=PP_ALIGN.CENTER, font=font)
@@ -169,11 +209,11 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
 
     # 6. "% of Interactions" axis label
     textbox(slide, "% of Interactions",
-            _FR_CHART_L, _FR_AX_LBL_TOP, _FR_CHART_W, 0.27,
+            _FR_CHART_L, fr_body_top + body_h + 0.06, _FR_CHART_W, 0.27,
             fsize=10, color=C_GREY, align=PP_ALIGN.CENTER, font=font)
 
     # 7. Scale tick labels
-    lbl_y = _FR_TOP + body_h + 0.06
+    lbl_y = fr_body_top + body_h + 0.06
     for tick in ticks:
         if x_min * 100 <= tick <= x_max * 100:
             frac = max(0.0, min(1.0, (tick - x_min * 100) / ((x_max - x_min) * 100)))
@@ -183,7 +223,7 @@ def render_followup_rep(slide, config, ask, data, *, namer=None):
                     align=PP_ALIGN.CENTER, font=font)
 
     # 8. Legend
-    ly = _FR_AX_LBL_TOP + 0.30
+    ly = fr_body_top + body_h + 0.36
     legend_items = [
         (color_current, extra.get("legend_current", cur_label)),
         (color_prior, extra.get("legend_prior", pri_label)),

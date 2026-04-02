@@ -154,3 +154,43 @@ Long labels truncated at LABEL_MAX (65 chars). Fix: add `label_shortcuts` config
 ### Template Rules
 - NEVER use a prior wave report PPTX as template — clearing slides with embedded charts corrupts the file
 - Always use a clean blank template created by python-pptx with correct slide dimensions
+
+### Multi-Column Field Naming Convention
+
+When using `question_code_multi_col`, the `columns` dict keys become the field names in the extracted data. The renderer expects the pattern `{field}_current` and `{field}_prior`. **Always use this convention:**
+
+```yaml
+# CORRECT — renderer finds hii_current, hii_prior, others_current, others_prior
+columns:
+  prior: 7
+  current: 17
+  hii_prior: 10
+  hii_current: 20
+  others_prior: 9
+  others_current: 19
+  comm_prior: 14
+  comm_current: 24
+  acad_prior: 15
+  acad_current: 25
+
+# WRONG — renderer looks for hii_current but finds current_hii (mismatch)
+columns:
+  prior_hii: 10
+  current_hii: 20
+  prior_hii_others: 9
+  current_hii_others: 19
+```
+
+Then in `extra.series`:
+```yaml
+extra:
+  series:
+    - field: hii
+      label: "High Impact"
+      color: "#F75824"
+    - field: others
+      label: "Others"
+      color: "#999999"
+```
+
+The renderer resolves: `r.get(f"{field}_current")` → `r.get("hii_current")` → value.
