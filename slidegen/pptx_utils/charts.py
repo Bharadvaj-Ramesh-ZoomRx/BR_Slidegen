@@ -48,6 +48,53 @@ CHART_PATTERNS = {
 }
 
 
+# ── Shared chart helpers ─────────────────────────────────────────────────────
+
+
+def _configure_bar_axes(ch, gap: int = 80, overlap: int = 0,
+                        cat_font_size: float = 7, invert: bool = True,
+                        font_name: Optional[str] = None,
+                        hide_cats: bool = False,
+                        plot_area: Optional[tuple] = None,
+                        val_scale: Optional[tuple] = None) -> None:
+    """Apply common bar chart axis configuration: hide val axis, style cat axis, set gap.
+
+    Args:
+        hide_cats: If True, hide category labels (for charts with external label tables).
+        plot_area: (x, y, w, h) fractions for set_chart_plot_area. Default: no change.
+        val_scale: (min_val, max_val) for set_val_axis_scale. Default: auto.
+    """
+    from .lxml_helpers import hide_cat_labels, set_chart_plot_area, set_val_axis_scale
+    hide_axis(ch, "val")
+    ch.category_axis.has_major_gridlines = False
+    if hide_cats:
+        hide_cat_labels(ch)
+    else:
+        ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
+        ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
+        suppress_cat_axis_bullets(ch)
+    if invert:
+        invert_cat_axis(ch)
+    set_plot_area_gap(ch, gap)
+    if overlap:
+        set_overlap(ch, overlap)
+    if plot_area:
+        set_chart_plot_area(ch, x=plot_area[0], y=plot_area[1],
+                            w=plot_area[2], h=plot_area[3])
+    if val_scale:
+        set_val_axis_scale(ch, val_scale[0], val_scale[1])
+
+
+def _style_bar_series(series, fill_color: RGBColor, label_color: RGBColor = C_WHITE,
+                      label_fsize: float = 8, label_pos: str = "inEnd",
+                      num_fmt: str = '0"%"', font_name: Optional[str] = None) -> None:
+    """Apply common series styling: color, no border, data labels."""
+    set_series_color(series, fill_color)
+    set_series_no_border(series)
+    enable_data_labels(series, label_color, fsize=label_fsize, pos=label_pos,
+                       num_fmt=num_fmt, font_name=font_name)
+
+
 # ── Chart builder functions ──────────────────────────────────────────────────
 
 def enable_data_labels(series, color: RGBColor, fsize: float = 8,
@@ -101,6 +148,8 @@ def enable_data_labels(series, color: RGBColor, fsize: float = 8,
 
 def delete_data_label(series, point_idx: int) -> None:
     """Hide the data label for a specific point (e.g. hide small segments in stacked bars)."""
+    if point_idx < 0 or point_idx >= len(series.values):
+        return
     dLbls = series._element.find(qn("c:dLbls"))
     if dLbls is not None:
         dLbl = etree.SubElement(dLbls, qn("c:dLbl"))
@@ -131,17 +180,8 @@ def add_single_bar_chart(slide, categories: list[str], values: list[float],
     ch.has_title = False
 
     s = ch.series[0]
-    set_series_color(s, fill_color)
-    set_series_no_border(s)
-    enable_data_labels(s, C_WHITE, pos="inEnd", font_name=font_name)
-
-    hide_axis(ch, "val")
-    ch.category_axis.has_major_gridlines = False
-    ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
-    ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
-    suppress_cat_axis_bullets(ch)
-    invert_cat_axis(ch)
-    set_plot_area_gap(ch, gap)
+    _style_bar_series(s, fill_color, C_WHITE, label_pos="inEnd", font_name=font_name)
+    _configure_bar_axes(ch, gap=gap, cat_font_size=cat_font_size, font_name=font_name)
 
     return cf, ch
 
@@ -176,18 +216,11 @@ def add_clustered_bar_chart(slide, categories: list[str],
 
     for idx, series in enumerate(ch.series):
         c = colors[idx] if idx < len(colors) else C_LTGREY
-        set_series_color(series, c)
-        set_series_no_border(series)
-        enable_data_labels(series, c, fsize=label_fsize, font_name=font_name)
+        _style_bar_series(series, c, c, label_fsize=label_fsize, label_pos="inEnd",
+                          font_name=font_name)
 
-    set_plot_area_gap(ch, gap)
-    set_overlap(ch, overlap)
-    hide_axis(ch, "val")
-    ch.category_axis.has_major_gridlines = False
-    ch.category_axis.tick_labels.font.size = Pt(cat_font_size)
-    ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
-    suppress_cat_axis_bullets(ch)
-    invert_cat_axis(ch)
+    _configure_bar_axes(ch, gap=gap, overlap=overlap, cat_font_size=cat_font_size,
+                        font_name=font_name)
 
     if legend:
         ch.has_legend = True
@@ -308,17 +341,10 @@ def add_stacked_column_chart(slide, categories: list[str],
 
     for idx, series in enumerate(ch.series):
         c = colors[idx] if idx < len(colors) else C_LTGREY
-        set_series_color(series, c)
-        set_series_no_border(series)
-        enable_data_labels(series, C_WHITE, fsize=label_fsize, num_fmt=num_fmt,
-                           pos="ctr", font_name=font_name)
+        _style_bar_series(series, c, C_WHITE, label_fsize=label_fsize,
+                          label_pos="ctr", num_fmt=num_fmt, font_name=font_name)
 
-    hide_axis(ch, "val")
-    ch.category_axis.has_major_gridlines = False
-    ch.category_axis.tick_labels.font.size = Pt(8)
-    ch.category_axis.tick_labels.font.name = font_name or FONT_TEXT
-    suppress_cat_axis_bullets(ch)
-    set_plot_area_gap(ch, gap)
+    _configure_bar_axes(ch, gap=gap, cat_font_size=8, invert=False, font_name=font_name)
 
     return cf, ch
 

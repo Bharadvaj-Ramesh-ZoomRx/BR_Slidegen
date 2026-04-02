@@ -1,7 +1,42 @@
 ---
 name: prior-wave-context
+effort: high
 description: "Pre-Stage 1 sub-skill. Scans the project input wave folder for any files containing prior wave findings (prior wave .pptx reports, prior_wave_es.md, readout decks, executive summaries), confirms with the user which files to use, extracts content from all confirmed files, and writes a structured prior_wave_context.md to the wave context folder. This file is then consumed by /build-project-context (Section 3) and /hypotheses. Run this before /build-project-context whenever prior wave files exist in the input folder. Trigger when: user says 'build prior wave context', 'extract prior wave findings', or when scanning a new wave folder that contains .pptx report files or prior_wave_es files."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for md in sorted(glob.glob(f'{ctx}/*.md')):
+        print(f'  - \`{os.path.basename(md)}\` ({os.path.getsize(md)//1024}KB)')
+    # Check input folder for prior wave files
+    for case in ['Wave', 'wave']:
+        inp = f'{proj}/input/{case}/{wave}'
+        if os.path.isdir(inp):
+            files = [f for f in os.listdir(inp) if not f.startswith('.')]
+            print(f'**Input files ({len(files)}):** ' + ', '.join(sorted(files)[:10]))
+            break
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # Prior Wave Context Extractor
 
@@ -13,12 +48,9 @@ This skill runs **before** `/build-project-context`. Its output feeds directly i
 
 ---
 
-## STEP 0 — Get project and wave from the user
+## STEP 0 — Confirm project and wave
 
-Ask for only two things:
-
-1. **Project folder** — e.g., `projects/Demo 1`
-2. **Wave name** (current wave being set up) — e.g., `Q1 2026`
+Use the auto-detected project and wave shown above. If correct, proceed. If not, ask the user to specify.
 
 Derive:
 - **INPUT_DIR** = `{project_folder}/input/Wave/{wave}` (check both `Wave` and `wave` casing)

@@ -87,6 +87,10 @@ class LiveEditor:
 
     def __exit__(self, *exc):
         self._save_edit_log()
+        # Release COM references to prevent orphaned PowerPoint processes
+        self._slide = None
+        self._prs = None
+        self._ppt_app = None
 
     def connect(self):
         """Establish COM connection to PowerPoint."""
@@ -179,7 +183,7 @@ class LiveEditor:
             }
             try:
                 info["text"] = sh.TextFrame.TextRange.Text[:80]
-            except Exception:
+            except AttributeError:
                 info["text"] = None
             result.append(info)
         return result
@@ -309,7 +313,7 @@ class LiveEditor:
                 }
                 try:
                     info["text"] = sh.TextFrame.TextRange.Text[:80]
-                except Exception:
+                except AttributeError:
                     info["text"] = None
                 results.append(info)
         return results

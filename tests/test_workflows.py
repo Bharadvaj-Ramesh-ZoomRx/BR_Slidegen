@@ -13,6 +13,7 @@ import os
 import sys
 import shutil
 import yaml
+from pptx import Presentation
 
 BASE = os.path.dirname(__file__)
 ROOT = os.path.dirname(BASE)
@@ -69,7 +70,6 @@ try:
            out_path)
 
     # Check slide count
-    from pptx import Presentation
     prs = Presentation(out_path)
     expected_slides = len(config.asks)
     report(f"Slide count = {len(prs.slides)} (expected {expected_slides})",

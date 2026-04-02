@@ -70,22 +70,6 @@ def horiz_line(slide, left: float, top: float, width: float,
     return shape
 
 
-def insert_image(slide, img_path: str, left: float, top: float,
-                 width: float, height: float, name: Optional[str] = None):
-    """Place an external PNG or JPG at specified inch coordinates.
-
-    Returns: the picture shape, or None if img_path does not exist.
-    """
-    if not os.path.exists(img_path):
-        return None
-    pic = slide.shapes.add_picture(
-        img_path,
-        Inches(left), Inches(top), Inches(width), Inches(height))
-    if name:
-        pic.name = name
-    return pic
-
-
 def dashed_separator(slide, left: float, top: float, length: float,
                       color: Optional[RGBColor] = None, width_pt: float = 0.75,
                       dash: str = "dash", vertical: bool = False):

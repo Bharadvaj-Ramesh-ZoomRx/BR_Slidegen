@@ -1,7 +1,54 @@
 ---
 name: hypotheses
+effort: max
 description: "Use when generating a hypothesis bank from context files. Trigger when: user says 'generate hypotheses', 'build hypothesis bank', or needs testable predictions organized by KBQs for a PET study wave. Reads 5 context files: Market Context, Project Context, Prior Wave Context, KBQs, and Survey Context. Prior wave findings are fed directly to generate validation hypotheses — testing whether prior wave findings persist, reverse, or improve in the current wave."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    # Check all 5 required/recommended context files
+    mc = f'{proj}/context/market_context.md'
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    files_to_check = [
+        ('market_context.md', mc, 'Required'),
+        ('project_context.md', f'{ctx}/project_context.md', 'Required'),
+        ('prior_wave_context.md', f'{ctx}/prior_wave_context.md', 'Recommended'),
+        ('survey_context.md', f'{ctx}/survey_context.md', 'Recommended'),
+    ]
+    for name, path, req in files_to_check:
+        if os.path.exists(path):
+            print(f'  ✓ {name} ({os.path.getsize(path)//1024}KB) [{req}]')
+        else:
+            print(f'  ✗ {name} — MISSING [{req}]')
+    # Check KBQs in input folder
+    for case in ['Wave', 'wave']:
+        kbq = f'{proj}/input/{case}/{wave}/KBQs.md'
+        if os.path.exists(kbq):
+            print(f'  ✓ KBQs.md ({os.path.getsize(kbq)//1024}KB) [Required]')
+            break
+    else:
+        print(f'  ✗ KBQs.md — MISSING [Required]')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # Hypotheses Generator v2 — Storyboard-Integrated
 
@@ -9,9 +56,11 @@ You are a senior market research analyst. Your job is to generate a comprehensiv
 
 ---
 
-## STEP 1 — Resolve context file paths
+## STEP 1 — Confirm project and resolve context file paths
 
-Ask the user for the **project folder** and **wave name** only. Derive all paths:
+Use the auto-detected project, wave, and file status shown above. If correct, proceed. If not, ask the user to specify.
+
+The required files are:
 
 | File | Path | Required? |
 |------|------|-----------|
@@ -20,22 +69,6 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 | **Prior Wave Context** | `{project}/context/{wave}/prior_wave_context.md` | Required if exists |
 | **KBQs** | `{project}/input/Wave/{wave}/KBQs.md` | Required |
 | **Survey Context** | `{project}/context/{wave}/survey_context.md` | Strongly recommended |
-
-Check which files exist:
-```bash
-find "{project}/context" -name "*.md" | sort
-find "{project}/input" -name "KBQs.md" | sort
-```
-
-Report status before reading:
-```
-Context files:
-  ✓ market_context.md          (competitive/clinical landscape)
-  ✓ project_context.md         (study design + field intel + wave hypotheses)
-  ✓ prior_wave_context.md      (prior wave findings — domain metrics + recs)
-  ✓ KBQs.md                   (organising structure)
-  ✓ survey_context.md          (question codes + message list)
-```
 
 If `prior_wave_context.md` is missing: proceed but flag — all prior-wave validation hypotheses will be based on narrative summaries in `project_context.md` only (less specific).
 

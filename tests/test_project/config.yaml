@@ -261,7 +261,7 @@ asks:
     headline: "Prescription intent by patient type"
     section: "PRESCRIPTION INTENT — {{period_current}}"
     source_text: "Source: Test Data"
-    data_key: rx_combined
+    data_key: ""
     extra:
       top: { data_key: "ryb_rx", label: "{{primary.name}} — Intent to Increase Rx", brand: "primary" }
       bottom: { data_key: "tag_rx", label: "{{competitor.name}}+Chemo — Intent to Increase Rx", brand: "competitor" }

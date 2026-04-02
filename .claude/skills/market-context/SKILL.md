@@ -1,7 +1,42 @@
 ---
 name: market-context
+effort: max
 description: "Generates a structured Market Context.md file for any therapy and indication using Claude's clinical and competitive knowledge, optionally enriched by any files in the project folder. Automatically runs a 3-round adversarial fact-check before finalizing. Output goes to context/market_context.md (not wave-versioned — shared across all waves for the product). Trigger when: user says 'build market context', 'generate market context', 'create market context', or needs a competitive/clinical landscape document for a new project."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    mc = f'{proj}/context/market_context.md'
+    if os.path.exists(mc):
+        import time
+        mtime = time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(mc)))
+        print(f'**market_context.md:** exists (last modified {mtime})')
+    else:
+        print(f'**market_context.md:** not yet created')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for md in sorted(glob.glob(f'{ctx}/*.md')):
+        print(f'  - \`{os.path.basename(md)}\` ({os.path.getsize(md)//1024}KB)')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # Market Context Generator
 
@@ -15,27 +50,23 @@ The output is **wave-independent** — it describes the therapy landscape as of 
 
 ---
 
-## STEP 0 — Check if market context already exists; gather inputs
+## STEP 0 — Confirm project; check if market context already exists
 
-**First, check if the file already exists:**
-```bash
-find "{project_folder}/context" -name "market_context.md" 2>/dev/null
-```
+Use the auto-detected project above. If it looks correct, proceed. If not, ask the user to specify the project folder.
 
-If `context/market_context.md` already exists:
-- Read it and report: "Market context already exists (last updated: {date from file header}). Using existing file — run `/market-context regenerate` to rebuild it."
-- Stop. Do not regenerate unless the user explicitly includes the word **regenerate** in their request.
+Check if `context/market_context.md` already exists (the auto-detected context above shows its status):
+- If it exists: report "Market context already exists (last modified: {date}). Using existing file — run `/market-context regenerate` to rebuild it." Stop unless user explicitly says **regenerate**.
 
 If it does not exist, ask the user for:
 
-1. **Project folder** — e.g., `projects/Demo 1` or `projects/pfizer_ibrance`
-2. **Therapy / product name** — e.g., `Rybrevant+Lazcluze (Amivantamab+Lazertinib)` or `Ibrance (Palbociclib)`
-3. **Indication** — e.g., `1L EGFR+ NSCLC` or `HR+/HER2- advanced breast cancer`
-4. **Primary competitors** — e.g., `Tagrisso (Osimertinib), Tagrisso+Chemo (FLAURA2)` — list 1–4
+1. **Therapy / product name** — e.g., `Rybrevant+Lazcluze (Amivantamab+Lazertinib)` or `Ibrance (Palbociclib)`
+2. **Indication** — e.g., `1L EGFR+ NSCLC` or `HR+/HER2- advanced breast cancer`
+3. **Primary competitors** — e.g., `Tagrisso (Osimertinib), Tagrisso+Chemo (FLAURA2)` — list 1–4
 
 Do not ask for file paths, data sources, or clinical information — you will derive these from your knowledge and from any files found in the project folder.
 
 Derive:
+- **PROJECT_FOLDER** = auto-detected or user-specified
 - **OUTPUT_PATH** = `{project_folder}/context/market_context.md`
 - **INPUT_DIR** = `{project_folder}/input/` (scan all subdirectories)
 

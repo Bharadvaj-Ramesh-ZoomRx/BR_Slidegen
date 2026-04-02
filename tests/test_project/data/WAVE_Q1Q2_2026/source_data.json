@@ -1,0 +1,1136 @@
+{
+  "_meta": {
+    "extracted_at": "2026-04-02T02:27:11.900043",
+    "excel_file": "source_data.xlsx",
+    "excel_hash": "e092653dc2ce",
+    "extractions_hash": "75e5e3910a2f",
+    "wave": "WAVE_Q1Q2_2026"
+  },
+  "ryb_mr": [
+    {
+      "desc": "Efficacy data shows superior outcomes",
+      "code": "",
+      "prior": 68.7,
+      "current": 67.5
+    },
+    {
+      "desc": "Safety profile is well-tolerated",
+      "code": "",
+      "prior": 72.9,
+      "current": 76.9
+    },
+    {
+      "desc": "NCCN Category 1 recommendation",
+      "code": "",
+      "prior": 34.7,
+      "current": 44.2
+    },
+    {
+      "desc": "Convenient dosing schedule",
+      "code": "",
+      "prior": 68.1,
+      "current": 73.8
+    },
+    {
+      "desc": "First-line treatment option",
+      "code": "",
+      "prior": 36.4,
+      "current": 35.4
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 51.1,
+      "current": 67.8
+    },
+    {
+      "desc": "Yes",
+      "code": "",
+      "prior": 39.3,
+      "current": 44.7
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 43.3,
+      "current": 36.8
+    },
+    {
+      "desc": "Yes",
+      "code": "",
+      "prior": 41.1,
+      "current": 31.3
+    },
+    {
+      "desc": "Medical Science Liaison (MSL)",
+      "code": "",
+      "prior": 43.1,
+      "current": 35.3
+    },
+    {
+      "desc": "Key Account Manager (KAM)",
+      "code": "",
+      "prior": 40.3,
+      "current": 24.2
+    },
+    {
+      "desc": "Field Reimbursement Manager (FRM)",
+      "code": "",
+      "prior": 48.8,
+      "current": 45.7
+    },
+    {
+      "desc": "No, I did not set follow-up",
+      "code": "",
+      "prior": 41.1,
+      "current": 17.8
+    },
+    {
+      "desc": "1L EGFR+ mNSCLC (no CNS)",
+      "code": "",
+      "prior": 48.7,
+      "current": 31.8
+    }
+  ],
+  "tag_mr": [
+    {
+      "desc": "mPFS 29.4 months with chemo",
+      "code": "",
+      "prior": 55.3,
+      "current": 59.8
+    },
+    {
+      "desc": "89% of patients stay on treatment",
+      "code": "",
+      "prior": 43.0,
+      "current": 42.2
+    },
+    {
+      "desc": "Grade 1/2 adverse reactions most common",
+      "code": "",
+      "prior": 27.0,
+      "current": 14.8
+    },
+    {
+      "desc": "NCCN Category 1 recommendation (mono+chemo)",
+      "code": "",
+      "prior": 53.4,
+      "current": 50.2
+    },
+    {
+      "desc": "Longest mPFS and mOS data",
+      "code": "",
+      "prior": 48.3,
+      "current": 52.4
+    },
+    {
+      "desc": "Once-daily oral dosing convenience",
+      "code": "",
+      "prior": 51.7,
+      "current": 50.6
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 46.8,
+      "current": 39.1
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 30.9,
+      "current": 43.1
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 36.4,
+      "current": 42.3
+    },
+    {
+      "desc": "Top Box",
+      "code": "",
+      "prior": 55.6,
+      "current": 37.0
+    },
+    {
+      "desc": "1L EGFR+ mNSCLC + chemo",
+      "code": "",
+      "prior": 31.8,
+      "current": 38.4
+    },
+    {
+      "desc": "2L+ EGFR+ mNSCLC + chemo",
+      "code": "",
+      "prior": 38.8,
+      "current": 49.9
+    }
+  ],
+  "ryb_me": [
+    {
+      "desc": "Superior efficacy outcomes",
+      "short": "Superior efficacy ou",
+      "mr_prior": 44.5,
+      "mr_current": 55.8,
+      "believ_prior": 50.2,
+      "believ_current": 77.4,
+      "me_prior": 36.6,
+      "me_current": 31.8
+    },
+    {
+      "desc": "Well-tolerated safety profile",
+      "short": "Well-tolerated safet",
+      "mr_prior": 51.7,
+      "mr_current": 79.6,
+      "believ_prior": 75.7,
+      "believ_current": 69.9,
+      "me_prior": 65.6,
+      "me_current": 65.7
+    },
+    {
+      "desc": "NCCN Category 1 recommendation",
+      "short": "NCCN Category 1 reco",
+      "mr_prior": 55.9,
+      "mr_current": 45.8,
+      "believ_prior": 70.9,
+      "believ_current": 66.5,
+      "me_prior": 45.0,
+      "me_current": 33.8
+    },
+    {
+      "desc": "Convenient dosing schedule",
+      "short": "Convenient dosing sc",
+      "mr_prior": 67.3,
+      "mr_current": 43.1,
+      "believ_prior": 77.5,
+      "believ_current": 49.6,
+      "me_prior": 34.9,
+      "me_current": 63.2
+    },
+    {
+      "desc": "First-line treatment option",
+      "short": "First-line treatment",
+      "mr_prior": 37.7,
+      "mr_current": 39.0,
+      "believ_prior": 64.0,
+      "believ_current": 75.0,
+      "me_prior": 37.9,
+      "me_current": 42.4
+    }
+  ],
+  "rep_perf": [
+    {
+      "desc": "Overall call quality",
+      "primary_prior": 68.2,
+      "primary_current": 58.1,
+      "comp_prior": 52.2,
+      "comp_current": 63.2
+    },
+    {
+      "desc": "Knowledge: competitors",
+      "primary_prior": 57.1,
+      "primary_current": 84.3,
+      "comp_prior": 70.3,
+      "comp_current": 68.8
+    },
+    {
+      "desc": "Knowledge: EGFR Exon 20",
+      "primary_prior": 67.3,
+      "primary_current": 75.1,
+      "comp_prior": 63.4,
+      "comp_current": 66.0
+    },
+    {
+      "desc": "Knowledge: product (RYB)",
+      "primary_prior": 53.4,
+      "primary_current": 66.6,
+      "comp_prior": 41.7,
+      "comp_current": 59.8
+    },
+    {
+      "desc": "Knowledge: EGFR mNSCLC",
+      "primary_prior": 63.2,
+      "primary_current": 55.8,
+      "comp_prior": 44.1,
+      "comp_current": 63.5
+    },
+    {
+      "desc": "Organized presentation",
+      "primary_prior": 56.8,
+      "primary_current": 87.0,
+      "comp_prior": 63.2,
+      "comp_current": 53.9
+    },
+    {
+      "desc": "Compelling reason to Rx",
+      "primary_prior": 73.6,
+      "primary_current": 50.9,
+      "comp_prior": 78.3,
+      "comp_current": 59.3
+    },
+    {
+      "desc": "Compelling reason to use broader m\u2026",
+      "primary_prior": 81.3,
+      "primary_current": 53.3,
+      "comp_prior": 59.5,
+      "comp_current": 59.6
+    },
+    {
+      "desc": "Credible support for product claims",
+      "primary_prior": 87.5,
+      "primary_current": 72.9,
+      "comp_prior": 58.9,
+      "comp_current": 50.7
+    },
+    {
+      "desc": "Prepared for conversation with me",
+      "primary_prior": 63.3,
+      "primary_current": 70.8,
+      "comp_prior": 57.6,
+      "comp_current": 40.9
+    },
+    {
+      "desc": "Engaging when discussing product",
+      "primary_prior": 83.0,
+      "primary_current": 85.9,
+      "comp_prior": 45.6,
+      "comp_current": 62.2
+    },
+    {
+      "desc": "Meaningful questions about my prac\u2026",
+      "primary_prior": 54.3,
+      "primary_current": 76.9,
+      "comp_prior": 51.2,
+      "comp_current": 66.4
+    },
+    {
+      "desc": "Valuable use of my time",
+      "primary_prior": 79.1,
+      "primary_current": 80.8,
+      "comp_prior": 44.3,
+      "comp_current": 76.6
+    },
+    {
+      "desc": "Address my questions about prescri\u2026",
+      "primary_prior": 59.2,
+      "primary_current": 51.5,
+      "comp_prior": 62.2,
+      "comp_current": 54.8
+    },
+    {
+      "desc": "Delivering a clear message about p\u2026",
+      "primary_prior": 83.2,
+      "primary_current": 82.3,
+      "comp_prior": 52.7,
+      "comp_current": 78.1
+    }
+  ],
+  "ryb_cta": [
+    {
+      "desc": "Compelling reason to prescribe",
+      "code": "C1_81Z",
+      "prior": 51.1,
+      "current": 67.8
+    },
+    {
+      "desc": "Changed opinion",
+      "code": "C1_82Z",
+      "prior": 39.3,
+      "current": 44.7
+    },
+    {
+      "desc": "Asked to prescribe (Branded closing)",
+      "code": "C1_83D1Z",
+      "prior": 43.3,
+      "current": 36.8
+    },
+    {
+      "desc": "Educational ask",
+      "code": "Q1_84bZ",
+      "prior": 41.1,
+      "current": 31.3
+    }
+  ],
+  "tag_cta": [
+    {
+      "desc": "Compelling reason to prescribe",
+      "code": "C1_81_TAG_mNSCLC_Z",
+      "prior": 46.8,
+      "current": 39.1
+    },
+    {
+      "desc": "Changed opinion",
+      "code": "C1_82_TAG_mNSCLC_Z",
+      "prior": 30.9,
+      "current": 43.1
+    },
+    {
+      "desc": "Asked to prescribe (Branded closing)",
+      "code": "C1_83D_TAG_mNSCLC_Z",
+      "prior": 36.4,
+      "current": 42.3
+    },
+    {
+      "desc": "Educational ask",
+      "code": "C1_84b_TAG_mNSCLC_Z",
+      "prior": 55.6,
+      "current": 37.0
+    }
+  ],
+  "ryb_followup": [
+    {
+      "desc": "MSL",
+      "code": "",
+      "prior": 43.1,
+      "current": 35.3
+    },
+    {
+      "desc": "KAM",
+      "code": "",
+      "prior": 40.3,
+      "current": 24.2
+    },
+    {
+      "desc": "FRM",
+      "code": "",
+      "prior": 48.8,
+      "current": 45.7
+    },
+    {
+      "desc": "No follow-up set",
+      "code": "",
+      "prior": 41.1,
+      "current": 17.8
+    },
+    {
+      "desc": "1L EGFR+ mNSCLC (no CNS)",
+      "code": "",
+      "prior": 48.7,
+      "current": 31.8
+    },
+    {
+      "desc": "1L EGFR+ mNSCLC (with CNS)",
+      "code": "",
+      "prior": 36.2,
+      "current": 57.3
+    },
+    {
+      "desc": "2L+ EGFR+ mNSCLC",
+      "code": "",
+      "prior": 59.8,
+      "current": 68.7
+    },
+    {
+      "desc": "Exon 20 insertion",
+      "code": "",
+      "prior": 43.0,
+      "current": 44.8
+    },
+    {
+      "desc": "Overall quality of sales call",
+      "code": "",
+      "prior": 68.8,
+      "current": 57.6
+    },
+    {
+      "desc": "knowledgeable about competitor pro\u2026",
+      "code": "",
+      "prior": 59.1,
+      "current": 76.8
+    }
+  ],
+  "ryb_rx": [
+    {
+      "desc": "1L EGFR+ mNSCLC (no CNS)",
+      "code": "",
+      "prior": 48.7,
+      "current": 31.8
+    },
+    {
+      "desc": "1L EGFR+ mNSCLC (with CNS)",
+      "code": "",
+      "prior": 36.2,
+      "current": 57.3
+    },
+    {
+      "desc": "2L+ EGFR+ mNSCLC",
+      "code": "",
+      "prior": 59.8,
+      "current": 68.7
+    },
+    {
+      "desc": "Exon 20 insertion",
+      "code": "",
+      "prior": 43.0,
+      "current": 44.8
+    },
+    {
+      "desc": "Overall quality of sales call",
+      "code": "",
+      "prior": 68.8,
+      "current": 57.6
+    },
+    {
+      "desc": "How knowledgeable about competitor products",
+      "code": "",
+      "prior": 59.1,
+      "current": 76.8
+    },
+    {
+      "desc": "How knowledgeable about EGFR exon 20",
+      "code": "",
+      "prior": 78.0,
+      "current": 62.5
+    }
+  ],
+  "tag_rx": [
+    {
+      "desc": "1L EGFR+ mNSCLC + chemo",
+      "code": "",
+      "prior": 31.8,
+      "current": 38.4
+    },
+    {
+      "desc": "2L+ EGFR+ mNSCLC + chemo",
+      "code": "",
+      "prior": 38.8,
+      "current": 49.9
+    }
+  ],
+  "share_of_time": [
+    {
+      "desc": "Efficacy data",
+      "prior": 10.7,
+      "current": 23.5
+    },
+    {
+      "desc": "Safety profile",
+      "prior": 5.5,
+      "current": 16.1
+    },
+    {
+      "desc": "Dosing information",
+      "prior": 17.7,
+      "current": 7.1
+    },
+    {
+      "desc": "Guidelines/NCCN",
+      "prior": 7.8,
+      "current": 13.4
+    },
+    {
+      "desc": "Patient support",
+      "prior": 24.3,
+      "current": 16.9
+    },
+    {
+      "desc": "Access/reimbursement",
+      "prior": 23.7,
+      "current": 21.1
+    },
+    {
+      "desc": "Competitive data",
+      "prior": 14.3,
+      "current": 20.7
+    },
+    {
+      "desc": "Clinical trials",
+      "prior": 5.4,
+      "current": 7.2
+    }
+  ],
+  "ryb_quality": [
+    {
+      "desc": "Overall call quality",
+      "code": "",
+      "prior": 68.8,
+      "current": 57.6
+    },
+    {
+      "desc": "Knowledge: competitors",
+      "code": "",
+      "prior": 59.1,
+      "current": 76.8
+    },
+    {
+      "desc": "Knowledge: EGFR Exon 20",
+      "code": "",
+      "prior": 78.0,
+      "current": 62.5
+    },
+    {
+      "desc": "Organized presentation",
+      "code": "",
+      "prior": 65.5,
+      "current": 61.5
+    },
+    {
+      "desc": "Compelling reason to Rx",
+      "code": "",
+      "prior": 58.0,
+      "current": 50.3
+    }
+  ],
+  "hii_compare": [
+    {
+      "desc": "Knowledge: competitors",
+      "hi_current": 89.1,
+      "other_current": 57.5,
+      "diff": 31.6
+    },
+    {
+      "desc": "Overall call quality",
+      "hi_current": 76.6,
+      "other_current": 45.2,
+      "diff": 31.4
+    },
+    {
+      "desc": "Knowledge: EGFR Exon 20",
+      "hi_current": 88.2,
+      "other_current": 73.3,
+      "diff": 14.9
+    },
+    {
+      "desc": "Compelling reason to Rx",
+      "hi_current": 83.3,
+      "other_current": 71.5,
+      "diff": 11.8
+    }
+  ],
+  "mariposa_rep": [
+    {
+      "desc": "Overall call quality",
+      "overall": 81.1,
+      "segment_a": 93.9,
+      "segment_b": 62.5
+    },
+    {
+      "desc": "Compelling reason to Rx",
+      "overall": 55.8,
+      "segment_a": 55.6,
+      "segment_b": 50.3
+    },
+    {
+      "desc": "Knowledge: product",
+      "overall": 55.3,
+      "segment_a": 82.1,
+      "segment_b": 45.5
+    },
+    {
+      "desc": "Knowledge: competitors",
+      "overall": 70.2,
+      "segment_a": 82.8,
+      "segment_b": 66.1
+    },
+    {
+      "desc": "Organized presentation",
+      "overall": 58.0,
+      "segment_a": 87.2,
+      "segment_b": 72.2
+    },
+    {
+      "desc": "Clear product message",
+      "overall": 79.6,
+      "segment_a": 60.2,
+      "segment_b": 45.6
+    },
+    {
+      "desc": "Engaging discussion",
+      "overall": 87.1,
+      "segment_a": 70.9,
+      "segment_b": 53.5
+    },
+    {
+      "desc": "Valuable use of time",
+      "overall": 69.5,
+      "segment_a": 81.5,
+      "segment_b": 83.0
+    }
+  ],
+  "tag_recall_order": [
+    {
+      "code": "TAG_Dail",
+      "desc": "Daily dosing",
+      "1st_current": 29.2,
+      "1st_prior": 11.7,
+      "2nd_current": 22.9,
+      "2nd_prior": 24.5,
+      "3rd_current": 11.8,
+      "3rd_prior": 16.2,
+      "4th_current": 27.6,
+      "4th_prior": 7.4,
+      "total_current": 91.5,
+      "total_prior": 59.8
+    },
+    {
+      "code": "TAG_Safe",
+      "desc": "Safety profile",
+      "1st_current": 20.8,
+      "1st_prior": 12.5,
+      "2nd_current": 7.2,
+      "2nd_prior": 14.1,
+      "3rd_current": 29.0,
+      "3rd_prior": 8.0,
+      "4th_current": 22.5,
+      "4th_prior": 27.7,
+      "total_current": 79.5,
+      "total_prior": 62.3
+    },
+    {
+      "code": "TAG_NCCN",
+      "desc": "NCCN recommendation",
+      "1st_current": 16.6,
+      "1st_prior": 23.1,
+      "2nd_current": 17.5,
+      "2nd_prior": 9.0,
+      "3rd_current": 22.4,
+      "3rd_prior": 8.8,
+      "4th_current": 14.5,
+      "4th_prior": 16.2,
+      "total_current": 71.0,
+      "total_prior": 57.1
+    },
+    {
+      "code": "TAG_mPFS",
+      "desc": "mPFS data",
+      "1st_current": 24.6,
+      "1st_prior": 18.9,
+      "2nd_current": 15.2,
+      "2nd_prior": 21.6,
+      "3rd_current": 9.2,
+      "3rd_prior": 25.4,
+      "4th_current": 7.2,
+      "4th_prior": 5.6,
+      "total_current": 56.2,
+      "total_prior": 71.5
+    }
+  ],
+  "_sheets": {
+    "primary": [
+      {
+        "row": 0,
+        "code": "Q2_10Z",
+        "desc": "Message Recall"
+      },
+      {
+        "row": 1,
+        "code": "",
+        "desc": "Efficacy data shows superior outcomes"
+      },
+      {
+        "row": 2,
+        "code": "",
+        "desc": "Safety profile is well-tolerated"
+      },
+      {
+        "row": 3,
+        "code": "",
+        "desc": "NCCN Category 1 recommendation"
+      },
+      {
+        "row": 4,
+        "code": "",
+        "desc": "Convenient dosing schedule"
+      },
+      {
+        "row": 5,
+        "code": "",
+        "desc": "First-line treatment option"
+      },
+      {
+        "row": 6,
+        "code": "C1_81Z",
+        "desc": "Compelling reason to prescribe"
+      },
+      {
+        "row": 7,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 8,
+        "code": "C1_82Z",
+        "desc": "Changed opinion"
+      },
+      {
+        "row": 9,
+        "code": "",
+        "desc": "Yes"
+      },
+      {
+        "row": 10,
+        "code": "C1_83D1Z",
+        "desc": "Asked to prescribe (Branded closing)"
+      },
+      {
+        "row": 11,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 12,
+        "code": "Q1_84bZ",
+        "desc": "Educational ask"
+      },
+      {
+        "row": 13,
+        "code": "",
+        "desc": "Yes"
+      },
+      {
+        "row": 14,
+        "code": "C1_84FZ",
+        "desc": "Follow-up with J&J reps"
+      },
+      {
+        "row": 15,
+        "code": "",
+        "desc": "Medical Science Liaison (MSL)"
+      },
+      {
+        "row": 16,
+        "code": "",
+        "desc": "Key Account Manager (KAM)"
+      },
+      {
+        "row": 17,
+        "code": "",
+        "desc": "Field Reimbursement Manager (FRM)"
+      },
+      {
+        "row": 18,
+        "code": "",
+        "desc": "No, I did not set follow-up"
+      },
+      {
+        "row": 19,
+        "code": "C1_85DZ",
+        "desc": "Prescription Intent"
+      },
+      {
+        "row": 20,
+        "code": "",
+        "desc": "1L EGFR+ mNSCLC (no CNS)"
+      },
+      {
+        "row": 21,
+        "code": "",
+        "desc": "1L EGFR+ mNSCLC (with CNS)"
+      },
+      {
+        "row": 22,
+        "code": "",
+        "desc": "2L+ EGFR+ mNSCLC"
+      },
+      {
+        "row": 23,
+        "code": "",
+        "desc": "Exon 20 insertion"
+      },
+      {
+        "row": 24,
+        "code": "Q1_87Z",
+        "desc": "Quality Metrics"
+      },
+      {
+        "row": 25,
+        "code": "",
+        "desc": "Overall quality of sales call"
+      },
+      {
+        "row": 26,
+        "code": "",
+        "desc": "How knowledgeable about competitor products"
+      },
+      {
+        "row": 27,
+        "code": "",
+        "desc": "How knowledgeable about EGFR exon 20"
+      },
+      {
+        "row": 28,
+        "code": "",
+        "desc": "Organized presentation of information"
+      },
+      {
+        "row": 29,
+        "code": "",
+        "desc": "Compelling reason to prescribe RYB"
+      }
+    ],
+    "competitor": [
+      {
+        "row": 0,
+        "code": "Q2_10Z",
+        "desc": "Message Recall"
+      },
+      {
+        "row": 1,
+        "code": "",
+        "desc": "mPFS 29.4 months with chemo"
+      },
+      {
+        "row": 2,
+        "code": "",
+        "desc": "89% of patients stay on treatment"
+      },
+      {
+        "row": 3,
+        "code": "",
+        "desc": "Grade 1/2 adverse reactions most common"
+      },
+      {
+        "row": 4,
+        "code": "",
+        "desc": "NCCN Category 1 recommendation (mono+chemo)"
+      },
+      {
+        "row": 5,
+        "code": "",
+        "desc": "Longest mPFS and mOS data"
+      },
+      {
+        "row": 6,
+        "code": "",
+        "desc": "Once-daily oral dosing convenience"
+      },
+      {
+        "row": 7,
+        "code": "C1_81_TAG_mNSCLC_Z",
+        "desc": "C1_81_TAG_mNSCLC_Z"
+      },
+      {
+        "row": 8,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 9,
+        "code": "C1_82_TAG_mNSCLC_Z",
+        "desc": "C1_82_TAG_mNSCLC_Z"
+      },
+      {
+        "row": 10,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 11,
+        "code": "C1_83D_TAG_mNSCLC_Z",
+        "desc": "C1_83D_TAG_mNSCLC_Z"
+      },
+      {
+        "row": 12,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 13,
+        "code": "C1_84b_TAG_mNSCLC_Z",
+        "desc": "C1_84b_TAG_mNSCLC_Z"
+      },
+      {
+        "row": 14,
+        "code": "",
+        "desc": "Top Box"
+      },
+      {
+        "row": 15,
+        "code": "C1_85D_TAG2_mNSCLCZ",
+        "desc": "Prescription Intent TAG"
+      },
+      {
+        "row": 16,
+        "code": "",
+        "desc": "1L EGFR+ mNSCLC + chemo"
+      },
+      {
+        "row": 17,
+        "code": "",
+        "desc": "2L+ EGFR+ mNSCLC + chemo"
+      },
+      {
+        "row": 250,
+        "code": "TAG_mPFS",
+        "desc": "mPFS data"
+      },
+      {
+        "row": 251,
+        "code": "TAG_mPFS",
+        "desc": "mPFS data"
+      },
+      {
+        "row": 252,
+        "code": "TAG_mPFS",
+        "desc": "mPFS data"
+      },
+      {
+        "row": 253,
+        "code": "TAG_mPFS",
+        "desc": "mPFS data"
+      },
+      {
+        "row": 254,
+        "code": "TAG_NCCN",
+        "desc": "NCCN recommendation"
+      },
+      {
+        "row": 255,
+        "code": "TAG_NCCN",
+        "desc": "NCCN recommendation"
+      },
+      {
+        "row": 256,
+        "code": "TAG_NCCN",
+        "desc": "NCCN recommendation"
+      },
+      {
+        "row": 257,
+        "code": "TAG_NCCN",
+        "desc": "NCCN recommendation"
+      },
+      {
+        "row": 258,
+        "code": "TAG_Safe",
+        "desc": "Safety profile"
+      },
+      {
+        "row": 259,
+        "code": "TAG_Safe",
+        "desc": "Safety profile"
+      },
+      {
+        "row": 260,
+        "code": "TAG_Safe",
+        "desc": "Safety profile"
+      },
+      {
+        "row": 261,
+        "code": "TAG_Safe",
+        "desc": "Safety profile"
+      },
+      {
+        "row": 262,
+        "code": "TAG_Dail",
+        "desc": "Daily dosing"
+      },
+      {
+        "row": 263,
+        "code": "TAG_Dail",
+        "desc": "Daily dosing"
+      },
+      {
+        "row": 264,
+        "code": "TAG_Dail",
+        "desc": "Daily dosing"
+      },
+      {
+        "row": 265,
+        "code": "TAG_Dail",
+        "desc": "Daily dosing"
+      }
+    ],
+    "analysis": [
+      {
+        "row": 4,
+        "code": "",
+        "desc": "Overall quality of sales call"
+      },
+      {
+        "row": 5,
+        "code": "",
+        "desc": "How knowledgeable about competitor products"
+      },
+      {
+        "row": 6,
+        "code": "",
+        "desc": "How knowledgeable about EGFR exon 20"
+      },
+      {
+        "row": 7,
+        "code": "",
+        "desc": "How knowledgeable about product (RYB/TAG)"
+      },
+      {
+        "row": 8,
+        "code": "",
+        "desc": "How knowledgeable about EGFR mNSCLC landscape"
+      },
+      {
+        "row": 9,
+        "code": "",
+        "desc": "Organized presentation of information"
+      },
+      {
+        "row": 10,
+        "code": "",
+        "desc": "Compelling reason to prescribe"
+      },
+      {
+        "row": 11,
+        "code": "",
+        "desc": "Compelling reason to use broader molecular testing"
+      },
+      {
+        "row": 12,
+        "code": "",
+        "desc": "Credible support for product claims"
+      },
+      {
+        "row": 13,
+        "code": "",
+        "desc": "Prepared for conversation with me"
+      },
+      {
+        "row": 14,
+        "code": "",
+        "desc": "Engaging when discussing product"
+      },
+      {
+        "row": 15,
+        "code": "",
+        "desc": "Meaningful questions about my practice"
+      },
+      {
+        "row": 16,
+        "code": "",
+        "desc": "Valuable use of my time"
+      },
+      {
+        "row": 17,
+        "code": "",
+        "desc": "Address my questions about prescribing"
+      },
+      {
+        "row": 18,
+        "code": "",
+        "desc": "Delivering a clear message about product"
+      },
+      {
+        "row": 30,
+        "code": "",
+        "desc": "Superior efficacy outcomes"
+      },
+      {
+        "row": 31,
+        "code": "",
+        "desc": "Well-tolerated safety profile"
+      },
+      {
+        "row": 32,
+        "code": "",
+        "desc": "NCCN Category 1 recommendation"
+      },
+      {
+        "row": 33,
+        "code": "",
+        "desc": "Convenient dosing schedule"
+      },
+      {
+        "row": 34,
+        "code": "",
+        "desc": "First-line treatment option"
+      }
+    ]
+  }
+}

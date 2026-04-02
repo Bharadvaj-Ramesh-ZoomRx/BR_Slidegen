@@ -143,11 +143,11 @@ def _acquire_azure_token() -> Optional[str]:
         "scope": scope,
     }
 
-    logger.info("Acquiring Azure AD token (client credentials flow)...")
+    logger.debug("Acquiring Azure AD token (client credentials flow)...")
 
     try:
         data = _post_form(token_url, form_data)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         logger.warning("Azure AD token acquisition failed: %s", exc)
         return None
 
@@ -162,7 +162,7 @@ def _acquire_azure_token() -> Optional[str]:
     _cached_token = access_token
     _cached_token_expiry = time.time() + expires_in
 
-    logger.info("Azure AD token acquired (expires in %ds)", expires_in)
+    logger.debug("Azure AD token acquired (expires in %ds)", expires_in)
     return access_token
 
 

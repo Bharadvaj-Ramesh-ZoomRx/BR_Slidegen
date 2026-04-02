@@ -56,6 +56,8 @@ except ImportError:
     import urllib.error as _urllib_err
     _USE_REQUESTS = False
 
+from slidegen.pipeline.http_utils import get_json as _get_json_shared, post_json as _post_json_shared
+
 _ENV_KEY_NAME = "SYNAPSE_API_KEY"
 
 
@@ -90,18 +92,18 @@ def fetch_all_raw(
     result = {}
 
     # 1. Download raw survey responses as JSON → DataFrames → pkl
-    print("Fetching raw survey responses from Synapse (JSON)...")
+    logger.info("Fetching raw survey responses from Synapse (JSON)...")
     dataframes, pkl_path = fetch_survey_responses_json(config, synapse, resolved_url, headers)
     result["dataframes"] = dataframes
     result["pkl_path"] = pkl_path
 
     # 2. Fetch segment definitions
-    print("Fetching segment definitions...")
+    logger.info("Fetching segment definitions...")
     segments = fetch_segments(synapse, resolved_url, headers)
     result["segments"] = segments
 
     # 3. Auto-discover and fetch VQ data
-    print("Fetching virtual question data...")
+    logger.info("Fetching virtual question data...")
     vq_questions, vq_data = fetch_virtual_questions(synapse, resolved_url, headers)
     result["vq_questions"] = vq_questions
     result["vq_data"] = vq_data
@@ -137,7 +139,7 @@ def fetch_survey_responses_json(
         "simulated_panelist": False,
     }
 
-    print(f"  Downloading JSON responses for surveys {synapse.survey_ids}...")
+    logger.info(f"  Downloading JSON responses for surveys {synapse.survey_ids}...")
     ndjson_lines = _post_ndjson(url, headers, payload)
 
     # Parse NDJSON into per-sheet DataFrames
@@ -159,7 +161,7 @@ def fetch_survey_responses_json(
             if current_sheet and current_rows:
                 df = pd.DataFrame(current_rows, columns=current_columns)
                 dataframes[current_sheet] = df
-                print(f"    {current_sheet}: {len(df)} respondents, {len(current_columns)} columns")
+                logger.info(f"    {current_sheet}: {len(df)} respondents, {len(current_columns)} columns")
 
             current_sheet = obj.get("sheet_name", f"survey_{obj.get('survey_id', 'unknown')}")
             current_columns = obj.get("columns", [])
@@ -172,6 +174,11 @@ def fetch_survey_responses_json(
             if len(values) < len(current_columns):
                 values.extend([None] * (len(current_columns) - len(values)))
             elif len(values) > len(current_columns):
+                logger.warning(
+                    "Row has %d values but only %d columns — truncating %d extra (sheet: %s)",
+                    len(values), len(current_columns),
+                    len(values) - len(current_columns), current_sheet,
+                )
                 values = values[:len(current_columns)]
             current_rows.append(values)
 
@@ -179,10 +186,10 @@ def fetch_survey_responses_json(
     if current_sheet and current_rows:
         df = pd.DataFrame(current_rows, columns=current_columns)
         dataframes[current_sheet] = df
-        print(f"    {current_sheet}: {len(df)} respondents, {len(current_columns)} columns")
+        logger.info(f"    {current_sheet}: {len(df)} respondents, {len(current_columns)} columns")
 
     if not dataframes:
-        print("  [WARN] No response data received from Synapse JSON endpoint")
+        logger.warning("  [WARN] No response data received from Synapse JSON endpoint")
 
     # Save as pkl cache
     pkl_path = _raw_pkl_path(config)
@@ -193,7 +200,7 @@ def fetch_survey_responses_json(
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = pkl_path.replace(".pkl", f"_backup_{ts}.pkl")
         shutil.copy2(pkl_path, backup_path)
-        print(f"  Backed up existing pkl → {os.path.basename(backup_path)}")
+        logger.info(f"  Backed up existing pkl → {os.path.basename(backup_path)}")
 
     cache_data = {
         "_meta": {
@@ -210,7 +217,7 @@ def fetch_survey_responses_json(
         pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     size_mb = os.path.getsize(pkl_path) / (1024 * 1024)
-    print(f"  Saved pkl cache: {pkl_path} ({size_mb:.1f} MB)")
+    logger.info(f"  Saved pkl cache: {pkl_path} ({size_mb:.1f} MB)")
 
     return dataframes, pkl_path
 
@@ -231,9 +238,9 @@ def load_cached_pkl(config: ProjectConfig) -> dict | None:
         meta = cached.get("_meta", {})
         dfs = cached.get("dataframes", {})
         total_rows = sum(len(df) for df in dfs.values())
-        print(f"  Loaded pkl cache: {pkl_path}")
-        print(f"    {len(dfs)} sheets, {total_rows} total rows")
-        print(f"    Fetched: {meta.get('fetched_at', 'unknown')}")
+        logger.info(f"  Loaded pkl cache: {pkl_path}")
+        logger.info(f"    {len(dfs)} sheets, {total_rows} total rows")
+        logger.info(f"    Fetched: {meta.get('fetched_at', 'unknown')}")
         return cached
     except (pickle.UnpicklingError, EOFError, Exception) as e:
         logger.warning("Failed to load pkl cache %s: %s", pkl_path, e)
@@ -253,9 +260,9 @@ def fetch_segments(
     response = _get_json(url, headers)
 
     segments = response.get("segments", [])
-    print(f"  Found {len(segments)} segments for project {synapse.project_id}")
+    logger.info(f"  Found {len(segments)} segments for project {synapse.project_id}")
     for seg in segments:
-        print(f"    [{seg['segment_id']}] {seg['segment_name']} ({seg['type']})")
+        logger.info(f"    [{seg['segment_id']}] {seg['segment_name']} ({seg['type']})")
 
     return segments
 
@@ -283,10 +290,10 @@ def fetch_virtual_questions(
         # List VQs for this survey
         vq_list = _list_virtual_questions(resolved_url, headers, survey_id)
         if not vq_list:
-            print(f"  No virtual questions found for survey {survey_id}")
+            logger.info(f"  No virtual questions found for survey {survey_id}")
             continue
 
-        print(f"  Survey {survey_id}: {len(vq_list)} virtual questions")
+        logger.info(f"  Survey {survey_id}: {len(vq_list)} virtual questions")
         for vq in vq_list:
             vq["survey_id"] = survey_id
         all_vq_questions.extend(vq_list)
@@ -301,7 +308,7 @@ def fetch_virtual_questions(
             )
             all_vq_data.update(vq_responses)
             total_rows = sum(len(rows) for rows in vq_responses.values())
-            print(f"    Exported {total_rows} VQ response rows across {len(vq_responses)} questions")
+            logger.info(f"    Exported {total_rows} VQ response rows across {len(vq_responses)} questions")
 
     return all_vq_questions, all_vq_data
 
@@ -456,10 +463,10 @@ def _resolve_wave_ids(
                             wave_ids.append(wid)
 
         if wave_ids:
-            print(f"  Resolved {len(wave_ids)} wave_ids from reporting plan {reporting_plan_id}")
+            logger.info(f"  Resolved {len(wave_ids)} wave_ids from reporting plan {reporting_plan_id}")
         return wave_ids
 
-    except Exception as e:
+    except (RuntimeError, KeyError, TypeError, ValueError) as e:
         logger.warning("Failed to resolve wave_ids from reporting plan: %s", e)
         return []
 
@@ -469,7 +476,7 @@ def _invalidate_raw_cache(config: ProjectConfig) -> None:
     pkl_path = _raw_pkl_path(config)
     if os.path.exists(pkl_path):
         os.remove(pkl_path)
-        print(f"  Invalidated raw data cache: {pkl_path}")
+        logger.info(f"  Invalidated raw data cache: {pkl_path}")
 
     # Also clean up legacy JSON cache if present
     if config.context_path:
@@ -486,47 +493,13 @@ def _invalidate_raw_cache(config: ProjectConfig) -> None:
 # ── HTTP helpers ──────────────────────────────────────────────────────────
 
 def _get_json(url: str, headers: dict) -> dict:
-    """GET and return parsed JSON."""
-    if _USE_REQUESTS:
-        resp = _requests.get(url, headers=headers, timeout=30)
-        if not resp.ok:
-            detail = resp.text
-            try:
-                detail = resp.json().get("detail", resp.text)
-            except Exception:
-                pass
-            raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
-        return resp.json()
-    else:
-        req = _urllib_req.Request(url, headers=headers)
-        try:
-            with _urllib_req.urlopen(req, timeout=30) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except _urllib_err.HTTPError as e:
-            raise RuntimeError(f"Synapse API error {e.code}: {e.reason}") from e
+    """GET and return parsed JSON (delegates to shared http_utils with retry)."""
+    return _get_json_shared(url, headers)
 
 
 def _post_json(url: str, headers: dict, payload: dict) -> dict:
-    """POST JSON and return parsed JSON response."""
-    body = json.dumps(payload).encode("utf-8")
-
-    if _USE_REQUESTS:
-        resp = _requests.post(url, data=body, headers=headers, timeout=60)
-        if not resp.ok:
-            detail = resp.text
-            try:
-                detail = resp.json().get("detail", resp.text)
-            except Exception:
-                pass
-            raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
-        return resp.json()
-    else:
-        req = _urllib_req.Request(url, data=body, headers=headers, method="POST")
-        try:
-            with _urllib_req.urlopen(req, timeout=60) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except _urllib_err.HTTPError as e:
-            raise RuntimeError(f"Synapse API error {e.code}: {e.reason}") from e
+    """POST JSON and return parsed JSON (delegates to shared http_utils with retry)."""
+    return _post_json_shared(url, headers, payload)
 
 
 def _post_ndjson(url: str, headers: dict, payload: dict) -> list[str]:
@@ -541,7 +514,7 @@ def _post_ndjson(url: str, headers: dict, payload: dict) -> list[str]:
             detail = resp.text[:500]
             try:
                 detail = resp.json().get("detail", resp.text[:500])
-            except Exception:
+            except (ValueError, KeyError):
                 pass
             raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
         return resp.text.strip().split("\n")
@@ -567,7 +540,7 @@ def _post_csv(url: str, headers: dict, payload: dict) -> str:
             detail = resp.text
             try:
                 detail = resp.json().get("detail", resp.text)
-            except Exception:
+            except (ValueError, KeyError):
                 pass
             raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
         return resp.text
@@ -617,21 +590,21 @@ def _cli() -> None:
         if cached:
             dfs = cached.get("dataframes", {})
             for name, df in dfs.items():
-                print(f"  {name}: {df.shape[0]} rows × {df.shape[1]} cols")
+                logger.info(f"  {name}: {df.shape[0]} rows × {df.shape[1]} cols")
         else:
-            print("No cached pkl found. Run without --load-cached to fetch.")
+            logger.info("No cached pkl found. Run without --load-cached to fetch.")
         return
 
     result = fetch_all_raw(config, api_key=args.api_key, synapse_url=args.synapse_url)
 
-    print(f"\nDone. Pkl cache: {result['pkl_path']}")
-    print(f"  DataFrames: {len(result['dataframes'])} sheets")
+    logger.info(f"\nDone. Pkl cache: {result['pkl_path']}")
+    logger.info(f"  DataFrames: {len(result['dataframes'])} sheets")
     for name, df in result["dataframes"].items():
-        print(f"    {name}: {df.shape[0]} rows × {df.shape[1]} cols")
-    print(f"  Segments: {len(result['segments'])}")
-    print(f"  VQ questions: {len(result['vq_questions'])}")
+        logger.info(f"    {name}: {df.shape[0]} rows × {df.shape[1]} cols")
+    logger.info(f"  Segments: {len(result['segments'])}")
+    logger.info(f"  VQ questions: {len(result['vq_questions'])}")
 
     if args.and_generate:
         from slidegen.pipeline.orchestrator import generate_deck
-        print("\nRunning generate_deck()...")
+        logger.info("\nRunning generate_deck()...")
         generate_deck(args.yaml_path)

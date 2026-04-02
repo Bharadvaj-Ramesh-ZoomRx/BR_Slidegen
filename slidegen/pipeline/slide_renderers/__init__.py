@@ -4,15 +4,17 @@ slidegen/pipeline/slide_renderers — Slide type renderer package.
 Each renderer takes (slide, config, ask, data, *, namer=None) and builds
 slide content generically from the ask definition + extracted data.
 
-19 renderers across 7 modules:
-  narrative:  cover, executive_summary
-  bar:        single_bar_with_delta, qoq_bar_with_delta, two_section_bar
-  bar_dual:   dual_bar_with_delta, dual_bar_qoq
-  compare:    clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
-  dot:        abacus, dual_abacus, followup_rep, message_mbd
-  line:       trended_scorecard, trended_activity
-  quadrant:   quadrant_scatter
-  heatmap:    heatmap_table
+20 renderers across 9 modules:
+  narrative:        cover, executive_summary
+  bar:              single_bar_with_delta, qoq_bar_with_delta, two_section_bar
+  bar_dual:         dual_bar_with_delta, dual_bar_qoq
+  compare:          clustered_compare, stacked_order, dual_bar_compare
+  compare_special:  hii_scorecard, dual_doughnut
+  dot:              abacus
+  dot_special:      dual_abacus, followup_rep, message_mbd
+  line:             trended_scorecard, trended_activity
+  quadrant:         quadrant_scatter
+  heatmap:          heatmap_table
 
   + "dual_brand_compare" backward-compat alias → dual_bar_compare
 """
@@ -24,8 +26,10 @@ from .bar import (
     render_two_section_bar,
 )
 from .bar_dual import render_dual_bar_with_delta, render_dual_bar_qoq
-from .compare import render_clustered_compare, render_stacked_order, render_dual_bar_compare, render_hii_scorecard, render_dual_doughnut
-from .dot import render_abacus, render_dual_abacus, render_followup_rep, render_message_mbd
+from .compare import render_clustered_compare, render_stacked_order, render_dual_bar_compare
+from .compare_special import render_hii_scorecard, render_dual_doughnut
+from .dot import render_abacus
+from .dot_special import render_dual_abacus, render_followup_rep, render_message_mbd
 from .line import render_trended_scorecard, render_trended_activity
 from .quadrant import render_quadrant_scatter
 from .heatmap import render_heatmap_table

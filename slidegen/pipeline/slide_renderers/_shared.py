@@ -5,6 +5,7 @@ slide renderer submodules.
 
 from __future__ import annotations
 import logging
+from dataclasses import dataclass
 
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
@@ -26,6 +27,7 @@ from slidegen.pptx_utils import (
     set_series_marker, set_series_line_style,
     _get_or_add, suppress_para_bullets, suppress_cat_axis_bullets, cell_vcenter,
     enable_data_labels, delete_data_label,
+    _configure_bar_axes, _style_bar_series,
     add_single_bar_chart, add_clustered_bar_chart,
     add_line_chart, add_stacked_column_chart, add_scatter_chart,
     add_delta_table, add_value_table,
@@ -88,6 +90,14 @@ DUAL_T_ME_DELTA_L = 9.526      # Effectiveness delta table left
 DUAL_T_ME_DELTA_W = 0.529      # Effectiveness delta table width
 DUAL_T_CALLOUT_L = 10.326      # Callout boxes left edge
 DUAL_T_CALLOUT_W = 2.677       # Callout boxes width
+
+# Common layout spacing (inches)
+ELEMENT_GAP = 0.08              # gap between adjacent chart elements (label table, chart, delta col)
+SIDE_MARGIN = 0.30              # horizontal margin on each side of centered block
+FOOTER_BUFFER = 0.55            # space reserved above footer for legend + gap
+ROW_H_MIN = 0.25                # minimum per-row height in tables/charts
+ROW_H_MAX = 0.42                # maximum per-row height in tables/charts
+HDR_H_STD = 0.30                # standard header row height for chart label tables
 
 # Chart sizing constraints
 MAX_CHART_HEIGHT = 4.5
@@ -172,6 +182,119 @@ DUAL_BC_R_DELTA_L   = 10.651  # right brand delta table left
 DUAL_BC_R_DELTA_W   = 0.529   # right brand delta table width
 
 
+# ── Layout archetype dataclasses ─────────────────────────────────────────────
+# Frozen dataclasses that group related constants per slide archetype.
+# Renderers can reference e.g. SINGLE_BAR.chart_w instead of SINGLE_BAR_WIDTH.
+# Flat constants above are preserved for backward compatibility.
+
+
+@dataclass(frozen=True)
+class _SingleBarLayout:
+    """Single horizontal bar + delta column (Archetype 1)."""
+    chart_w: float = SINGLE_BAR_WIDTH        # 9.0
+    delta_w: float = DELTA_COL_WIDTH         # 0.65
+    delta_gap: float = CHART_DELTA_GAP       # 0.10
+    chart_top: float = CHART_TOP_STD         # 1.85
+    max_h: float = MAX_CHART_HEIGHT          # 4.5
+    min_h: float = MIN_CHART_HEIGHT          # 3.0
+    row_h_min: float = ROW_H_MIN            # 0.25
+    row_h_max: float = ROW_H_MAX            # 0.42
+    hdr_h: float = HDR_H_STD                # 0.30
+    bar_gap: int = BAR_GAP_STD              # 80
+    label_max: int = LABEL_MAX_SINGLE       # 65
+    row_scale: float = ROW_SCALE_FACTOR     # 0.85
+
+
+@dataclass(frozen=True)
+class _QoQBarLayout:
+    """Clustered Q4-vs-Q3 bar + delta (Archetype 1b)."""
+    chart_w: float = 8.0
+    delta_w: float = DELTA_COL_WIDTH
+    delta_gap: float = CHART_DELTA_GAP
+    chart_top: float = CHART_TOP_STD
+    max_h: float = MAX_QOQ_HEIGHT           # 4.0
+    min_h: float = MIN_CHART_HEIGHT
+    bar_gap: int = BAR_GAP_STD
+    overlap: int = CLUSTERED_OVERLAP        # -10
+    label_max: int = LABEL_MAX_DUAL         # 55
+    row_scale: float = ROW_SCALE_FACTOR
+
+
+@dataclass(frozen=True)
+class _DualBarLayout:
+    """Side-by-side MR+ME bars with red header row (Archetype 3)."""
+    hdr_top: float = DUAL_HEADER_ROW_TOP    # 1.40
+    hdr_h: float = DUAL_HEADER_ROW_H        # 0.42
+    chart_top: float = DUAL_CHART_TOP       # 1.84
+    mr_left: float = DUAL_MR_LEFT           # 0.20
+    mr_w: float = DUAL_MR_WIDTH             # 7.30
+    mr_delta_l: float = DUAL_MR_DELTA_LEFT  # 7.54
+    me_left: float = DUAL_ME_LEFT           # 8.26
+    me_w: float = DUAL_ME_WIDTH             # 4.40
+    me_delta_l: float = DUAL_ME_DELTA_LEFT  # 12.70
+    delta_w: float = DUAL_DELTA_WIDTH       # 0.62
+    sep_x: float = DUAL_SEPARATOR_X         # 8.16
+    max_h: float = DUAL_MAX_CHART_HEIGHT    # 4.90
+    bar_gap: int = BAR_GAP_STD
+    label_max: int = LABEL_MAX_DUAL
+
+
+@dataclass(frozen=True)
+class _AbacusLayout:
+    """XY scatter abacus with label + value + delta tables (Archetype 4)."""
+    hdr_h: float = _ABS_HDR_H              # 0.28
+    row_h_min: float = _ABS_ROW_H_MIN      # 0.25
+    row_h_max: float = _ABS_ROW_H_MAX      # 0.38
+    top: float = _ABS_TOP                   # 1.88
+    label_w: float = _ABS_LABEL_W           # 3.80
+    val_w: float = _ABS_VAL_W              # 0.58
+    chart_w: float = _ABS_CHART_W          # 3.10
+    delta_w: float = _ABS_DELTA_W          # 0.58
+    gap: float = _ABS_GAP                  # 0.08
+    slide_w: float = _ABS_SLIDE_W          # 13.33
+
+
+@dataclass(frozen=True)
+class _ClusteredCompareLayout:
+    """Clustered compare with label table + dual series (Archetype 2)."""
+    chart_w: float = CLUSTERED_BAR_WIDTH    # 8.5
+    delta_w: float = DELTA_COL_WIDTH        # 0.65
+    delta_gap: float = CHART_DELTA_GAP
+    chart_top: float = CHART_TOP_STD
+    max_h: float = MAX_CLUSTERED_HEIGHT     # 4.8
+    min_h: float = MIN_CHART_HEIGHT
+    bar_gap: int = CLUSTERED_GAP           # 65
+    overlap: int = -15
+    label_max: int = LABEL_MAX_CLUSTERED   # 65
+
+
+@dataclass(frozen=True)
+class _DualBrandCompareLayout:
+    """Side-by-side brand comparison with shared category column (Archetype 5)."""
+    top: float = DUAL_BC_TOP               # 2.30
+    row_h: float = DUAL_BC_ROW_H           # 0.930
+    cat_left: float = DUAL_BC_CAT_LEFT     # 1.917
+    cat_w: float = DUAL_BC_CAT_W           # 2.710
+    l_chart_l: float = DUAL_BC_L_CHART_L   # 5.041
+    l_chart_w: float = DUAL_BC_L_CHART_W   # 2.480
+    l_delta_l: float = DUAL_BC_L_DELTA_L   # 6.976
+    l_delta_w: float = DUAL_BC_L_DELTA_W   # 0.529
+    sep_x: float = DUAL_BC_SEP_X           # 7.756
+    r_chart_l: float = DUAL_BC_R_CHART_L   # 8.536
+    r_chart_w: float = DUAL_BC_R_CHART_W   # 2.480
+    r_delta_l: float = DUAL_BC_R_DELTA_L   # 10.651
+    r_delta_w: float = DUAL_BC_R_DELTA_W   # 0.529
+
+
+# Singleton instances — use these in renderers
+SINGLE_BAR = _SingleBarLayout()
+QOQ_BAR = _QoQBarLayout()
+DUAL_BAR = _DualBarLayout()
+ABACUS = _AbacusLayout()
+CLUSTERED = _ClusteredCompareLayout()
+DUAL_BRAND = _DualBrandCompareLayout()
+
+
 # ── Dynamic label width ──────────────────────────────────────────────────────
 
 def _auto_label_width(labels: list[str], fsize: float = 7.5,
@@ -195,16 +318,27 @@ def _auto_label_width(labels: list[str], fsize: float = 7.5,
 # ── Template resolution ───────────────────────────────────────────────────────
 
 def _resolve_template(text: str, config: ProjectConfig) -> str:
-    """Replace {{...}} placeholders in headline/section text."""
-    if not text:
+    """Replace {{...}} placeholders in headline/section text.
+
+    Missing fields leave the placeholder intact and log a warning (never crash).
+    """
+    if not text or "{{" not in text:
         return text
-    text = text.replace("{{primary.name}}", config.primary.name)
-    text = text.replace("{{primary.full_name}}", config.primary.full_name)
-    text = text.replace("{{competitor.name}}", config.competitor.name)
-    text = text.replace("{{competitor.full_name}}", config.competitor.full_name)
-    text = text.replace("{{period_current}}", config.period_current)
-    text = text.replace("{{period_prior}}", config.period_prior)
-    text = text.replace("{{client}}", config.client)
+    replacements = {
+        "{{primary.name}}": lambda: config.primary.name,
+        "{{primary.full_name}}": lambda: config.primary.full_name,
+        "{{competitor.name}}": lambda: config.competitor.name,
+        "{{competitor.full_name}}": lambda: config.competitor.full_name,
+        "{{period_current}}": lambda: config.period_current,
+        "{{period_prior}}": lambda: config.period_prior,
+        "{{client}}": lambda: config.client,
+    }
+    for placeholder, getter in replacements.items():
+        if placeholder in text:
+            try:
+                text = text.replace(placeholder, getter())
+            except (AttributeError, KeyError):
+                logger.warning("Template placeholder %s could not be resolved — left as-is", placeholder)
     return text
 
 
@@ -236,6 +370,16 @@ def _get_brand_colors(config: ProjectConfig, ask: AskConfig):
     brand_key = ask.brand if ask.brand else "primary"
     brand = config.brands.get(brand_key, config.primary)
     return brand.color_current, brand.color_prior
+
+
+def _compute_row_h(n_rows: int, available_h: float,
+                    min_h: float = 0.25, max_h: float = 0.42) -> float:
+    """Compute per-row height clamped to [min_h, max_h].
+
+    Replaces the repeated pattern:
+        row_h = min(MAX, max(MIN, available_h / max(n, 1)))
+    """
+    return min(max_h, max(min_h, available_h / max(n_rows, 1)))
 
 
 def _sort_data(rows: list[dict], sort_by: str | None, sort_desc: bool = True) -> list[dict]:
@@ -344,3 +488,89 @@ def _cell_bottom_border(cell, hex_rgb, w_emu=6350):
     sf = etree.SubElement(lnB, qn('a:solidFill'))
     clr = etree.SubElement(sf, qn('a:srgbClr'))
     clr.set('val', hex_rgb)
+
+
+# ── Shared DRY helpers (Phase 3 refactoring) ────────────────────────────────
+
+# Font size scheme — use these instead of inline magic numbers
+FONT_HDR = 8.0
+FONT_BODY = 7.5
+FONT_LABEL = 7.0
+FONT_SMALL = 6.5
+
+
+def _alt_row_bg(i: int):
+    """Return alternating row background color: grey for even rows, white for odd."""
+    return C_LBGREY if i % 2 == 0 else C_WHITE
+
+
+def _no_data_placeholder(slide, ask_id: str = ""):
+    """Show a red 'Data not available' message and log a warning."""
+    logger.warning("No data available for %s", ask_id or "slide")
+    textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+
+
+def _require_data(data: dict, ask: AskConfig) -> list | None:
+    """Get rows for an ask's data_key. Returns None (and shows placeholder) if empty."""
+    rows = data.get(ask.data_key, [])
+    return rows if rows else None
+
+
+def _prepare_rows(slide, data: dict, ask: AskConfig) -> list | None:
+    """Get, sort, and validate data rows for a renderer.
+
+    Returns sorted rows ready for rendering, or None if no data (after
+    placing a red placeholder on the slide). Replaces the 3-line boilerplate:
+        rows = data.get(ask.data_key, [])
+        rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
+        if not rows: _no_data_placeholder(slide, ask.id); return
+    """
+    rows = data.get(ask.data_key, [])
+    rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
+    if not rows:
+        _no_data_placeholder(slide, ask.id)
+        return None
+    return rows
+
+
+def _layout_blocks(slide_w: float, *block_widths: float,
+                   gap: float = ELEMENT_GAP) -> tuple[float, list[float]]:
+    """Center-align blocks horizontally within slide_w.
+
+    Returns (origin, [left_positions]) where each left position corresponds
+    to the left edge of the block at the same index.
+
+    Example:
+        origin, (label_l, chart_l, delta_l) = _layout_blocks(
+            SLIDE_W, label_w, chart_w, delta_w)
+    """
+    total = sum(block_widths) + gap * (len(block_widths) - 1)
+    origin = (slide_w - total) / 2
+    positions = []
+    x = origin
+    for i, w in enumerate(block_widths):
+        positions.append(x)
+        x += w + gap
+    return origin, positions
+
+
+def _build_label_table(slide, labels: list[str], label_w: float, row_h: float,
+                       left: float, top: float, header_text: str = "Message",
+                       font: str | None = None, hdr_h: float = HDR_H_STD):
+    """Build a label column table with header + alternating-row styling.
+
+    Returns the (shape, table) tuple for further customization.
+    """
+    n = len(labels)
+    shape, tbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n, left, top)
+    _style_tbl_cell(tbl.cell(0, 0), header_text, bg=C_HDRGREY, fg=C_WHITE,
+                    fsize=FONT_HDR, bold=True, align=PP_ALIGN.LEFT, font=font,
+                    ml=0.08, mr=0.05)
+    for i, label in enumerate(labels):
+        cell = tbl.cell(i + 1, 0)
+        _style_tbl_cell(cell, label,
+                        bg=_alt_row_bg(i),
+                        fg=C_GREY, fsize=FONT_BODY, align=PP_ALIGN.LEFT, font=font,
+                        ml=0.08, mr=0.05)
+        cell.text_frame.word_wrap = True
+    return shape, tbl

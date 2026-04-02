@@ -443,6 +443,20 @@ index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
             "projects/{name}/context/{wave}/source_data.json")
 ```
 
+### Stages 0.5a/b/c — Parallel Context Generation
+
+**These three stages are independent and can run in parallel using background subagents:**
+
+```
+┌─ Agent 1: /market-context       → context/market_context.md         (if missing)
+├─ Agent 2: /prior-wave-context   → context/{wave}/prior_wave_context.md (if prior files exist)
+└─ Agent 3: /survey-context       → context/{wave}/survey_context.md   (if survey draft exists)
+    All write to independent files — no dependencies between them.
+    Wait for all to complete before Stage 1.
+```
+
+Each skill now auto-detects the active project/wave via dynamic context injection (no manual path entry needed).
+
 ### Stage 0.5a — Market Context (`/market-context`) — auto if context/market_context.md missing
 Checks if `context/market_context.md` already exists. If yes, uses it as-is (no re-run). If missing, auto-generates from Claude's clinical/competitive knowledge (+ any enrichment files in the project folder), runs the 3-round adversarial fact-check, and writes `context/market_context.md`. To force regeneration, user must explicitly say "regenerate market context."
 **No gate** — runs silently. Fact-check summary shown inline; user only pauses if flagged claims need review.
@@ -511,15 +525,13 @@ INPUT FOLDER: input/wave/{wave}/
 ─────────────────────────────────────────────────── no gates ──
 Stage 0    index_excel()          →  context/{wave}/source_data.json
 
-Stage 0.5a /market-context        →  context/market_context.md
-           (skip if already exists;   NOT wave-versioned)
-           (one prompt: flagged claims only)
-
-Stage 0.5b /prior-wave-context    →  context/{wave}/prior_wave_context.md
-           (skip if no prior files;   one prompt: file list)
-
-Stage 0.5c /survey-context        →  context/{wave}/survey_context.md
-           (skip if no survey draft;  one prompt: file list + code count)
+┌─ Stage 0.5a /market-context     →  context/market_context.md          ─┐
+│  (skip if exists; NOT wave-versioned; one prompt: flagged claims only)  │
+├─ Stage 0.5b /prior-wave-context →  context/{wave}/prior_wave_context.md│ PARALLEL
+│  (skip if no prior files; one prompt: file list)                       │ (background
+├─ Stage 0.5c /survey-context     →  context/{wave}/survey_context.md    │  subagents)
+│  (skip if no survey draft; one prompt: file list + code count)         │
+└─ All three write independent files — wait for all before Stage 1 ─────┘
 ─────────────────────────────────────────────────── no gates ──
 
 Stage 1    /build-project-context

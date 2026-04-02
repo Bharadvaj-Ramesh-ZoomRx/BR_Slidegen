@@ -1,14 +1,9 @@
 """
-data_loaders.py — Generic data extraction functions.
+data_loaders.py — Data loading, JSON caching, and Excel extraction orchestration.
 
-All the repeated "find code, walk rows, extract Q3/Q4" patterns
-from generate_asks.py are consolidated here into reusable extractors.
-
-Auto-JSON mode: On first run, data is extracted from Excel and saved as
-`source_data.json` alongside the Excel file. Subsequent runs read the JSON
-directly — no pandas, no column indices, no question-code walking. Delete
-`source_data.json` to force re-extraction, or it auto-invalidates when the
-Excel file changes.
+Coordinates the three data tiers: aggregated Excel, respondent-level local,
+and Synapse API. Extraction functions have been moved to extractors.py;
+this module handles caching, index building, and the master load_all_data().
 """
 
 from __future__ import annotations
@@ -16,460 +11,21 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import pandas as pd
 from datetime import datetime
 from typing import Optional, Callable
 
+# Re-export extraction functions for backward compatibility
+from slidegen.pipeline.extractors import (  # noqa: F401
+    pct, straight, delta,
+    make_label_shortener, _build_brand_replacements,
+    extract_by_question_code, extract_multi_question_code,
+    extract_row_range, extract_question_code_multi_col,
+    extract_nested_ordinal,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# ── Value converters ─────────────────────────────────────────────────────────
-
-def pct(v) -> Optional[float]:
-    """Convert decimal 0-1 to percentage rounded to 1 decimal."""
-    if v is None:
-        return None
-    try:
-        return round(float(v) * 100, 1)
-    except (ValueError, TypeError):
-        return None
-
-
-def straight(v) -> Optional[float]:
-    """Value is already a percentage, just round."""
-    if v is None:
-        return None
-    try:
-        return round(float(v), 1)
-    except (ValueError, TypeError):
-        return None
-
-
-def delta(current, prior) -> Optional[float]:
-    """Current minus prior in ppts, rounded to 1 decimal."""
-    if current is None or prior is None:
-        return None
-    return round(current - prior, 1)
-
-
-# ── Label shortening ────────────────────────────────────────────────────────
-
-def make_label_shortener(shortcuts: list[dict], max_len: int = 35) -> Callable[[str], str]:
-    """Build a label shortening function from a list of keyword→short mappings.
-
-    Each shortcut: {"keywords": ["kw1", "kw2"], "short": "Short Label"}
-    """
-    def shorten(label: str) -> str:
-        ll = label.lower()
-        for sc in shortcuts:
-            kws = sc["keywords"]
-            if all(kw.lower() in ll for kw in kws):
-                return sc["short"]
-        # Generic cleanup
-        label = label.replace("Johnson & Johnson (Formerly Janssen)", "J&J")
-        label = label.replace("Johnson &amp; Johnson", "J&J")
-        label = label.replace("[COMPANY]", "J&J")
-        label = label.replace("[PRODUCT]", "RYB")
-        label = label.replace("How well the ", "").replace("How ", "")
-        label = label.strip()
-        if len(label) > max_len:
-            label = label[:max_len - 1] + "\u2026"
-        return label
-
-    return shorten
-
-
-# ── Generic extractors ───────────────────────────────────────────────────────
-
-def extract_by_question_code(
-    sheet: pd.DataFrame,
-    code: str,
-    q_prior_col: int,
-    q_current_col: int,
-    code_col: int = 0,
-    desc_col: int = 1,
-    max_rows: int = 20,
-    label_fn: Optional[Callable[[str], str]] = None,
-    converter: Callable = pct,
-    occurrence: int = 1,
-    dim_col: Optional[int] = None,
-) -> list[dict]:
-    """Find a question code row, walk sub-rows, extract prior/current values.
-
-    Args:
-        occurrence: Which occurrence of the code to use (1-based). Default 1
-            targets the first block. Use 2+ to skip to later blocks of the
-            same code (e.g. T2B block vs full distribution).
-        dim_col: If set, capture the value in this column as a "dim" field
-            on each row. Used by mbd_pivot aggregation to identify
-            Motivating/Believable/Differentiated dimensions.
-
-    Returns list of: {"desc": str, "prior": float, "current": float, "code": str}
-    """
-    results = []
-    match_count = 0
-    for i in range(len(sheet)):
-        if sheet.iloc[i, code_col] == code:
-            match_count += 1
-            if match_count < occurrence:
-                continue
-            j = i + 1
-            while j < len(sheet) and pd.notna(sheet.iloc[j, desc_col]):
-                desc = str(sheet.iloc[j, desc_col]).strip()
-                q_prior = sheet.iloc[j, q_prior_col]
-                q_current = sheet.iloc[j, q_current_col]
-                row_code = sheet.iloc[j, code_col] if pd.notna(sheet.iloc[j, code_col]) else ""
-
-                if desc and not desc.startswith("Base") and pd.notna(q_current):
-                    prior_val = converter(q_prior) if pd.notna(q_prior) else None
-                    current_val = converter(q_current) if pd.notna(q_current) else None
-                    # Skip stale rows where both prior and current are 0
-                    if (prior_val is None or prior_val == 0) and (current_val is None or current_val == 0):
-                        j += 1
-                        continue
-                    label = label_fn(desc) if label_fn else desc
-                    row_data = {
-                        "desc": label,
-                        "code": str(row_code),
-                        "prior": prior_val,
-                        "current": current_val,
-                    }
-                    if dim_col is not None:
-                        dim_val = sheet.iloc[j, dim_col]
-                        row_data["dim"] = str(dim_val).strip() if pd.notna(dim_val) else ""
-                    results.append(row_data)
-                j += 1
-                if j - i > max_rows:
-                    break
-            break
-    return results
-
-
-# ── Post-extraction aggregators ─────────────────────────────────────────────
-
-def _aggregate_avg_by_desc(rows: list[dict]) -> list[dict]:
-    """Group rows by desc, compute geometric mean of prior/current values.
-
-    Used for Message Effectiveness: each message has M/B/D sub-rows in the
-    raw extraction. This collapses them into one row per message with the
-    geometric mean (cube root of M×B×D) as the aggregate score.
-    """
-    import math
-    from collections import OrderedDict
-
-    groups: dict[str, list[dict]] = OrderedDict()
-    for r in rows:
-        key = r["desc"]
-        groups.setdefault(key, []).append(r)
-
-    results = []
-    for desc, group in groups.items():
-        priors = [r["prior"] for r in group if r.get("prior") is not None and r["prior"] > 0]
-        currents = [r["current"] for r in group if r.get("current") is not None and r["current"] > 0]
-
-        geo_prior = round(math.prod(priors) ** (1 / len(priors)), 1) if priors else None
-        geo_current = round(math.prod(currents) ** (1 / len(currents)), 1) if currents else None
-
-        results.append({
-            "desc": desc,
-            "code": group[0].get("code", ""),
-            "prior": geo_prior,
-            "current": geo_current,
-        })
-
-    return results
-
-
-# Dimension detection patterns for mbd_pivot
-_DIM_PATTERNS = {
-    "motiv": ["motivat", "m", "sq001"],
-    "believ": ["believab", "b", "sq002"],
-    "diff": ["differenti", "d", "sq003"],
-}
-
-
-def _detect_dimension(dim_value: str) -> Optional[str]:
-    """Detect M/B/D dimension from a cell value.
-
-    Handles variants: "Motivating", "M", "SQ001", etc.
-    Returns "motiv", "believ", "diff", or None.
-    """
-    v = dim_value.strip().lower()
-    for dim_key, patterns in _DIM_PATTERNS.items():
-        for pat in patterns:
-            if v == pat or v.startswith(pat):
-                return dim_key
-    return None
-
-
-def _aggregate_mbd_pivot(rows: list[dict]) -> list[dict]:
-    """Pivot M/B/D sub-rows into motiv/believ/diff fields + compute CE.
-
-    Input rows must have a "dim" field (from dim_col) identifying the
-    dimension. Groups by desc, pivots dimensions into separate fields,
-    then computes Composite Effectiveness (CE) as geometric mean of M×B×D.
-
-    Returns list of: {desc, motiv, motiv_prior, believ, believ_prior,
-                      diff, diff_prior, ce_current, ce_prior}
-    """
-    import math
-    from collections import OrderedDict
-
-    groups: dict[str, dict] = OrderedDict()
-    for r in rows:
-        key = r["desc"]
-        if key not in groups:
-            groups[key] = {"desc": key, "code": r.get("code", "")}
-
-        dim = _detect_dimension(r.get("dim", ""))
-        if dim is None:
-            logger.warning("mbd_pivot: unrecognized dimension '%s' for desc '%s'", r.get("dim"), key)
-            continue
-
-        groups[key][dim] = r.get("current")
-        groups[key][f"{dim}_prior"] = r.get("prior")
-
-    results = []
-    for entry in groups.values():
-        m_cur = entry.get("motiv")
-        b_cur = entry.get("believ")
-        d_cur = entry.get("diff")
-        m_pri = entry.get("motiv_prior")
-        b_pri = entry.get("believ_prior")
-        d_pri = entry.get("diff_prior")
-
-        # Compute CE (geometric mean) for current and prior
-        if all(v is not None and v > 0 for v in (m_cur, b_cur, d_cur)):
-            entry["ce_current"] = round((m_cur * b_cur * d_cur) ** (1/3), 1)
-        else:
-            entry["ce_current"] = None
-
-        if all(v is not None and v > 0 for v in (m_pri, b_pri, d_pri)):
-            entry["ce_prior"] = round((m_pri * b_pri * d_pri) ** (1/3), 1)
-        else:
-            entry["ce_prior"] = None
-
-        results.append(entry)
-
-    return results
-
-
-def extract_multi_question_code(
-    sheet: pd.DataFrame,
-    codes: list[dict],
-    q_prior_col: int,
-    q_current_col: int,
-    code_col: int = 0,
-    desc_col: int = 1,
-    converter: Callable = pct,
-) -> list[dict]:
-    """Extract one row per question code (e.g. CTA metrics).
-
-    Each code entry: {"code": "C1_81Z", "label": "Compelling reason to prescribe"}
-    Optional "pick" key: match a specific sub-row code (e.g. "DIA", "WCNS", "A2").
-    Without "pick", finds the code row, then looks for "top"/"yes" sub-row or takes first data row.
-    """
-    results = []
-    for entry in codes:
-        code = entry["code"]
-        label = entry["label"]
-        pick = entry.get("pick")
-        for i in range(len(sheet)):
-            if sheet.iloc[i, code_col] == code:
-                for j in range(i, min(i + 15, len(sheet))):
-                    cell = str(sheet.iloc[j, code_col]) if pd.notna(sheet.iloc[j, code_col]) else ""
-                    desc = str(sheet.iloc[j, desc_col]) if pd.notna(sheet.iloc[j, desc_col]) else ""
-                    if pick:
-                        if cell == pick:
-                            q_prior = sheet.iloc[j, q_prior_col]
-                            q_current = sheet.iloc[j, q_current_col]
-                            if pd.notna(q_prior) and pd.notna(q_current):
-                                results.append({
-                                    "desc": label,
-                                    "code": code,
-                                    "prior": converter(q_prior),
-                                    "current": converter(q_current),
-                                })
-                            break
-                    elif "top" in desc.lower() or "yes" in desc.lower() or j == i + 1:
-                        q_prior = sheet.iloc[j, q_prior_col]
-                        q_current = sheet.iloc[j, q_current_col]
-                        if pd.notna(q_prior) and pd.notna(q_current):
-                            results.append({
-                                "desc": label,
-                                "code": code,
-                                "prior": converter(q_prior),
-                                "current": converter(q_current),
-                            })
-                            break
-                break
-    return results
-
-
-def extract_row_range(
-    sheet: pd.DataFrame,
-    row_start: int,
-    row_end: int,
-    col_map: dict[str, int],
-    label_fn: Optional[Callable[[str], str]] = None,
-    converter: Callable = pct,
-    min_label_len: int = 3,
-) -> list[dict]:
-    """Extract data from a fixed row range with a column mapping.
-
-    col_map: {"label": 1, "primary_prior": 2, "primary_current": 3, ...}
-    The "label" key is required; all others become data fields.
-    """
-    results = []
-    label_col = col_map["label"]
-    data_cols = {k: v for k, v in col_map.items() if k != "label" and k != "short"}
-    short_col = col_map.get("short")
-
-    for i in range(row_start, min(row_end, len(sheet))):
-        raw_label = sheet.iloc[i, label_col]
-        if not pd.notna(raw_label) or not isinstance(raw_label, str) or len(raw_label) < min_label_len:
-            continue
-
-        label = label_fn(raw_label.strip()) if label_fn else raw_label.strip()
-        row = {"desc": label}
-
-        if short_col is not None:
-            short_val = sheet.iloc[i, short_col]
-            row["short"] = str(short_val).strip() if pd.notna(short_val) else label[:30]
-
-        # Check at least one data col is non-null
-        has_data = False
-        for key, col_idx in data_cols.items():
-            val = sheet.iloc[i, col_idx]
-            row[key] = converter(val) if pd.notna(val) else None
-            if pd.notna(val):
-                has_data = True
-
-        if has_data:
-            results.append(row)
-
-    return results
-
-
-def extract_question_code_multi_col(
-    sheet: pd.DataFrame,
-    code: str,
-    columns: dict[str, int],
-    code_col: int = 0,
-    desc_col: int = 1,
-    max_rows: int = 20,
-    label_fn: Optional[Callable[[str], str]] = None,
-    converter: Callable = pct,
-    min_diff: float = 0,
-) -> list[dict]:
-    """Extract multiple columns per row under a question code.
-
-    Used for HII comparison: hi_current=col20, other_current=col19.
-    Returns list with computed 'diff' field.
-    """
-    results = []
-    for i in range(len(sheet)):
-        if sheet.iloc[i, code_col] == code:
-            j = i + 1
-            while j < len(sheet) and pd.notna(sheet.iloc[j, desc_col]):
-                desc = str(sheet.iloc[j, desc_col]).strip()
-                if desc and not desc.startswith("Base"):
-                    row = {"desc": label_fn(desc) if label_fn else desc}
-                    all_valid = True
-                    for key, col_idx in columns.items():
-                        val = sheet.iloc[j, col_idx]
-                        if pd.notna(val):
-                            row[key] = converter(val)
-                        else:
-                            all_valid = False
-                    if all_valid and len(columns) >= 2:
-                        vals = list(row.values())
-                        # diff = first data col - second data col
-                        data_vals = [v for k, v in row.items() if k != "desc"]
-                        if len(data_vals) >= 2:
-                            row["diff"] = round(data_vals[0] - data_vals[1], 1)
-                    # Skip stale rows where all data values are 0
-                    if all_valid:
-                        data_vals = [v for k, v in row.items() if k not in ("desc", "diff")]
-                        if not all(v == 0 for v in data_vals):
-                            results.append(row)
-                j += 1
-                if j - i > max_rows:
-                    break
-            break
-
-    if min_diff > 0:
-        pre_filter = len(results)
-        results = [r for r in results if abs(r.get("diff", 0)) > min_diff]
-        results.sort(key=lambda x: abs(x.get("diff", 0)), reverse=True)
-        if pre_filter > 0 and len(results) == 0:
-            logger.warning(
-                "extract_question_code_multi_col: min_diff=%.1f filtered all "
-                "%d rows to 0 for code '%s'", min_diff, pre_filter, code
-            )
-
-    return results
-
-
-def extract_nested_ordinal(
-    sheet: pd.DataFrame,
-    row_start: int,
-    row_end: int,
-    code_col: int = 0,
-    desc_col: int = 1,
-    ordinal_col: int = 2,
-    ordinals: list[str] = None,
-    q_prior_col: int = 7,
-    q_current_col: int = 13,
-    label_fn: Optional[Callable[[str], str]] = None,
-    converter: Callable = pct,
-) -> list[dict]:
-    """Extract grouped data with ordinal sub-rows (e.g. recall order).
-
-    Each message code has sub-rows for 1st, 2nd, 3rd, 4th recalled.
-    Returns list with per-ordinal fields and totals.
-    """
-    if ordinals is None:
-        ordinals = ["1st", "2nd", "3rd", "4th"]
-
-    groups = {}  # code → {desc, 1st_current, 2nd_current, ..., total_current}
-
-    for i in range(row_start, min(row_end, len(sheet))):
-        code = str(sheet.iloc[i, code_col]).strip() if pd.notna(sheet.iloc[i, code_col]) else ""
-        desc = str(sheet.iloc[i, desc_col]).strip() if pd.notna(sheet.iloc[i, desc_col]) else ""
-        ordinal = str(sheet.iloc[i, ordinal_col]).strip() if pd.notna(sheet.iloc[i, ordinal_col]) else ""
-
-        if not code or not desc:
-            continue
-
-        if code not in groups:
-            label = label_fn(desc) if label_fn else desc
-            entry = {"code": code, "desc": label}
-            for o in ordinals:
-                entry[f"{o}_current"] = 0
-                entry[f"{o}_prior"] = 0
-            groups[code] = entry
-
-        entry = groups[code]
-        q_cur = converter(sheet.iloc[i, q_current_col]) if pd.notna(sheet.iloc[i, q_current_col]) else 0
-        q_pri = converter(sheet.iloc[i, q_prior_col]) if pd.notna(sheet.iloc[i, q_prior_col]) else 0
-
-        for o in ordinals:
-            if ordinal.lower().startswith(o.lower()):
-                entry[f"{o}_current"] = q_cur
-                entry[f"{o}_prior"] = q_pri
-                break
-
-    # Compute totals
-    results = []
-    for entry in groups.values():
-        entry["total_current"] = round(sum(entry.get(f"{o}_current", 0) for o in ordinals), 1)
-        entry["total_prior"] = round(sum(entry.get(f"{o}_prior", 0) for o in ordinals), 1)
-        if entry["total_current"] > 0:
-            results.append(entry)
-
-    results.sort(key=lambda x: x["total_current"], reverse=True)
-    return results
 
 
 # ── Excel → JSON indexing (Stage 0) ─────────────────────────────────────────
@@ -589,11 +145,11 @@ def index_excel(excel_path: str, json_path: str) -> dict:
         meta = existing.get("_meta", {})
         if meta.get("excel_hash") == _file_hash(excel_path) and "_sheets" in existing and "_codes" in existing:
             n_codes = sum(len(v) for v in existing.get("_codes", {}).values())
-            print(f"  source_data.json up to date — {len(existing['_sheets'])} sheets, {n_codes} codes indexed")
+            logger.info("  source_data.json up to date — %d sheets, %d codes indexed", len(existing['_sheets']), n_codes)
             return existing
 
     # Build raw sheet index from Excel
-    print(f"  Indexing Excel: {os.path.basename(excel_path)}")
+    logger.info("  Indexing Excel: %s", os.path.basename(excel_path))
     wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     sheets_index = {}
     codes_index = {}   # rich per-code metadata for Stage 7 auto-detection
@@ -626,7 +182,7 @@ def index_excel(excel_path: str, json_path: str) -> dict:
                 all_rows.append((row_idx, code, desc, row))
         sheets_index[sheet_name] = rows
         skipped_msg = f" ({skipped} stale removed)" if skipped else ""
-        print(f"    {sheet_name}: {len(rows)} rows{skipped_msg}")
+        logger.info("    %s: %d rows%s", sheet_name, len(rows), skipped_msg)
 
         # Build _codes: analyze question code patterns (codes ending in Z are
         # typically parent codes with sub-rows beneath them)
@@ -725,15 +281,30 @@ def index_excel(excel_path: str, json_path: str) -> dict:
     if column_layouts:
         payload["_column_layouts"] = column_layouts
 
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, default=str)
+    _atomic_json_write(json_path, payload)
 
-    print(f"  Saved: {json_path}")
+    logger.info("  Saved: %s", json_path)
     return payload
 
 
 # ── JSON auto-cache ───────────��─────────────────────────────────��───────────
+
+def _atomic_json_write(path: str, payload: dict):
+    """Write JSON atomically via temp-file + os.replace to prevent corruption."""
+    dir_path = os.path.dirname(path)
+    os.makedirs(dir_path, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, default=str)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
 
 def _file_hash(path: str) -> str:
     """Fast MD5 hash of a file for staleness checks."""
@@ -787,13 +358,13 @@ def _load_source_json(config) -> dict | None:
     if os.path.exists(config.data_source_path):
         current_hash = _file_hash(config.data_source_path)
         if meta.get("excel_hash") != current_hash:
-            print("  source_data.json stale (Excel changed) — re-extracting")
+            logger.info("  source_data.json stale (Excel changed) — re-extracting")
             return None
 
     # Invalidate if extraction config changed
     current_ext_hash = _extractions_hash(config)
     if meta.get("extractions_hash") and meta["extractions_hash"] != current_ext_hash:
-        print("  source_data.json stale (extraction params changed) — re-extracting")
+        logger.info("  source_data.json stale (extraction params changed) — re-extracting")
         return None
 
     # Keep _meta alongside data (renderers ignore it; orchestrator uses extracted_at)
@@ -803,10 +374,10 @@ def _load_source_json(config) -> dict | None:
     # If JSON only has _sheets (index-only from Stage 0) but no extractions,
     # signal re-extraction needed
     if n_extractions == 0:
-        print("  source_data.json has index only (no extractions) — extracting from Excel")
+        logger.info("  source_data.json has index only (no extractions) — extracting from Excel")
         return None
 
-    print(f"  Loaded from JSON: {json_path} ({n_extractions} extractions)")
+    logger.info("  Loaded from JSON: %s (%d extractions)", json_path, n_extractions)
     return data
 
 
@@ -833,10 +404,9 @@ def _save_source_json(data: dict, config) -> str:
     }
     payload.update(data)
 
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, default=str)
+    _atomic_json_write(json_path, payload)
 
-    print(f"  Saved: {json_path}")
+    logger.info("  Saved: %s", json_path)
     return json_path
 
 
@@ -863,9 +433,10 @@ def _extract_all_from_excel(config) -> dict:
                 header=None,
             )
 
-    # Reuse _sheets from existing JSON if available and Excel hash matches,
-    # avoiding a redundant scan that index_excel() already performed.
+    # Reuse _sheets and _codes from existing JSON if available and Excel hash
+    # matches, avoiding a redundant scan that index_excel() already performed.
     raw_index = None
+    codes_index = {}  # {sheet: {code: {value_range, ...}}} for pct_mode auto-detect
     json_path = _json_path_for(config)
     if os.path.exists(json_path):
         try:
@@ -875,7 +446,8 @@ def _extract_all_from_excel(config) -> dict:
             if (meta.get("excel_hash") == _file_hash(config.data_source_path)
                     and "_sheets" in existing):
                 raw_index = existing["_sheets"]
-                print("  Reusing _sheets index from existing source_data.json")
+                logger.info("  Reusing _sheets index from existing source_data.json")
+            codes_index = existing.get("_codes", {})
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -893,11 +465,14 @@ def _extract_all_from_excel(config) -> dict:
                     rows.append({"row": i, "code": code_str, "desc": desc_str})
             raw_index[sheet_key] = rows
 
+    # Build brand-specific label replacements from config
+    brand_replacements = _build_brand_replacements(config)
+
     # Build global label shortener
     global_shortener = None
     if config.label_shortcuts:
         shortcuts = [{"keywords": ls.keywords, "short": ls.short} for ls in config.label_shortcuts]
-        global_shortener = make_label_shortener(shortcuts)
+        global_shortener = make_label_shortener(shortcuts, brand_replacements=brand_replacements)
 
     data = {}
 
@@ -918,10 +493,22 @@ def _extract_all_from_excel(config) -> dict:
             label_fn = global_shortener
         elif "label_shortcuts" in params:
             local_shortcuts = params["label_shortcuts"]
-            label_fn = make_label_shortener(local_shortcuts)
+            label_fn = make_label_shortener(local_shortcuts, brand_replacements=brand_replacements)
 
-        # Determine converter
-        converter = straight if params.get("pct_mode") == "straight" else pct
+        # Determine converter — explicit pct_mode wins; else auto-detect from _codes
+        explicit_mode = params.get("pct_mode")
+        if explicit_mode:
+            converter = straight if explicit_mode == "straight" else pct
+        else:
+            # Auto-detect from _codes value_range metadata (if available)
+            code_key = params.get("code", "")
+            sheet_codes = codes_index.get(ex.sheet, {})
+            vr = sheet_codes.get(code_key, {}).get("value_range", "")
+            if vr == "whole":
+                converter = straight
+                logger.debug("  Auto pct_mode=straight for %s (value_range=whole)", ex.id)
+            else:
+                converter = pct
 
         if ex.method == "question_code":
             # Per-extraction desc_col override (e.g. VA/Starter Kit labels in col 0)
@@ -1005,7 +592,7 @@ def _extract_all_from_excel(config) -> dict:
             pass
 
         else:
-            print(f"  [WARN] Unknown extraction method: {ex.method} for {ex.id}")
+            logger.warning("  [WARN] Unknown extraction method: %s for %s", ex.method, ex.id)
 
         # Warn if extraction returned no rows
         if ex.id in data and isinstance(data[ex.id], list) and len(data[ex.id]) == 0:
@@ -1043,11 +630,11 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
         # Try JSON first
         data = _load_source_json(config)
     else:
-        print("  --fresh: forcing re-extraction from Excel")
+        logger.info("  --fresh: forcing re-extraction from Excel")
 
     if data is None:
         # Extract from Excel and save JSON for next time
-        print("  Extracting from Excel...")
+        logger.info("  Extracting from Excel...")
         data = _extract_all_from_excel(config)
         _save_source_json(data, config)
 
@@ -1059,11 +646,12 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
             from datetime import datetime as _dt
             pull_time = _dt.fromisoformat(extracted_at)
             age_hours = (datetime.now() - pull_time).total_seconds() / 3600
-            if age_hours > _STALENESS_THRESHOLD_HOURS:
-                print(
-                    f"  [STALE] Data extracted {age_hours:.0f}h ago "
-                    f"({extracted_at[:16]}). "
-                    f"Use force_fresh=True to re-extract."
+            threshold = getattr(config, 'staleness_hours', 0) or _STALENESS_THRESHOLD_HOURS
+            if age_hours > threshold:
+                logger.warning(
+                    "[STALE] Data extracted %.0fh ago (%s). "
+                    "Use force_fresh=True to re-extract.",
+                    age_hours, extracted_at[:16],
                 )
         except (ValueError, TypeError):
             pass
@@ -1088,14 +676,17 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                 for ex in synapse_extractions:
                     if ex.id in synapse_data:
                         data[ex.id] = synapse_data[ex.id]
-                        print(f"  {ex.id}: {len(synapse_data[ex.id])} rows (synapse_report)")
-            except Exception as e:
+                        logger.info("  %s: %d rows (synapse_report)", ex.id, len(synapse_data[ex.id]))
+            except (RuntimeError, OSError, ValueError, KeyError) as e:
                 logger.warning("Synapse JSON fetch failed: %s — falling back to Excel", e)
                 # Fallback: skip, data may already be in JSON cache from prior Excel extraction
         else:
             logger.info(
                 "No Synapse API token available — synapse_report extractions skipped, using Excel only"
             )
+
+    # Build brand-specific label replacements for raw/synapse shorteners
+    brand_replacements = _build_brand_replacements(config)
 
     # ── Raw data aggregation (respondent-level) ──
     raw_extractions = [ex for ex in config.extractions if ex.method == "raw_aggregate"]
@@ -1113,12 +704,12 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
             # Validate all raw extractions upfront
             warnings = validate_raw_extractions(config, raw_data)
             for w in warnings:
-                print(f"  [WARN] {w}")
+                logger.warning("  [WARN] %s", w)
             # Build global label shortener
             global_shortener = None
             if config.label_shortcuts:
                 shortcuts = [{"keywords": ls.keywords, "short": ls.short} for ls in config.label_shortcuts]
-                global_shortener = make_label_shortener(shortcuts)
+                global_shortener = make_label_shortener(shortcuts, brand_replacements=brand_replacements)
 
             for ex in raw_extractions:
                 params = ex.params
@@ -1126,7 +717,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                 if params.get("use_label_shortcuts") and global_shortener:
                     label_fn = global_shortener
                 elif "label_shortcuts" in params:
-                    label_fn = make_label_shortener(params["label_shortcuts"])
+                    label_fn = make_label_shortener(params["label_shortcuts"], brand_replacements=brand_replacements)
 
                 sheet_key = params.get("raw_sheet", ex.sheet)
                 raw_mode = params.get("mode", "single")
@@ -1187,7 +778,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                     )
 
                 data[ex.id] = result
-                print(f"  {ex.id}: {len(result)} rows (raw_aggregate/{raw_mode})")
+                logger.info("  %s: %d rows (raw_aggregate/%s)", ex.id, len(result), raw_mode)
 
     # ── Synapse raw data fetching (respondent-level via API) ──
     synapse_raw_extractions = [ex for ex in config.extractions if ex.method == "synapse_raw"]
@@ -1251,7 +842,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                     if config.label_shortcuts:
                         shortcuts = [{"keywords": ls.keywords, "short": ls.short}
                                      for ls in config.label_shortcuts]
-                        global_shortener_raw = make_label_shortener(shortcuts)
+                        global_shortener_raw = make_label_shortener(shortcuts, brand_replacements=brand_replacements)
 
                     # Run synapse_raw extractions
                     for ex in synapse_raw_extractions:
@@ -1260,7 +851,7 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                         if params.get("use_label_shortcuts") and global_shortener_raw:
                             label_fn = global_shortener_raw
                         elif "label_shortcuts" in params:
-                            label_fn = make_label_shortener(params["label_shortcuts"])
+                            label_fn = make_label_shortener(params["label_shortcuts"], brand_replacements=brand_replacements)
 
                         sheet_key = params.get("raw_sheet", ex.sheet)
                         raw_mode = params.get("mode", "single")
@@ -1305,9 +896,9 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                             )
 
                         data[ex.id] = result
-                        print(f"  {ex.id}: {len(result)} rows (synapse_raw/{raw_mode})")
+                        logger.info("  %s: %d rows (synapse_raw/%s)", ex.id, len(result), raw_mode)
 
-            except Exception as e:
+            except (RuntimeError, OSError, ValueError, KeyError) as e:
                 logger.warning("Synapse raw fetch failed: %s — skipping synapse_raw extractions", e)
         else:
             if not api_key:
@@ -1317,5 +908,24 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
 
     # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes
+
+    # ── Post-load completeness check ──
+    _warnings: list[str] = []
+    expected_ids = {ex.id for ex in config.extractions}
+    loaded_ids = {k for k in data if not k.startswith("_")}
+    missing = expected_ids - loaded_ids
+    empty = {k for k in loaded_ids if isinstance(data.get(k), list) and len(data[k]) == 0}
+    if missing:
+        for m in sorted(missing):
+            _warnings.append(f"Extraction '{m}' not loaded (missing from data)")
+    if empty:
+        for e in sorted(empty):
+            _warnings.append(f"Extraction '{e}' returned 0 rows")
+    data["_warnings"] = _warnings
+    if _warnings:
+        logger.warning("Data completeness: %d/%d extractions loaded, %d warnings:",
+                        len(loaded_ids - empty), len(expected_ids), len(_warnings))
+        for w in _warnings:
+            logger.warning("  - %s", w)
 
     return data

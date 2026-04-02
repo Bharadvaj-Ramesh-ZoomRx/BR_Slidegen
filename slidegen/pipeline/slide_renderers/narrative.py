@@ -4,6 +4,8 @@ narrative.py — Cover and executive summary slide renderers.
 
 from __future__ import annotations
 
+import logging
+import os
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
@@ -11,12 +13,14 @@ from lxml import etree
 from pptx.oxml.ns import qn
 
 from ._shared import (
-    _resolve_template,
+    _resolve_template, _alt_row_bg,
     C_GREY, C_FTGREY, C_RED, C_WHITE, C_LBGREY,
     textbox, solidrect, slide_header, slide_footer,
     cover_slide, _get_or_add,
     ProjectConfig, AskConfig,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def render_cover(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
@@ -76,8 +80,8 @@ def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data:
                         insight = stripped.split(".", 1)[1].strip().lstrip("*").strip()
                         if len(insight) > 10:
                             insights.append(insight)
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError):
+                logger.warning("Failed to read source_text file: %s", src_path)
 
     if not insights:
         textbox(slide, "No insights provided", 2, 3, 8, 1, fsize=14, color=C_RED)
@@ -109,7 +113,7 @@ def render_executive_summary(slide, config: ProjectConfig, ask: AskConfig, data:
         y = card_top + i * row_h
 
         # Alternating row background
-        bg = C_LBGREY if i % 2 == 0 else C_WHITE
+        bg = _alt_row_bg(i)
         solidrect(slide, card_l + accent_w, y, card_w - accent_w, row_h, bg)
 
         # Number badge (brand-colored, bold, centered in its column)

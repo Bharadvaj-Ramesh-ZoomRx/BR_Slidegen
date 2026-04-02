@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
+import tempfile
 from datetime import datetime
 from pptx import Presentation
 
@@ -28,6 +30,8 @@ from slidegen.pptx_utils.deck import (
     clear_sections as _clear_sections_impl,
     create_sections as _create_sections_impl,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ── Shape naming ─────────────────────────────────────────────────────────────
@@ -93,19 +97,59 @@ class ShapeNamer:
         return meta
 
 
+def _atomic_json_write(path: str, payload: dict):
+    """Write JSON atomically via temp-file + os.replace to prevent corruption."""
+    dir_path = os.path.dirname(path)
+    os.makedirs(dir_path, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _save_shape_registry(registries: dict, output_dir: str,
                          slide_to_ask: list[int] | None = None):
     """Save the combined shape registry for all slides."""
     path = os.path.join(output_dir, "shape_registry.json")
-    os.makedirs(output_dir, exist_ok=True)
     payload = {
         "created": datetime.now().isoformat(),
         "slides": registries,
     }
     if slide_to_ask is not None:
         payload["slide_to_ask"] = slide_to_ask
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    _atomic_json_write(path, payload)
+
+
+def _safe_save_pptx(prs, path: str, suffix: str = "_regen") -> str:
+    """Save PPTX with PermissionError fallback when file is open in PowerPoint.
+
+    Returns the actual path where the file was saved.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        prs.save(path)
+        # Clean up stale fallback files from prior PermissionError
+        alt_path = path.replace(".pptx", f"{suffix}.pptx")
+        if os.path.exists(alt_path):
+            os.remove(alt_path)
+        return path
+    except PermissionError:
+        alt_path = path.replace(".pptx", f"{suffix}.pptx")
+        prs.save(alt_path)
+        logger.warning(
+            "%s is open in PowerPoint — saved to: %s\n"
+            "  Close the original in PowerPoint, then replace it with the new file\n"
+            "  (or reopen the new file directly)",
+            os.path.basename(path), alt_path
+        )
+        return alt_path
 
 
 # ── Speaker notes ─────────────────────────────────────────────────────────────
@@ -312,8 +356,12 @@ def _resolve_ask_id_to_slide_index(
     """
     # Try shape_registry.json first (authoritative — accounts for skipped asks)
     if os.path.exists(registry_path):
-        with open(registry_path, "r", encoding="utf-8") as f:
-            reg = json.load(f)
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                reg = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Corrupt shape_registry.json — ignoring: %s", e)
+            reg = {}
         slides = reg.get("slides", {})
         for slide_num_str, slide_meta in slides.items():
             if slide_meta.get("ask_id") == ask_id:
@@ -349,22 +397,22 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
         Path to the generated PPTX file.
     """
     # 1. Load config
-    print(f"Loading config: {yaml_path}")
+    logger.info("Loading config: %s", yaml_path)
     config = load_project_config(yaml_path)
 
     # 1b. Validate config consistency
     errors = config.validate()
     if errors:
-        print("\n  Config validation errors:")
+        logger.warning("Config validation errors:")
         for err in errors:
-            print(f"    - {err}")
+            logger.warning("  - %s", err)
         raise ValueError(
             f"Config validation failed with {len(errors)} error(s):\n"
             + "\n".join(f"  - {e}" for e in errors)
         )
 
     # 2. Load data (from JSON if available, else extract from Excel)
-    print("Loading data...")
+    logger.info("Loading data...")
     data = load_all_data(config, force_fresh=force_fresh)
 
     # Extract data pull timestamp for registry lineage
@@ -376,10 +424,22 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
         if key.startswith("_"):
             continue
         count = len(val) if isinstance(val, list) else "—"
-        print(f"  {key}: {count} rows")
+        logger.info("  %s: %s rows", key, count)
+
+    # 2b. Data completeness gate — abort if majority of extractions failed
+    data_warnings = data.get("_warnings", [])
+    if data_warnings:
+        expected_count = len(config.extractions)
+        missing_count = sum(1 for w in data_warnings if "not loaded" in w)
+        if expected_count > 0 and missing_count > expected_count * 0.5:
+            raise RuntimeError(
+                f"Data loading failed: {missing_count}/{expected_count} extractions missing. "
+                f"Aborting deck generation.\n"
+                + "\n".join(f"  - {w}" for w in data_warnings)
+            )
 
     # 3. Create presentation from template (preserves master logos/fonts)
-    print("\nCreating presentation...")
+    logger.info("Creating presentation...")
     prs, blank_layout = _load_template(config)
 
     # 4. Build slides
@@ -388,11 +448,11 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
     slide_to_ask: list[int] = []
     ask_id_to_slide_idx: dict[str, int] = {}  # for section mapping
     cfg_hash = _config_hash(yaml_path)
-    print("\nBuilding slides...")
+    logger.info("Building slides...")
     for ask_idx, ask in enumerate(config.asks):
         renderer = RENDERERS.get(ask.slide_type)
         if renderer is None:
-            print(f"  [ask {ask_idx}] SKIP — unknown slide_type: {ask.slide_type}")
+            logger.warning("[ask %d] SKIP — unknown slide_type: %s", ask_idx, ask.slide_type)
             continue
 
         # Add slide using template layout (inherits master slide logos/chrome)
@@ -416,11 +476,17 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
             # Add speaker notes with question codes and descriptions
             notes_text = _build_speaker_notes(ask, config, data)
             _add_speaker_notes(slide, notes_text)
-            print(f"  [{slide_num}] {ask.id} ({ask.slide_type})")
+            logger.info("[%d] %s (%s)", slide_num, ask.id, ask.slide_type)
         except Exception as e:
-            print(f"  [{slide_num}] ERROR on {ask.id}: {e}")
+            logger.error("Renderer error on %s (slide %d): %s", ask.id, slide_num, e, exc_info=True)
             from slidegen.pptx_utils import textbox, C_RED
             textbox(slide, f"Error: {e}", 1, 3, 10, 1, fsize=12, color=C_RED)
+            # Record error in registry for post-run review
+            slide_registries[str(slide_num)] = {
+                "ask_id": ask.id,
+                "slide_type": ask.slide_type,
+                "error": str(e),
+            }
 
     # 4b. Create PowerPoint sections (if defined in config)
     if config.sections:
@@ -431,24 +497,11 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
     if not out:
         out = os.path.join(os.path.dirname(yaml_path), "output_deck.pptx")
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    try:
-        prs.save(out)
-        saved_path = out
-    except PermissionError:
-        alt = out.replace(".pptx", "_regen.pptx")
-        prs.save(alt)
-        saved_path = alt
-        print(
-            f"\n  [!] deck.pptx is open in PowerPoint — saved to:\n"
-            f"      {alt}\n"
-            f"  Close deck.pptx in PowerPoint, then replace it with _regen.pptx\n"
-            f"  (or reopen _regen.pptx directly)\n"
-        )
+    saved_path = _safe_save_pptx(prs, out)
     _save_shape_registry(slide_registries, os.path.dirname(saved_path),
                          slide_to_ask=slide_to_ask)
-    print(f"\nSaved: {saved_path}")
-    print(f"Total slides: {len(prs.slides)}")
+    logger.info("Saved: %s", saved_path)
+    logger.info("Total slides: %d", len(prs.slides))
 
     return saved_path
 
@@ -486,12 +539,12 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
     if isinstance(slide_index, str):
         ask_id = slide_index
         slide_index = _resolve_ask_id_to_slide_index(ask_id, registry_path, config)
-        print(f"  Resolved ask_id '{ask_id}' → slide index {slide_index}")
+        logger.info("Resolved ask_id %r → slide index %d", ask_id, slide_index)
 
     # Backup before editing (PRD §10.3)
     backup = _backup_pptx(pptx_path)
     if backup:
-        print(f"  Backup saved: {backup}")
+        logger.info("Backup saved: %s", backup)
 
     prs = Presentation(pptx_path)
     if slide_index < 0 or slide_index >= len(prs.slides):
@@ -504,8 +557,12 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
     # asks that were skipped during generate_deck() (unknown slide_type).
     ask_index = slide_index  # default: assume 1:1 mapping
     if os.path.exists(registry_path):
-        with open(registry_path, "r", encoding="utf-8") as f:
-            reg = json.load(f)
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                reg = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Corrupt shape_registry.json — ignoring: %s", e)
+            reg = {}
         slide_to_ask = reg.get("slide_to_ask")
         if slide_to_ask and slide_index < len(slide_to_ask):
             ask_index = slide_to_ask[slide_index]
@@ -534,21 +591,9 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
     notes_text = _build_speaker_notes(ask, config, data)
     _add_speaker_notes(slide, notes_text)
 
-    try:
-        prs.save(pptx_path)
-        print(f"Regenerated slide {slide_index + 1} ({ask.id}) in {pptx_path}")
-        return pptx_path
-    except PermissionError:
-        # File is open in PowerPoint — save alongside it and instruct user to replace
-        alt_path = pptx_path.replace(".pptx", "_regen.pptx")
-        prs.save(alt_path)
-        print(
-            f"\n  [!] deck.pptx is open in PowerPoint — saved to:\n"
-            f"      {alt_path}\n"
-            f"  Close deck.pptx in PowerPoint, then replace it with _regen.pptx\n"
-            f"  (or reopen _regen.pptx directly)\n"
-        )
-        return alt_path
+    saved = _safe_save_pptx(prs, pptx_path)
+    logger.info("Regenerated slide %d (%s) in %s", slide_index + 1, ask.id, saved)
+    return saved
 
 
 # ── Deck refresh (PRD §9.2) ──────────────────────────────────────────────────
@@ -576,13 +621,16 @@ def refresh_deck(yaml_path: str, output_path: str | None = None) -> dict:
         raise FileNotFoundError(f"Shape registry not found: {registry_path}")
 
     # Load registry to find data-driven slides
-    with open(registry_path, "r", encoding="utf-8") as f:
-        reg = json.load(f)
+    try:
+        with open(registry_path, "r", encoding="utf-8") as f:
+            reg = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Corrupt shape_registry.json — delete and regenerate deck: {e}")
 
     slides_meta = reg.get("slides", {})
 
     # Force fresh data extraction
-    print("Refreshing deck — forcing data re-extraction...")
+    logger.info("Refreshing deck — forcing data re-extraction...")
     data = load_all_data(config, force_fresh=True)
     data_meta = data.get("_meta", {})
     last_data_pull = data_meta.get("extracted_at", "")
@@ -590,7 +638,7 @@ def refresh_deck(yaml_path: str, output_path: str | None = None) -> dict:
     # Backup before refresh
     backup = _backup_pptx(pptx_path)
     if backup:
-        print(f"  Backup saved: {backup}")
+        logger.info("Backup saved: %s", backup)
 
     prs = Presentation(pptx_path)
     slide_to_ask = reg.get("slide_to_ask", [])
@@ -646,28 +694,27 @@ def refresh_deck(yaml_path: str, output_path: str | None = None) -> dict:
             # Update registry entry for this slide
             slides_meta[slide_num_str] = namer.slide_metadata
             result["refreshed"].append(ask_id)
-            print(f"  [{slide_num_str}] {ask_id} refreshed")
+            logger.info("[%s] %s refreshed", slide_num_str, ask_id)
         except Exception as e:
+            logger.error("Refresh error on %s: %s", ask_id, e, exc_info=True)
             result["errors"].append(f"{ask_id}: {e}")
-            print(f"  [{slide_num_str}] {ask_id} ERROR: {e}")
+            logger.error("[%s] %s ERROR: %s", slide_num_str, ask_id, e)
+            # Record error in registry for post-run review
+            slides_meta[slide_num_str] = {
+                "ask_id": ask_id,
+                "error": str(e),
+            }
 
     # Save updated deck
-    try:
-        prs.save(pptx_path)
-    except PermissionError:
-        alt = pptx_path.replace(".pptx", "_refreshed.pptx")
-        prs.save(alt)
-        pptx_path = alt
-        print(f"  [!] Saved to {alt} (original is open in PowerPoint)")
+    pptx_path = _safe_save_pptx(prs, pptx_path, suffix="_refreshed")
 
     # Save updated registry
     reg["slides"] = slides_meta
     reg["last_refreshed"] = datetime.now().isoformat()
-    with open(registry_path, "w", encoding="utf-8") as f:
-        json.dump(reg, f, indent=2)
+    _atomic_json_write(registry_path, reg)
 
-    print(f"\nRefresh complete: {len(result['refreshed'])} refreshed, "
-          f"{len(result['skipped'])} skipped, {len(result['errors'])} errors")
+    logger.info("Refresh complete: %d refreshed, %d skipped, %d errors",
+                len(result['refreshed']), len(result['skipped']), len(result['errors']))
     return result
 
 

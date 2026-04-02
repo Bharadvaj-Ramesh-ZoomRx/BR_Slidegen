@@ -34,14 +34,7 @@ from slidegen.pipeline.project_config import ProjectConfig
 
 logger = logging.getLogger(__name__)
 
-# Prefer requests; fall back to urllib
-try:
-    import requests as _requests
-    _USE_REQUESTS = True
-except ImportError:
-    import urllib.request as _urllib_req
-    import urllib.error as _urllib_err
-    _USE_REQUESTS = False
+from slidegen.pipeline.http_utils import get_json as _get_json, post_json as _post_json
 
 _ENV_KEY_NAME = "SYNAPSE_API_KEY"
 _POLL_INTERVAL = 5
@@ -117,7 +110,7 @@ def fetch_data_as_json(
         tp_ids = list(time_period_map.values())
         seg_ids = params.get("segment_ids", synapse.segment_ids if synapse else [])
 
-        print(f"  [{ex.id}] Fetching analysis_id={analysis_id} from Synapse...")
+        logger.info(f"  [{ex.id}] Fetching analysis_id={analysis_id} from Synapse...")
 
         report = _fetch_report(
             resolved_url, headers,
@@ -138,7 +131,7 @@ def fetch_data_as_json(
         # Restructure records into slidegen format
         rows = _restructure_records(report, time_period_map, params)
         data[ex.id] = rows
-        print(f"    → {len(rows)} rows extracted")
+        logger.info(f"    → {len(rows)} rows extracted")
 
         # Collect for _sheets index
         q_code = report.get("question_code", "")
@@ -198,7 +191,7 @@ def _fetch_report(
     if report.get("is_cached_report") and report.get("cache_status") == "PROCESSING":
         cached_id = report.get("cached_report_id")
         if cached_id:
-            print(f"    Report is processing (cached_report_id={cached_id}), polling...")
+            logger.info(f"    Report is processing (cached_report_id={cached_id}), polling...")
             report = _poll_cached_report(base_url, headers, cached_id)
 
     # Verify we have records
@@ -225,14 +218,16 @@ def _poll_cached_report(
         if status == "PROCESSED":
             return report
         elif status == "PROCESSING":
-            print(f"    [{elapsed}s] Still processing...")
+            logger.info(f"    [{elapsed}s] Still processing...")
             continue
         else:
             logger.warning("Unexpected cache_status: %s", status)
             return report
 
-    logger.warning("Cached report %d not ready after %ds", cached_report_id, _MAX_POLL_WAIT)
-    return None
+    raise RuntimeError(
+        f"Cached report {cached_report_id} not ready after {_MAX_POLL_WAIT}s — "
+        "Synapse may be under heavy load. Retry or increase _MAX_POLL_WAIT."
+    )
 
 
 # ── Record restructuring ──────────────────────────────────────────────────
@@ -363,42 +358,4 @@ def _convert_value(val, pct_mode: str) -> float | None:
         return round(v * 100, 1)
 
 
-# ── HTTP helpers ──────────────────────────────────────────────────────────
-
-def _post_json(url: str, headers: dict, payload: dict) -> dict:
-    """POST JSON and return parsed response."""
-    body = json.dumps(payload).encode("utf-8")
-
-    if _USE_REQUESTS:
-        resp = _requests.post(url, data=body, headers=headers, timeout=60)
-        if not resp.ok:
-            detail = resp.text
-            try:
-                detail = resp.json().get("detail", resp.text)
-            except Exception:
-                pass
-            raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
-        return resp.json()
-    else:
-        req = _urllib_req.Request(url, data=body, headers=headers, method="POST")
-        try:
-            with _urllib_req.urlopen(req, timeout=60) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except _urllib_err.HTTPError as e:
-            raise RuntimeError(f"Synapse API error {e.code}: {e.reason}") from e
-
-
-def _get_json(url: str, headers: dict) -> dict:
-    """GET and return parsed JSON."""
-    if _USE_REQUESTS:
-        resp = _requests.get(url, headers=headers, timeout=30)
-        if not resp.ok:
-            raise RuntimeError(f"Synapse API error {resp.status_code}: {resp.text}")
-        return resp.json()
-    else:
-        req = _urllib_req.Request(url, headers=headers)
-        try:
-            with _urllib_req.urlopen(req, timeout=30) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except _urllib_err.HTTPError as e:
-            raise RuntimeError(f"Synapse API error {e.code}: {e.reason}") from e
+# HTTP helpers (_get_json, _post_json) are imported from http_utils.py

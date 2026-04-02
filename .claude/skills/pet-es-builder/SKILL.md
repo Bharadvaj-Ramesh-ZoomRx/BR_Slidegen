@@ -1,7 +1,35 @@
 ---
 name: pet-es-builder
+effort: high
 description: "Use when writing PET Executive Summaries or Recommendations slides. Trigger when: user says 'write executive summary', 'build ES', 'pet-es-builder', or needs to create publication-ready executive summary content for a PET study wave. Supports 8 format templates (A-H) for different audience and data complexity scenarios."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for md in sorted(glob.glob(f'{ctx}/*.md')):
+        print(f'  - \`{os.path.basename(md)}\` ({os.path.getsize(md)//1024}KB)')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # PET Executive Summary Builder
 

@@ -70,99 +70,103 @@ def reconcile(target_filename, slide_num=1, registry_path=None):
     except Exception as e:
         raise RuntimeError(f"Cannot connect to PowerPoint: {e}")
 
-    prs = None
-    for i in range(1, ppt_app.Presentations.Count + 1):
-        p = ppt_app.Presentations(i)
-        if target_filename in p.Name:
-            prs = p
-            break
+    try:
+        prs = None
+        for i in range(1, ppt_app.Presentations.Count + 1):
+            p = ppt_app.Presentations(i)
+            if target_filename in p.Name:
+                prs = p
+                break
 
-    if prs is None:
-        open_files = [
-            ppt_app.Presentations(i).Name
-            for i in range(1, ppt_app.Presentations.Count + 1)
-        ]
-        raise RuntimeError(
-            f"'{target_filename}' not found. Open files: {open_files}"
-        )
+        if prs is None:
+            open_files = [
+                ppt_app.Presentations(i).Name
+                for i in range(1, ppt_app.Presentations.Count + 1)
+            ]
+            raise RuntimeError(
+                f"'{target_filename}' not found. Open files: {open_files}"
+            )
 
-    slide = prs.Slides(slide_num)
+        slide = prs.Slides(slide_num)
 
-    # ── Build shape inventory ────────────────────────────────────────────────
-    zrx_shapes = defaultdict(list)
-    for i in range(1, slide.Shapes.Count + 1):
-        sh = slide.Shapes(i)
-        if sh.Name.startswith(SHAPE_PREFIX):
-            zrx_shapes[sh.Name].append(sh)
+        # ── Build shape inventory ────────────────────────────────────────────
+        zrx_shapes = defaultdict(list)
+        for i in range(1, slide.Shapes.Count + 1):
+            sh = slide.Shapes(i)
+            if sh.Name.startswith(SHAPE_PREFIX):
+                zrx_shapes[sh.Name].append(sh)
 
-    # ── Duplicate detection (hard stop) ──────────────────────────────────────
-    duplicates = [name for name, refs in zrx_shapes.items() if len(refs) > 1]
-    if duplicates:
-        return {
-            "found": 0,
-            "missing": [],
-            "unregistered": [],
-            "duplicates": duplicates,
-            "changes": [],
-            "ok": False,
-        }
-
-    # ── Reconcile each registered shape ──────────────────────────────────────
-    reg_shapes = registry.get("shapes", {})
-    found = []
-    missing = []
-    changes = []
-
-    for name, record in reg_shapes.items():
-        if name in zrx_shapes:
-            sh = zrx_shapes[name][0]
-            found.append(name)
-
-            live = {
-                "left":   round(sh.Left / IN, 4),
-                "top":    round(sh.Top / IN, 4),
-                "width":  round(sh.Width / IN, 4),
-                "height": round(sh.Height / IN, 4),
+        # ── Duplicate detection (hard stop) ──────────────────────────────────
+        duplicates = [name for name, refs in zrx_shapes.items() if len(refs) > 1]
+        if duplicates:
+            return {
+                "found": 0,
+                "missing": [],
+                "unregistered": [],
+                "duplicates": duplicates,
+                "changes": [],
+                "ok": False,
             }
 
-            try:
-                live["text"] = sh.TextFrame.TextRange.Text[:100]
-            except Exception:
-                pass
+        # ── Reconcile each registered shape ──────────────────────────────────
+        reg_shapes = registry.get("shapes", {})
+        found = []
+        missing = []
+        changes = []
 
-            for field in ("left", "top", "width", "height"):
-                old_val = record.get(field)
-                new_val = live[field]
-                if old_val is not None and abs(old_val - new_val) > 0.01:
-                    changes.append({
-                        "shape": name,
-                        "field": field,
-                        "before": old_val,
-                        "after": new_val,
-                    })
+        for name, record in reg_shapes.items():
+            if name in zrx_shapes:
+                sh = zrx_shapes[name][0]
+                found.append(name)
 
-            record.update(live)
-            record["last_reconciled"] = datetime.now().isoformat(timespec="seconds")
-        else:
-            missing.append(name)
+                live = {
+                    "left":   round(sh.Left / IN, 4),
+                    "top":    round(sh.Top / IN, 4),
+                    "width":  round(sh.Width / IN, 4),
+                    "height": round(sh.Height / IN, 4),
+                }
 
-    # ── Detect unregistered shapes ───────────────────────────────────────────
-    unregistered = sorted(set(zrx_shapes.keys()) - set(reg_shapes.keys()))
+                try:
+                    live["text"] = sh.TextFrame.TextRange.Text[:100]
+                except AttributeError:
+                    pass
 
-    # ── Update and save ──────────────────────────────────────────────────────
-    registry.setdefault("meta", {})
-    registry["meta"]["last_reconciled"] = datetime.now().isoformat(timespec="seconds")
-    registry["meta"]["reconcile_source"] = prs.Name
-    _save_registry(registry, reg_path)
+                for field in ("left", "top", "width", "height"):
+                    old_val = record.get(field)
+                    new_val = live[field]
+                    if old_val is not None and abs(old_val - new_val) > 0.01:
+                        changes.append({
+                            "shape": name,
+                            "field": field,
+                            "before": old_val,
+                            "after": new_val,
+                        })
 
-    return {
-        "found": len(found),
-        "missing": missing,
-        "unregistered": unregistered,
-        "duplicates": [],
-        "changes": changes,
-        "ok": True,
-    }
+                record.update(live)
+                record["last_reconciled"] = datetime.now().isoformat(timespec="seconds")
+            else:
+                missing.append(name)
+
+        # ── Detect unregistered shapes ───────────────────────────────────────
+        unregistered = sorted(set(zrx_shapes.keys()) - set(reg_shapes.keys()))
+
+        # ── Update and save ──────────────────────────────────────────────────
+        registry.setdefault("meta", {})
+        registry["meta"]["last_reconciled"] = datetime.now().isoformat(timespec="seconds")
+        registry["meta"]["reconcile_source"] = prs.Name
+        _save_registry(registry, reg_path)
+
+        return {
+            "found": len(found),
+            "missing": missing,
+            "unregistered": unregistered,
+            "duplicates": [],
+            "changes": changes,
+            "ok": True,
+        }
+    finally:
+        # Release COM references to prevent orphaned PowerPoint processes
+        ppt_app = None
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

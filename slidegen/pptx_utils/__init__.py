@@ -45,7 +45,7 @@ from .lxml_helpers import (
 
 # ── Shape primitives ─────────────────────────────────────────────────────────
 from .shapes import (
-    textbox, solidrect, horiz_line, insert_image,
+    textbox, solidrect, horiz_line,
     dashed_separator, stat_callout, callout_box,
 )
 
@@ -62,6 +62,7 @@ from .layout import (
 # ── Chart builders ───────────────────────────────────────────────────────────
 from .charts import (
     CHART_PATTERNS,
+    _configure_bar_axes, _style_bar_series,
     enable_data_labels, delete_data_label,
     add_single_bar_chart, add_clustered_bar_chart,
     add_line_chart, add_stacked_column_chart, add_scatter_chart,
@@ -91,7 +92,7 @@ from .text import (
 )
 
 # ── Image/logo placement ────────────────────────────────────────────────────
-from .images import insert_image as _insert_image_new, add_logo
+from .images import insert_image, add_logo
 
 # ── Deck/template management ────────────────────────────────────────────────
 from .deck import load_template, clear_slide, clear_sections, create_sections

@@ -1,7 +1,48 @@
 ---
 name: slidegen
+effort: high
+paths: ["projects/*/config.yaml", "slidegen/**/*.py"]
 description: "Use when working with the SlideGen pipeline — creating, editing, or regenerating YAML-driven PowerPoint decks. Trigger when: creating slides for a project, editing slide N, switching wave data, adding/removing slides, writing renderers or extractors, using pptx_utils functions, working with the shape registry, choosing chart types, applying brand colors, or designing slide layouts. This is the primary skill for all SlideGen and pptx_utils work."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    asks = cfg.get('asks',[])
+    extractions = cfg.get('extractions',{})
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    print(f'**Config:** {len(asks)} asks, {len(extractions)} extractions')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    sj = f'{ctx}/source_data.json'
+    if os.path.exists(sj):
+        with open(sj) as f:
+            idx = json.load(f)
+        codes = idx.get('_codes',{})
+        print(f'**source_data.json:** {sum(len(v) for v in codes.values())} codes indexed')
+    out = f'{proj}/output/{wave}' if wave else f'{proj}/output'
+    deck = f'{out}/deck.pptx'
+    reg = f'{out}/shape_registry.json'
+    print(f'**deck.pptx:** {\"exists\" if os.path.exists(deck) else \"not yet generated\"}')
+    print(f'**shape_registry.json:** {\"exists\" if os.path.exists(reg) else \"not yet generated\"}')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # SlideGen Skill
 
@@ -243,11 +284,11 @@ Each `slide_type` expects specific `extra` fields in the ask config:
 | Scatter / quadrant | Importance vs performance | `scatter_quadrant_fills` |
 | Donut / pie | Share-of-wallet, interaction mix | `set_pie_slice_colors`, `set_donut_hole_size` |
 
-For full layout specs and implementation sequences, see `references/slide-archetypes.md`.
-For chart selection guidance, see `references/chart-types.md`.
-For brand constants and spacing, see `references/brand-constants.md`.
-For function signatures, see `references/function-ref.md`.
-For chart pattern checklists, see `references/chart-patterns.md`.
+For full layout specs and implementation sequences, see `${CLAUDE_SKILL_DIR}/references/slide-archetypes.md`.
+For chart selection guidance, see `${CLAUDE_SKILL_DIR}/references/chart-types.md`.
+For brand constants and spacing, see `${CLAUDE_SKILL_DIR}/references/brand-constants.md`.
+For function signatures, see `${CLAUDE_SKILL_DIR}/references/function-ref.md`.
+For chart pattern checklists, see `${CLAUDE_SKILL_DIR}/references/chart-patterns.md`.
 
 ---
 

@@ -7,14 +7,16 @@ that complement the shape primitives in shapes.py. Per PRD §4.2.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pptx.util import Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 
 def format_run(run, font_name: str = "", font_size: float = 0,
-               bold: bool | None = None, italic: bool | None = None,
-               color: RGBColor | None = None, underline: bool | None = None):
+               bold: Optional[bool] = None, italic: Optional[bool] = None,
+               color: Optional[RGBColor] = None, underline: Optional[bool] = None):
     """Apply formatting to a single text run.
 
     Only sets properties that are explicitly provided (non-default).
@@ -35,8 +37,8 @@ def format_run(run, font_name: str = "", font_size: float = 0,
 
 
 def add_run(paragraph, text: str, font_name: str = "", font_size: float = 0,
-            bold: bool | None = None, italic: bool | None = None,
-            color: RGBColor | None = None) -> object:
+            bold: Optional[bool] = None, italic: Optional[bool] = None,
+            color: Optional[RGBColor] = None) -> object:
     """Add a formatted text run to an existing paragraph.
 
     Returns the created run object.

@@ -27,6 +27,7 @@ def insert_image(slide, img_path: str, left: float, top: float,
         The picture shape, or None if img_path does not exist.
     """
     if not os.path.exists(img_path):
+        print(f"  [WARN] Image not found: {img_path}")
         return None
     pic = slide.shapes.add_picture(
         img_path,
@@ -55,6 +56,7 @@ def add_logo(slide, logo_path: str, position: str = "bottom_left",
         The picture shape, or None if logo_path does not exist.
     """
     if not os.path.exists(logo_path):
+        print(f"  [WARN] Logo not found: {logo_path}")
         return None
 
     # Estimate height as square (actual aspect ratio maintained by python-pptx)

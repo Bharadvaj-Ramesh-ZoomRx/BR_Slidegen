@@ -1,7 +1,47 @@
 ---
 name: survey-context
+effort: medium
 description: "Pre-Stage 1 sub-skill. Converts any survey draft file (Word, PDF, Excel, text) into a structured survey_context.md file. Parses question codes, question text, response scales, message lists, module architecture, and segment definitions. Output goes to context/{wave}/survey_context.md and is consumed by /hypotheses ('Test with:' lines) and /slide-plan (question code mapping). Trigger when: user says 'build survey context', 'convert survey draft', 'extract survey questions', or a survey questionnaire file exists in the project input folder."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for md in sorted(glob.glob(f'{ctx}/*.md')):
+        print(f'  - \`{os.path.basename(md)}\` ({os.path.getsize(md)//1024}KB)')
+    sj = f'{ctx}/source_data.json'
+    if os.path.exists(sj):
+        with open(sj) as f:
+            idx = json.load(f)
+        codes = idx.get('_codes',{})
+        print(f'**source_data.json:** {sum(len(v) for v in codes.values())} codes indexed')
+    for case in ['Wave', 'wave']:
+        inp = f'{proj}/input/{case}/{wave}'
+        if os.path.isdir(inp):
+            files = [f for f in os.listdir(inp) if not f.startswith('.')]
+            print(f'**Input files ({len(files)}):** ' + ', '.join(sorted(files)[:10]))
+            break
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # Survey Context Extractor
 
@@ -11,13 +51,12 @@ This skill is format-agnostic and study-type-agnostic. It works for PET/SFEA sur
 
 ---
 
-## STEP 0 — Get project and wave from the user
+## STEP 0 — Confirm project and wave
 
-Ask for:
+Use the auto-detected project and wave shown above. If correct, proceed. If not, ask the user to specify.
 
-1. **Project folder** — e.g., `projects/Demo 1`
-2. **Wave name** — e.g., `Q1 2026`
-3. **Study/product name** — e.g., `RYBREVANT+LAZCLUZE SFEA` (used in the output header)
+Also ask for:
+- **Study/product name** — e.g., `RYBREVANT+LAZCLUZE SFEA` (used in the output header)
 
 Derive:
 - **INPUT_DIR** = `{project_folder}/input/Wave/{wave}` (check both `Wave` and `wave` casing)

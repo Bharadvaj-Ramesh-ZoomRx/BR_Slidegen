@@ -16,9 +16,12 @@ from ._shared import (
     ROW_SCALE_FACTOR,
     BAR_GAP_STD, CLUSTERED_OVERLAP,
     LABEL_MAX_SINGLE, LABEL_MAX_DUAL,
+    ELEMENT_GAP, SIDE_MARGIN, FOOTER_BUFFER, ROW_H_MIN, ROW_H_MAX, HDR_H_STD,
     # helpers
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
-    _cap_chart_h, _auto_label_width,
+    _cap_chart_h, _auto_label_width, _prepare_rows,
+    _alt_row_bg, _no_data_placeholder, _layout_blocks, _build_label_table,
+    FONT_HDR, FONT_BODY,
     # pptx_utils
     C_GREEN, C_GREY, C_LBGREY, C_HDRGREY, C_WHITE, C_RED,
     FOOTER_TOP, PP_ALIGN,
@@ -40,10 +43,8 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     """Single horizontal bar chart with label table and QoQ delta column."""
     _slide_chrome(slide, config, ask)
 
-    rows = data.get(ask.data_key, [])
-    rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
-    if not rows:
-        textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+    rows = _prepare_rows(slide, data, ask)
+    if rows is None:
         return
 
     color_current, color_prior = _get_brand_colors(config, ask)
@@ -57,34 +58,20 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
 
     # Layout: [Label table] [Bar chart (no cat labels)] [Delta col]
     delta_w = DELTA_COL_WIDTH
-    gap = 0.08
     label_w = _auto_label_width(labels)
-    chart_w = SLIDE_W - 0.60 - label_w - delta_w - gap * 2  # fill remaining
-    hdr_h = 0.30
+    chart_w = SLIDE_W - SIDE_MARGIN * 2 - label_w - delta_w - ELEMENT_GAP * 2
+    hdr_h = HDR_H_STD
     chart_top = CHART_TOP_STD + 0.05
-    max_body_h = FOOTER_TOP - chart_top - 0.55
-    row_h = min(0.42, max(0.28, max_body_h / max(n, 1)))
+    max_body_h = FOOTER_TOP - chart_top - FOOTER_BUFFER
+    row_h = min(ROW_H_MAX, max(ROW_H_MIN, max_body_h / max(n, 1)))
     body_h = n * row_h
 
     # Center
-    block_w = label_w + gap + chart_w + gap + delta_w
-    origin = (SLIDE_W - block_w) / 2
-    label_l = origin
-    chart_l = label_l + label_w + gap
-    delta_l = chart_l + chart_w + gap
+    block_w = label_w + ELEMENT_GAP + chart_w + ELEMENT_GAP + delta_w
+    _, (label_l, chart_l, delta_l) = _layout_blocks(SLIDE_W, label_w, chart_w, delta_w)
 
     # 1. Label table
-    _, ltbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n,
-                           label_l, chart_top)
-    _style_tbl_cell(ltbl.cell(0, 0), "Message", bg=C_HDRGREY, fg=C_WHITE,
-                    fsize=8, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
-    for i, label in enumerate(labels):
-        cell = ltbl.cell(i + 1, 0)
-        _style_tbl_cell(cell, label,
-                        bg=C_LBGREY if i % 2 == 0 else C_WHITE,
-                        fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
-                        ml=0.08, mr=0.05)
-        cell.text_frame.word_wrap = True
+    _build_label_table(slide, labels, label_w, row_h, label_l, chart_top, font=font)
 
     # 2. Bar chart (no category labels)
     cf, ch = add_single_bar_chart(
@@ -120,10 +107,8 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     """Clustered Q4 vs Q3 bar chart with delta column."""
     _slide_chrome(slide, config, ask)
 
-    rows = data.get(ask.data_key, [])
-    rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
-    if not rows:
-        textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+    rows = _prepare_rows(slide, data, ask)
+    if rows is None:
         return
 
     color_current, color_prior = _get_brand_colors(config, ask)
@@ -141,8 +126,7 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
     # Center the chart + delta block
     qoq_chart_w = 8.0
     block_w = qoq_chart_w + CHART_DELTA_GAP + DELTA_COL_WIDTH
-    chart_left = (SLIDE_W - block_w) / 2
-    delta_left = chart_left + qoq_chart_w + CHART_DELTA_GAP
+    _, (chart_left, delta_left) = _layout_blocks(SLIDE_W, qoq_chart_w, DELTA_COL_WIDTH, gap=CHART_DELTA_GAP)
 
     # Clustered bar
     cd = CategoryChartData()

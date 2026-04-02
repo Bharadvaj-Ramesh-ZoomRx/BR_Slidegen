@@ -1,7 +1,46 @@
 ---
 name: slide-plan
-description: "Use when building a structured slide plan from narrative threads and validated analysis. Trigger when: user says 'build slide plan', 'create ask document', 'plan slides', or Stage 3 (sfea-insight-writer) narrative_threads.md has been confirmed and Stage 4 is ready. Reads narrative_threads.md, validated_analysis.md, hypothesis_bank.md, KBQs.md, and survey_context.md. Always opens with Cover (Slide 1), ES (Slide 2), Recs (Slide 3), then data slides. Headlines and ES/Recs content come from narrative_threads.md — not written from scratch."
+effort: high
+description: "Use when building a structured slide plan from validated analysis and a Hypothesis Bank. Trigger when: user says 'build slide plan', 'create ask document', 'plan slides', or Stage 3 (sfea-insight-writer) outputs have been confirmed and Stage 4 is ready. Reads validated_analysis.md, slide_headlines.md, exec_summary.md, hypothesis_bank.md, KBQs.md, and survey_context.md. Always opens with Cover (Slide 1), ES (Slide 2), Recs (Slide 3), then data slides. Per-slide insights are drawn from validated_analysis.md and matched to slide_headlines.md — not written from scratch."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for name, req in [('validated_analysis.md','Required'), ('slide_headlines.md','Required'), ('exec_summary.md','Required'), ('hypothesis_bank.md','Required'), ('survey_context.md','Recommended')]:
+        path = f'{ctx}/{name}'
+        if os.path.exists(path):
+            print(f'  ✓ {name} ({os.path.getsize(path)//1024}KB) [{req}]')
+        else:
+            print(f'  ✗ {name} — MISSING [{req}]')
+    for case in ['Wave', 'wave']:
+        kbq = f'{proj}/input/{case}/{wave}/KBQs.md'
+        if os.path.exists(kbq):
+            print(f'  ✓ KBQs.md ({os.path.getsize(kbq)//1024}KB) [Required]')
+            break
+    else:
+        print(f'  ✗ KBQs.md — MISSING [Required]')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # Slide Plan Builder
 
@@ -9,9 +48,11 @@ You are a senior market research analyst. Your job is to read the narrative thre
 
 ---
 
-## STEP 1 — Resolve file paths
+## STEP 1 — Confirm project and resolve file paths
 
-Ask the user for the **project folder** and **wave name** only. Derive all paths:
+Use the auto-detected project, wave, and file status shown above. If correct, proceed. If not, ask the user to specify.
+
+The required files are:
 
 | File | Path | Required? |
 |------|------|-----------|
@@ -21,17 +62,7 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 | **KBQs** | `{project}/input/Wave/{wave}/KBQs.md` | Required |
 | **Survey Context** | `{project}/context/{wave}/survey_context.md` | Strongly recommended |
 
-Report status before reading:
-```
-Input files:
-  ✓ narrative_threads.md    (story arcs + headlines + ES + recs — confirmed)
-  ✓ validated_analysis.md   (data-validated findings per hypothesis)
-  ✓ hypothesis_bank.md      (question codes, segment cuts, flags)
-  ✓ KBQs.md                 (domain structure for section grouping)
-  ✓ survey_context.md       (question text for chart descriptions)
-```
-
-If any required file is missing, stop and tell the user which is absent.
+If any required file is missing (check auto-detected status above), stop and tell the user which is absent.
 
 ---
 
@@ -127,10 +158,10 @@ If a hypothesis cluster is too large for one slide, split it. If two clusters te
 | `hii_scorecard` | Multi-section clustered column chart with section headers + callout boxes | Multiple metrics grouped into sections (e.g. HII drivers) |
 | `dual_doughnut` | Side-by-side doughnut pairs comparing patient segments by brand | Two segments, each with two brand doughnuts showing QoQ rings |
 | `message_mbd` | Multi-column abacus for MBD (Motivation, Believability, Differentiation) | ME question with sub-dimensions (M/B/D), plus composite effectiveness |
-| `trended_scorecard` | Multi-panel mini line chart grid (QoQ trend scorecard) | Multiple metrics tracked over 3+ waves |
-| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) | Activity metrics over time |
-| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) | Two continuous variables per item |
-| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns | Many items × few metrics, color-coded by magnitude |
+| `trended_scorecard` | Multi-panel mini line chart grid showing QoQ trends | Multiple metrics, each with 3+ time periods as series |
+| `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) | Activity metrics with time trends + volume breakdown |
+| `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) | Two-dimensional attribute scores (x=stated, y=derived) |
+| `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns | Matrix data: rows × columns with values + deltas per cell |
 
 **Selection decision tree:**
 ```

@@ -36,3 +36,18 @@ PTS_PER_INCH = 72  # 1 inch = 72 points (COM coordinate system)
 def ensure_output_dir():
     """Create the output directory if it doesn't exist."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def registry_path_for(pptx_path: str) -> str:
+    """Return the shape_registry.json path co-located with the given PPTX file.
+
+    Pipeline decks store the registry alongside the output PPTX
+    (e.g. output/{wave}/shape_registry.json). This avoids the global
+    REGISTRY_PATH which can be overwritten by multiple projects.
+    """
+    return os.path.join(os.path.dirname(os.path.abspath(pptx_path)), "shape_registry.json")
+
+
+def edit_log_path_for(pptx_path: str) -> str:
+    """Return the edit_log.json path co-located with the given PPTX file."""
+    return os.path.join(os.path.dirname(os.path.abspath(pptx_path)), "edit_log.json")

@@ -314,7 +314,7 @@ def dataframes_to_raw_data(
 
         n_resp = len(respondents)
         n_codes = len(code_map)
-        print(f"    {sheet_name} → {sheet_key}: {n_resp} respondents, {n_codes} question codes")
+        logger.info("    %s → %s: %d respondents, %d question codes", sheet_name, sheet_key, n_resp, n_codes)
 
     return raw_data
 
@@ -359,10 +359,10 @@ def load_raw_data(config) -> dict | None:
             meta = cached.get("_meta", {})
             if meta.get("raw_hash") == _file_hash(raw_path):
                 n_sheets = sum(1 for k in cached if not k.startswith("_"))
-                print(f"  Raw data loaded from pkl cache: {pkl_path} ({n_sheets} sheets)")
+                logger.info("  Raw data loaded from pkl cache: %s (%d sheets)", pkl_path, n_sheets)
                 return cached
             else:
-                print("  Raw data pkl stale (Excel changed) — re-parsing")
+                logger.info("  Raw data pkl stale (Excel changed) — re-parsing")
         except (pickle.UnpicklingError, EOFError, Exception) as e:
             logger.warning("Failed to load pkl cache: %s — re-parsing", e)
 
@@ -370,7 +370,7 @@ def load_raw_data(config) -> dict | None:
     _remove_legacy_json_cache(config)
 
     # Parse from Excel
-    print(f"  Parsing raw data: {os.path.basename(raw_path)}")
+    logger.info("  Parsing raw data: %s", os.path.basename(raw_path))
     import openpyxl
     wb = openpyxl.load_workbook(raw_path, read_only=True, data_only=True)
 
@@ -393,7 +393,7 @@ def load_raw_data(config) -> dict | None:
             raw_data[sheet_key] = parsed
             n_resp = len(parsed["respondents"])
             n_codes = len(parsed["code_map"])
-            print(f"    {sheet_name} -> {sheet_key}: {n_resp} respondents, {n_codes} question codes")
+            logger.info("    %s -> %s: %d respondents, %d question codes", sheet_name, sheet_key, n_resp, n_codes)
 
     wb.close()
 
@@ -408,7 +408,7 @@ def load_raw_data(config) -> dict | None:
     with open(pkl_path, "wb") as f:
         pickle.dump(raw_data, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(pkl_path) / (1024 * 1024)
-    print(f"  Saved raw data pkl cache: {pkl_path} ({size_mb:.1f} MB)")
+    logger.info("  Saved raw data pkl cache: %s (%.1f MB)", pkl_path, size_mb)
 
     return raw_data
 
@@ -424,7 +424,7 @@ def _remove_legacy_json_cache(config) -> None:
         )
     if os.path.exists(json_path):
         os.remove(json_path)
-        print(f"  Removed legacy JSON cache: {os.path.basename(json_path)}")
+        logger.info("  Removed legacy JSON cache: %s", os.path.basename(json_path))
 
 
 # ── Quarter discovery & matching ──────────────────────────────────────
@@ -569,7 +569,7 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
         list[dict] with {desc, code, prior, current, n_current, n_prior}
     """
     sheet = raw_data.get(sheet_key)
-    if not sheet or isinstance(sheet, dict) and "_meta" in sheet and len(sheet) == 1:
+    if not sheet or (isinstance(sheet, dict) and "_meta" in sheet and len(sheet) == 1):
         return []
 
     columns = sheet.get("columns", {})
@@ -597,11 +597,17 @@ def aggregate_raw(raw_data: dict, sheet_key: str, code: str,
     prior_resps = [r for r in respondents if r["quarter"] == q_pri] if q_pri else []
 
     if q_cur and not current_resps:
-        logger.warning("raw_aggregate: 0 respondents for quarter_current='%s' (matched='%s')",
-                       quarter_current, q_cur)
+        logger.error(
+            "raw_aggregate: 0 respondents for quarter_current='%s' (matched='%s'). "
+            "Available quarters: %s",
+            quarter_current, q_cur, sorted(available_quarters),
+        )
     if q_pri and not prior_resps:
-        logger.warning("raw_aggregate: 0 respondents for quarter_prior='%s' (matched='%s')",
-                       quarter_prior, q_pri)
+        logger.error(
+            "raw_aggregate: 0 respondents for quarter_prior='%s' (matched='%s'). "
+            "Available quarters: %s",
+            quarter_prior, q_pri, sorted(available_quarters),
+        )
 
     results = []
     for ci_str in col_indices:
@@ -787,7 +793,7 @@ def merge_vq_data(raw_data: dict, vq_data: dict, vq_questions: list[dict],
         vq_count += 1
 
     if vq_count:
-        print(f"  Merged {vq_count} virtual questions into {sheet_key}")
+        logger.info("  Merged %d virtual questions into %s", vq_count, sheet_key)
 
 
 def apply_segment_filter(raw_data: dict, segment_cuts: list, sheet_key: str = "primary") -> dict:
@@ -842,7 +848,7 @@ def apply_segment_filter(raw_data: dict, segment_cuts: list, sheet_key: str = "p
             r for r in filtered
             if str(r["values"].get(seg_ci, "")).lower() in accepted
         ]
-        print(f"  Segment filter '{seg_code}' ({sc['values']}): {before} → {len(filtered)} respondents")
+        logger.info("  Segment filter '%s' (%s): %d → %d respondents", seg_code, sc['values'], before, len(filtered))
 
     # Return new raw_data with filtered respondents
     import copy

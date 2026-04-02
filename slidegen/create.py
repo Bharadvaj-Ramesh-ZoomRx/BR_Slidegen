@@ -61,12 +61,12 @@ class SlideBuilder:
         self._counter = 0
         self._shapes = {}  # zrx_NNN -> metadata dict
 
-    def _next_name(self):
+    def _next_name(self) -> str:
         """Generate the next sequential zrx_ shape name."""
         self._counter += 1
         return f"{SHAPE_PREFIX}{self._counter:03d}"
 
-    def register(self, shape, label, shape_type, **extra):
+    def register(self, shape, label: str, shape_type: str, **extra) -> str:
         """Name a shape and register it. Returns the assigned name."""
         name = self._next_name()
         shape.name = name
@@ -82,7 +82,7 @@ class SlideBuilder:
         self._shapes[name] = record
         return name
 
-    def add_blank_slide(self, strip_existing=False):
+    def add_blank_slide(self, strip_existing: bool = False):
         """Add a blank slide. Optionally strip all template slides."""
         blank_layout = None
         for layout in self.prs.slide_layouts:
@@ -196,7 +196,7 @@ class SlideBuilder:
         self.register(shape, label, "rect")
         return shape
 
-    def save(self, output_path):
+    def save(self, output_path: str) -> dict:
         """Save the presentation and write the registry.
 
         Args:

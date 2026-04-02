@@ -115,6 +115,12 @@ def set_overlap(chart, overlap: int = 0) -> None:
     ov.set("val", str(overlap))
 
 
+_VALID_MARKER_TYPES = frozenset({
+    "circle", "diamond", "square", "triangle", "star",
+    "dot", "dash", "plus", "x", "none",
+})
+
+
 def set_series_marker(series, marker_type: str = "circle", size: int = 10,
                       fill_color: Optional[RGBColor] = None,
                       line_color: Optional[RGBColor] = None) -> None:
@@ -124,10 +130,14 @@ def set_series_marker(series, marker_type: str = "circle", size: int = 10,
         series: python-pptx Series object
         marker_type: OOXML symbol — "circle", "diamond", "square", "triangle",
                      "star", "dot", "dash", "plus", "x", "none"
-        size: marker size in points (default 10)
+        size: marker size in points (2-72, default 10)
         fill_color: RGBColor for fill, or None to skip
         line_color: RGBColor for border, or None to skip
     """
+    if marker_type not in _VALID_MARKER_TYPES:
+        marker_type = "circle"
+    size = max(2, min(72, size))
+
     ser_el = series._element
     marker = _get_or_add(ser_el, "c:marker")
     sym = _get_or_add(marker, "c:symbol")

@@ -28,8 +28,9 @@ from ._shared import (
     HEADER_ROW_HEIGHT_IN,
     LABEL_MAX_DUAL,
     # helpers
-    _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
+    _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _prepare_rows,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h,
+    _alt_row_bg, _no_data_placeholder,
     # pptx_utils
     C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_RED,
     PP_ALIGN,
@@ -47,6 +48,36 @@ from ._shared import (
 )
 
 
+def _add_secondary_bar_chart(slide, labels, values, left, top, width, height,
+                              fill_color, axis_max, gap, font_name,
+                              plot_x=0.02, plot_y=0.0, plot_w=0.98, plot_h=1.0):
+    """Add a secondary bar chart (no category labels, shared axis scale).
+
+    Used by dual bar renderers for the right-side chart that mirrors the left
+    but hides category labels (they come from the left chart or a shared table).
+    """
+    cd = CategoryChartData()
+    cd.categories = labels
+    cd.add_series("Values", values)
+    cf = slide.shapes.add_chart(
+        XL_CHART_TYPE.BAR_CLUSTERED,
+        Inches(left), Inches(top), Inches(width), Inches(height), cd)
+    ch = cf.chart
+    ch.has_legend = False
+    ch.has_title = False
+    s = ch.series[0]
+    set_series_color(s, fill_color)
+    set_series_no_border(s)
+    enable_data_labels(s, C_WHITE, pos="inEnd", font_name=font_name)
+    hide_axis(ch, "val")
+    hide_cat_labels(ch)
+    invert_cat_axis(ch)
+    set_plot_area_gap(ch, gap)
+    set_val_axis_scale(ch, 0, axis_max)
+    set_chart_plot_area(ch, x=plot_x, y=plot_y, w=plot_w, h=plot_h)
+    return cf, ch
+
+
 def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
     """Two side-by-side bar charts (e.g. MR + ME) each with delta columns.
 
@@ -55,10 +86,8 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
     """
     _slide_chrome(slide, config, ask)
 
-    rows = data.get(ask.data_key, [])
-    rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
-    if not rows:
-        textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+    rows = _prepare_rows(slide, data, ask)
+    if rows is None:
         return
 
     color_current, color_prior = _get_brand_colors(config, ask)
@@ -126,7 +155,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         for i, label in enumerate(labels):
             cell = cat_tbl.cell(i + 1, 0)
             _style_tbl_cell(cell, label,
-                            bg=C_LBGREY if i % 2 == 0 else C_WHITE,
+                            bg=_alt_row_bg(i),
                             fg=C_GREY, fsize=7.5, align=PP_ALIGN.RIGHT, font=font,
                             ml=0.04, mr=0.06)
             cell.text_frame.word_wrap = True
@@ -167,26 +196,10 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         )
 
         # 5. Effectiveness chart (overlaid, no category labels)
-        cd2 = CategoryChartData()
-        cd2.categories = labels
-        cd2.add_series(config.period_current, right_current)
-        cf2 = slide.shapes.add_chart(
-            XL_CHART_TYPE.BAR_CLUSTERED,
-            Inches(DUAL_T_ME_CHART_L), Inches(chart_top_n),
-            Inches(DUAL_T_ME_CHART_W), Inches(chart_h_n), cd2)
-        ch2 = cf2.chart
-        ch2.has_legend = False
-        ch2.has_title = False
-        s2 = ch2.series[0]
-        set_series_color(s2, color_current)
-        set_series_no_border(s2)
-        enable_data_labels(s2, C_WHITE, pos="inEnd", font_name=font)
-        hide_axis(ch2, "val")
-        hide_cat_labels(ch2)
-        invert_cat_axis(ch2)
-        set_plot_area_gap(ch2, BAR_GAP_STD)
-        set_val_axis_scale(ch2, 0, axis_max)
-        set_chart_plot_area(ch2, x=0.02, y=0.0, w=0.98, h=1.0)
+        cf2, ch2 = _add_secondary_bar_chart(
+            slide, labels, right_current,
+            DUAL_T_ME_CHART_L, chart_top_n, DUAL_T_ME_CHART_W, chart_h_n,
+            color_current, axis_max, BAR_GAP_STD, font)
 
         # 6. Effectiveness delta (no header)
         add_delta_table(
@@ -272,26 +285,11 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         dashed_separator(slide, DUAL_SEPARATOR_X, DUAL_HEADER_ROW_TOP,
                          sep_h, color=C_FTGREY, width_pt=0.5, vertical=True)
 
-        cd2 = CategoryChartData()
-        cd2.categories = labels
-        cd2.add_series(config.period_current, right_current)
-        cf2 = slide.shapes.add_chart(
-            XL_CHART_TYPE.BAR_CLUSTERED,
-            Inches(DUAL_ME_LEFT), Inches(chart_top),
-            Inches(DUAL_ME_WIDTH), Inches(chart_h), cd2)
-        ch2 = cf2.chart
-        ch2.has_legend = False
-        ch2.has_title = False
-        s2 = ch2.series[0]
-        set_series_color(s2, color_current)
-        set_series_no_border(s2)
-        enable_data_labels(s2, C_WHITE, pos="inEnd", font_name=font)
-        hide_axis(ch2, "val")
-        hide_cat_labels(ch2)
-        invert_cat_axis(ch2)
-        set_plot_area_gap(ch2, BAR_GAP_STD)
-        set_val_axis_scale(ch2, 0, axis_max)
-        set_chart_plot_area(ch2, x=0.02, y=0.04, w=0.94, h=0.90)
+        cf2, ch2 = _add_secondary_bar_chart(
+            slide, labels, right_current,
+            DUAL_ME_LEFT, chart_top, DUAL_ME_WIDTH, chart_h,
+            color_current, axis_max, BAR_GAP_STD, font,
+            plot_x=0.02, plot_y=0.04, plot_w=0.94, plot_h=0.90)
 
         add_delta_table(
             slide, right_deltas,
@@ -324,10 +322,8 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
     """Two side-by-side clustered bar charts (Q4 vs Q3) each with delta columns."""
     _slide_chrome(slide, config, ask)
 
-    rows = data.get(ask.data_key, [])
-    rows = _sort_data(rows, ask.sort_by, ask.sort_desc)
-    if not rows:
-        textbox(slide, "Data not available", 2, 3, 8, 1, fsize=14, color=C_RED)
+    rows = _prepare_rows(slide, data, ask)
+    if rows is None:
         return
 
     color_current, color_prior = _get_brand_colors(config, ask)

@@ -1,7 +1,45 @@
 ---
 name: sfea-insight-writer
-description: "Use when writing data-validated analysis, narrative threads, headlines, executive summary, and recommendations for a PET SFEA wave. Trigger when: user says 'write insights', 'build ES', 'run insight writer', or Stage 2 hypothesis bank has been signed off and Stage 3 is ready to begin. Reads hypothesis_bank.md, project_context.md, and source_data.json. Runs in 2 phases: Phase 0 (auto) validates hypotheses vs data → validated_analysis.md; Phase 1 synthesizes story arcs + headlines + ES + recs → narrative_threads.md (single human gate)."
+effort: max
+description: "Use when writing data-validated analysis, slide headlines, executive summary, and recommendations for a PET SFEA wave. Trigger when: user says 'write insights', 'build ES', 'run insight writer', or Stage 2 hypothesis bank has been signed off and Stage 3 is ready to begin. Reads hypothesis_bank.md, project_context.md, and source_data.json. Runs in 4 phases: Phase 0 (auto) validates hypotheses vs data → validated_analysis.md; Phase 1 writes talking headlines → slide_headlines.md; Phase 2 writes ES → exec_summary.md; Phase 3 appends Recommendations."
 ---
+
+## Auto-Detected Context
+!`python3 -c "
+import glob, json, os
+try:
+    import yaml
+except ImportError:
+    yaml = None
+configs = sorted(glob.glob('projects/*/config.yaml'), key=os.path.getmtime, reverse=True) if yaml else []
+if configs:
+    try:
+        with open(configs[0]) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+    if not isinstance(cfg, dict): cfg = {}
+    proj = os.path.dirname(configs[0])
+    wave = cfg.get('project',{}).get('wave','')
+    print(f'**Active project:** \`{proj}\`')
+    print(f'**Active wave:** \`{wave}\`')
+    ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
+    for name, req in [('hypothesis_bank.md','Required'), ('project_context.md','Required'), ('source_data.json','Required'), ('validated_analysis.md','Output'), ('slide_headlines.md','Output'), ('exec_summary.md','Output')]:
+        path = f'{ctx}/{name}'
+        if os.path.exists(path):
+            print(f'  ✓ {name} ({os.path.getsize(path)//1024}KB) [{req}]')
+        else:
+            print(f'  ✗ {name} — MISSING [{req}]')
+    sj = f'{ctx}/source_data.json'
+    if os.path.exists(sj):
+        with open(sj) as f:
+            idx = json.load(f)
+        codes = idx.get('_codes',{})
+        print(f'**source_data.json:** {sum(len(v) for v in codes.values())} codes indexed')
+else:
+    print('**No active project detected** — user must specify project folder')
+"
+`
 
 # SFEA Insight Writer
 
@@ -25,9 +63,11 @@ Stage 5: config.yaml + generate_deck()
 
 ---
 
-## STEP 1 — Resolve file paths
+## STEP 1 — Confirm project and resolve file paths
 
-Ask the user for the **project folder** and **wave name** only. Derive all paths:
+Use the auto-detected project, wave, and file status shown above. If correct, proceed. If not, ask the user to specify.
+
+The required files are:
 
 | File | Path | Required? |
 |------|------|-----------|
@@ -37,17 +77,7 @@ Ask the user for the **project folder** and **wave name** only. Derive all paths
 | **Market Context** | `{project}/context/market_context.md` | Required |
 | **ES Format** | Ask user — A through H; default **A** | Optional |
 
-If any required file is missing, stop and tell the user which is absent.
-
-Report before reading:
-```
-Input files:
-  ✓ hypothesis_bank.md     (signed-off hypothesis bank)
-  ✓ project_context.md     (brand names, wave labels, field intel, methodology flags)
-  ✓ market_context.md      (competitive landscape, clinical context)
-  ✓ source_data.json       (survey data keyed by question code)
-ES format: A (Narrative + Recommendations)
-```
+If any required file is missing (check auto-detected status above), stop and tell the user which is absent.
 
 ---
 

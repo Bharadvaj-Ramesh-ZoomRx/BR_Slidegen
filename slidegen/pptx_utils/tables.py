@@ -6,6 +6,8 @@ Reusable table patterns used alongside charts in slide renderers.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt, Emu
@@ -27,7 +29,7 @@ def _cell_vcenter(cell) -> None:
 
 # ── Shared helpers ───────────────────────────────────────────────────────────
 
-def _render_header(tbl, header_text: str, font_name: str | None = None):
+def _render_header(tbl, header_text: str, font_name: Optional[str] = None):
     """Style row 0 as a dark header with centered white bold text."""
     tbl.rows[0].height = Inches(HEADER_ROW_HEIGHT_IN)
     hc = tbl.cell(0, 0)
@@ -46,8 +48,8 @@ def _render_header(tbl, header_text: str, font_name: str | None = None):
 
 
 def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
-                     row_height_in: float, font_name: str | None = None,
-                     data_idx: int | None = None):
+                     row_height_in: float, font_name: Optional[str] = None,
+                     data_idx: Optional[int] = None):
     """Style a single data row: alternating bg, centered colored bold text."""
     tbl.rows[row_idx].height = Inches(row_height_in)
     cell = tbl.cell(row_idx, 0)
@@ -106,48 +108,21 @@ def add_delta_col(slide, deltas: list[float | None],
 
     # Header row (custom height for proportional mode)
     tbl.rows[0].height = Emu(int(hdr_h * EMU_PER_IN))
-    hc = tbl.cell(0, 0)
-    hc.fill.solid()
-    hc.fill.fore_color.rgb = C_HDRGREY
-    hdr_p = hc.text_frame.paragraphs[0]
-    hdr_p.alignment = PP_ALIGN.CENTER
-    suppress_para_bullets(hdr_p._p)
-    run = hdr_p.add_run()
-    run.text = header
-    run.font.size = Pt(7)
-    run.font.bold = True
-    run.font.color.rgb = C_WHITE
-    run.font.name = FONT_TEXT
-    _cell_vcenter(hc)
+    _render_header(tbl, header)
 
-    # Data rows
+    # Data rows (use integer-rounded delta format for proportional mode)
     for i, d in enumerate(deltas):
+        if d is None:
+            text, color = "N/A", C_FTGREY
+        elif d > 0:
+            text, color = f"+{d:.0f}", C_GREEN
+        elif d < 0:
+            text, color = f"{d:.0f}", C_RED
+        else:
+            text, color = "0", C_GREY
         row_idx = i + 1
         tbl.rows[row_idx].height = Emu(int(row_h * EMU_PER_IN))
-        cell = tbl.cell(row_idx, 0)
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = C_LBGREY if i % 2 == 0 else C_WHITE
-
-        if d is None:
-            text, fcolor = "N/A", C_FTGREY
-        elif d > 0:
-            text, fcolor = f"+{d:.0f}", C_GREEN
-        elif d < 0:
-            text, fcolor = f"{d:.0f}", C_RED
-        else:
-            text, fcolor = "0", C_GREY
-
-        tf = cell.text_frame
-        dp = tf.paragraphs[0]
-        dp.alignment = PP_ALIGN.CENTER
-        suppress_para_bullets(dp._p)
-        run = dp.add_run()
-        run.text = text
-        run.font.size = Pt(8)
-        run.font.bold = True
-        run.font.color.rgb = fcolor
-        _cell_vcenter(cell)
-        run.font.name = FONT_TEXT
+        _render_data_row(tbl, row_idx, text, color, row_h, data_idx=i)
 
     tbl.columns[0].width = Inches(width)
     return tbl
@@ -155,7 +130,7 @@ def add_delta_col(slide, deltas: list[float | None],
 
 def add_delta_table(slide, deltas: list[float | None],
                     left: float, top: float, width: float, row_height: float,
-                    header_text: str = "QoQ \u0394", font_name: str | None = None,
+                    header_text: str = "QoQ \u0394", font_name: Optional[str] = None,
                     show_header: bool = True):
     """Add a single-column delta table with green/red conditional coloring.
 
@@ -197,7 +172,7 @@ def add_delta_table(slide, deltas: list[float | None],
 def add_value_table(slide, values: list[float | None],
                     left: float, top: float, width: float, row_height: float,
                     header_text: str = "Total %", value_color: RGBColor | None = None,
-                    font_name: str | None = None):
+                    font_name: Optional[str] = None):
     """Add a single-column table showing plain values (not delta-colored).
 
     Useful for total percentages in stacked bar charts.

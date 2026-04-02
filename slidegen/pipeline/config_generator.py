@@ -269,28 +269,12 @@ _FIELD_PATTERN = re.compile(r'^\*\*([^*]+)\*\*:?\s*(.+)', re.MULTILINE)
 _Q_CODE_LINE = re.compile(r'^\s*-\s+([A-Z]\d[\w_]*)\s*[—–-]\s*"?(.+?)"?\s*$', re.MULTILINE)
 _BACKTICK_VALUE = re.compile(r'`([^`]+)`')
 
-# Known valid slide_type values
-_VALID_SLIDE_TYPES = {
-    "cover", "executive_summary", "single_bar_with_delta",
-    "dual_bar_with_delta", "dual_bar_qoq", "clustered_compare",
-    "dual_bar_compare", "qoq_bar_with_delta", "two_section_bar",
-    "stacked_order", "abacus", "dual_abacus", "followup_rep",
-    "hii_scorecard", "dual_doughnut", "message_mbd",
-    "trended_scorecard", "trended_activity", "quadrant_scatter",
-    "heatmap_table",
-}
+# Import valid slide types from the single source of truth (RENDERERS registry)
+from slidegen.pipeline.slide_renderers import RENDERERS as _RENDERERS
+_VALID_SLIDE_TYPES = set(_RENDERERS.keys())
 
 # Slide types that don't need data extractions
 _NO_DATA_TYPES = {"cover", "executive_summary"}
-
-# Method selection heuristics based on _codes metadata
-_METHOD_HEURISTICS = {
-    # (has_sub_codes, sub_row_count_threshold) → method
-    "multi_question_code": lambda c: c.get("has_sub_codes", False),
-    "question_code": lambda c: c.get("sub_row_count", 0) > 1,
-    "nested_ordinal": lambda c: c.get("sub_row_count", 0) > 1 and "ordinal" in c.get("desc", "").lower(),
-}
-
 
 def scaffold_config_from_plan(
     plan_path: str,
@@ -323,8 +307,12 @@ def scaffold_config_from_plan(
     codes_index = {}
     sheets_in_json = {}
     if json_path and os.path.exists(json_path):
-        with open(json_path, "r", encoding="utf-8") as f:
-            source_data = _json.load(f)
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                source_data = _json.load(f)
+        except _json.JSONDecodeError as e:
+            logger.warning("Corrupt %s — skipping code index: %s", json_path, e)
+            source_data = {}
         codes_index = source_data.get("_codes", {})
         sheets_in_json = source_data.get("_sheets", {})
 
@@ -733,8 +721,11 @@ def _merge_into_base_config(
     base_config_path: str, extractions: list[dict], asks: list[dict]
 ) -> str:
     """Load an existing config.yaml and replace extractions + asks."""
-    with open(base_config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(base_config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Malformed YAML in {base_config_path}: {e}") from e
 
     config["extractions"] = extractions
     config["asks"] = asks

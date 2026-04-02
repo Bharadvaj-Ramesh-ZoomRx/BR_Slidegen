@@ -22,6 +22,7 @@ Authentication:
 """
 
 import json
+import logging
 import os
 import shutil
 import time
@@ -37,7 +38,10 @@ except ImportError:
     import urllib.error as _urllib_err
     _USE_REQUESTS = False
 
+from slidegen.pipeline.http_utils import get_json as _get_json_shared
 from slidegen.pipeline.project_config import ProjectConfig, SynapseConfig, load_project_config
+
+logger = logging.getLogger(__name__)
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -76,9 +80,9 @@ def trigger_generation(
     """
     synapse, resolved_url, headers = _resolve_synapse_params(config, api_key, synapse_url)
 
-    print(f"Submitting banner plan generation for project_id={synapse.project_id}...")
+    logger.info(f"Submitting banner plan generation for project_id={synapse.project_id}...")
     history_id = _trigger_generation(resolved_url, synapse, headers)
-    print(f"  Generation queued: history_id={history_id}")
+    logger.info(f"  Generation queued: history_id={history_id}")
     return history_id
 
 
@@ -87,8 +91,8 @@ def wait_and_download(
     history_id: int,
     api_key: Optional[str] = None,
     synapse_url: Optional[str] = None,
-    poll_interval: int = _DEFAULT_POLL_INTERVAL,
-    max_wait: int = _DEFAULT_MAX_WAIT,
+    poll_interval: Optional[int] = None,
+    max_wait: Optional[int] = None,
 ) -> str:
     """Poll for completion and download the banner plan Excel (blocking).
 
@@ -108,10 +112,17 @@ def wait_and_download(
     """
     _, resolved_url, headers = _resolve_synapse_params(config, api_key, synapse_url)
 
+    # Use config timeouts as defaults, fall back to module constants
+    synapse = config.synapse
+    if poll_interval is None:
+        poll_interval = synapse.poll_interval if synapse else _DEFAULT_POLL_INTERVAL
+    if max_wait is None:
+        max_wait = synapse.max_wait if synapse else _DEFAULT_MAX_WAIT
+
     # Poll for completion
-    print(f"Polling for completion (max {max_wait}s, interval {poll_interval}s)...")
+    logger.info(f"Polling for completion (max {max_wait}s, interval {poll_interval}s)...")
     _poll_until_done(resolved_url, headers, history_id, poll_interval, max_wait)
-    print("  Banner plan generation complete.")
+    logger.info("  Banner plan generation complete.")
 
     # Download and save
     return _download_and_save(config, resolved_url, headers, history_id)
@@ -121,8 +132,8 @@ def fetch_synapse_data(
     config: ProjectConfig,
     api_key: Optional[str] = None,
     synapse_url: Optional[str] = None,
-    poll_interval: int = _DEFAULT_POLL_INTERVAL,
-    max_wait: int = _DEFAULT_MAX_WAIT,
+    poll_interval: Optional[int] = None,
+    max_wait: Optional[int] = None,
 ) -> str:
     """Fetch fresh banner plan data from the Synapse API (blocking convenience wrapper).
 
@@ -181,13 +192,13 @@ def _download_and_save(
 
     tmp_path = excel_dest + ".tmp"
     try:
-        print(f"  Downloading Excel → {os.path.basename(excel_dest)}...")
+        logger.info(f"  Downloading Excel → {os.path.basename(excel_dest)}...")
         _download_banner_plan(resolved_url, headers, history_id, tmp_path)
         if os.path.exists(excel_dest):
             os.remove(excel_dest)
         os.rename(tmp_path, excel_dest)
-        print(f"  Saved: {excel_dest}")
-    except Exception:
+        logger.info(f"  Saved: {excel_dest}")
+    except BaseException:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         raise
@@ -227,7 +238,7 @@ def _trigger_generation(base_url: str, synapse: SynapseConfig, headers: dict) ->
             detail = resp.text
             try:
                 detail = resp.json().get("detail", resp.text)
-            except Exception:
+            except (ValueError, KeyError):
                 pass
             raise RuntimeError(f"Synapse API error {resp.status_code}: {detail}")
         data = resp.json()
@@ -268,7 +279,7 @@ def _poll_until_done(
                 f"Banner plan generation failed (history_id={history_id})"
             )
         else:
-            print(f"  [{elapsed}s] status={last_status!r} — waiting {poll_interval}s...")
+            logger.info(f"  [{elapsed}s] status={last_status!r} — waiting {poll_interval}s...")
             time.sleep(poll_interval)
             elapsed += poll_interval
 
@@ -290,7 +301,7 @@ def _download_banner_plan(
             detail = resp.text
             try:
                 detail = resp.json().get("detail", resp.text)
-            except Exception:
+            except (ValueError, KeyError):
                 pass
             raise RuntimeError(f"Download error {resp.status_code}: {detail}")
         with open(dest_path, "wb") as f:
@@ -311,24 +322,8 @@ def _download_banner_plan(
 
 
 def _get_json(url: str, headers: dict) -> dict:
-    """GET a URL and return parsed JSON."""
-    if _USE_REQUESTS:
-        resp = _requests.get(url, headers=headers, timeout=30)
-        if not resp.ok:
-            detail = resp.text
-            try:
-                detail = resp.json().get("detail", resp.text)
-            except Exception:
-                pass
-            raise RuntimeError(f"Status check error {resp.status_code}: {detail}")
-        return resp.json()
-    else:
-        req = _urllib_req.Request(url, headers=headers)
-        try:
-            with _urllib_req.urlopen(req, timeout=30) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except _urllib_err.HTTPError as e:
-            raise RuntimeError(f"Status check error {e.code}: {e.reason}") from e
+    """GET a URL and return parsed JSON (delegates to shared http_utils with retry)."""
+    return _get_json_shared(url, headers)
 
 
 def _backup_existing_excel(excel_path: str) -> Optional[str]:
@@ -342,7 +337,7 @@ def _backup_existing_excel(excel_path: str) -> Optional[str]:
     backup_name = f"source_data_backup_{ts}.xlsx"
     backup_path = os.path.join(os.path.dirname(excel_path), backup_name)
     shutil.copy2(excel_path, backup_path)
-    print(f"  Backed up existing Excel → {backup_name}")
+    logger.info(f"  Backed up existing Excel → {backup_name}")
     return backup_path
 
 
@@ -355,9 +350,9 @@ def _invalidate_json_cache(config: ProjectConfig) -> None:
 
     if os.path.exists(json_path):
         os.remove(json_path)
-        print(f"  Invalidated JSON cache: {json_path}")
+        logger.info(f"  Invalidated JSON cache: {json_path}")
     else:
-        print("  No JSON cache to invalidate.")
+        logger.info("  No JSON cache to invalidate.")
 
 
 # ── CLI entrypoint ────────────────────────────────────────────────────────────
@@ -413,9 +408,9 @@ def _cli() -> None:
         poll_interval=args.poll_interval,
         max_wait=args.max_wait,
     )
-    print(f"\nDone. Excel saved: {excel_path}")
+    logger.info(f"\nDone. Excel saved: {excel_path}")
 
     if args.and_generate:
         from slidegen.pipeline.orchestrator import generate_deck
-        print("\nRunning generate_deck()...")
+        logger.info("\nRunning generate_deck()...")
         generate_deck(args.yaml_path)

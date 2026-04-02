@@ -33,10 +33,6 @@ def load_template(config) -> tuple:
         # Strategy: Build a clean blank PPTX with the correct dimensions,
         # then copy only the slide master XML theme (colors, fonts) from the
         # template. This avoids ALL orphaned chart/slide/customXml issues.
-        from pptx.oxml.ns import qn as _qn
-        import zipfile
-        import tempfile
-
         source_prs = Presentation(config.template_path)
         original_count = len(source_prs.slides)
 
@@ -46,8 +42,8 @@ def load_template(config) -> tuple:
             master = source_prs.slide_masters[0]
             theme_part = master.part.related_part('rId1')  # theme is usually rId1
             theme_xml = theme_part._element
-        except Exception:
-            pass
+        except (IndexError, KeyError, AttributeError) as e:
+            print(f"  [WARN] Could not extract theme from template: {e}")
 
         # Create a fresh blank presentation
         prs = Presentation()
@@ -63,8 +59,8 @@ def load_template(config) -> tuple:
                 blank_theme_part._element.getparent().replace(
                     blank_theme_part._element, theme_xml
                 )
-            except Exception:
-                pass  # If theme injection fails, proceed with default theme
+            except (IndexError, KeyError, AttributeError) as e:
+                print(f"  [WARN] Theme injection failed, using defaults: {e}")
 
         # Find the "Blank" layout
         blank_layout = None

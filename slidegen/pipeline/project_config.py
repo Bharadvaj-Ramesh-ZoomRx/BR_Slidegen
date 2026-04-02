@@ -18,6 +18,8 @@ from pptx.dml.color import RGBColor
 def parse_color(hex_str: str) -> RGBColor:
     """Parse '#RRGGBB' or 'RRGGBB' → RGBColor."""
     h = hex_str.lstrip("#")
+    if len(h) != 6 or not all(c in "0123456789abcdefABCDEF" for c in h):
+        raise ValueError(f"Invalid hex color '{hex_str}' — expected '#RRGGBB' or 'RRGGBB'")
     return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
@@ -84,6 +86,8 @@ class SynapseConfig:
     multi_question_analysis_ids: list[int] = field(default_factory=list)
     virtual_question_analysis_ids: list[int] = field(default_factory=list)
     segments: list[SegmentCutConfig] = field(default_factory=list)  # segment cut configs
+    poll_interval: int = 10                   # seconds between status checks
+    max_wait: int = 300                       # max seconds to wait for banner plan generation
 
 
 @dataclass
@@ -137,6 +141,7 @@ class ProjectConfig:
     context_path: str = ""       # wave-versioned context folder (system-generated files)
     section_icon_path: str = ""  # small icon for section header bars
     raw_data_source_path: str = ""  # respondent-level raw data Excel (source_raw_data.xlsx)
+    staleness_hours: int = 24   # JSON cache staleness warning threshold (hours)
     synapse_api_url: str = ""    # deprecated — use synapse.api_url instead
     synapse: Optional[SynapseConfig] = None  # Synapse API config for banner plan download
 
@@ -162,7 +167,19 @@ class ProjectConfig:
         from slidegen.pipeline.slide_renderers import RENDERERS
 
         errors = []
-        extraction_ids = {ex.id for ex in self.extractions}
+
+        # Check for duplicate extraction IDs
+        seen_ids: dict[str, int] = {}
+        for i, ex in enumerate(self.extractions):
+            if ex.id in seen_ids:
+                errors.append(
+                    f"extractions[{i}] ({ex.id}): duplicate extraction ID "
+                    f"(first defined at extractions[{seen_ids[ex.id]}])"
+                )
+            else:
+                seen_ids[ex.id] = i
+
+        extraction_ids = set(seen_ids.keys())
         known_methods = {
             "question_code", "multi_question_code", "row_range",
             "question_code_multi_col", "nested_ordinal", "mock",
@@ -204,11 +221,42 @@ class ProjectConfig:
                     if rk not in params:
                         errors.append(f"extractions[{i}] ({ex.id}): method 'synapse_report' requires params.{rk}")
 
+        # Validate brand colors
+        for brand_key, brand in self.brands.items():
+            for color_field in ("color_current", "color_prior"):
+                c = getattr(brand, color_field, None)
+                if c is None:
+                    errors.append(f"brands.{brand_key}: missing {color_field}")
+
+        # Validate sample sizes are positive
+        for ss_key, ss in self.sample_sizes.items():
+            if ss.prior <= 0:
+                errors.append(f"sample_sizes.{ss_key}: prior must be positive, got {ss.prior}")
+            if ss.current <= 0:
+                errors.append(f"sample_sizes.{ss_key}: current must be positive, got {ss.current}")
+
         # Validate asks
         for i, ask in enumerate(self.asks):
             if ask.slide_type not in RENDERERS:
                 errors.append(
                     f"asks[{i}] ({ask.id}): unknown slide_type '{ask.slide_type}'"
+                )
+            # Check sort_by references a plausible data field
+            if ask.sort_by:
+                valid_suffixes = ("current", "prior", "desc", "delta", "total", "gap")
+                parts = ask.sort_by.rsplit("_", 1)
+                base_ok = ask.sort_by in valid_suffixes or (
+                    len(parts) == 2 and parts[-1] in valid_suffixes
+                )
+                if not base_ok:
+                    errors.append(
+                        f"asks[{i}] ({ask.id}): sort_by '{ask.sort_by}' doesn't end with a "
+                        f"recognized field suffix ({', '.join(valid_suffixes)})"
+                    )
+            # Check brand reference
+            if ask.brand and ask.brand not in self.brands:
+                errors.append(
+                    f"asks[{i}] ({ask.id}): brand '{ask.brand}' not in config.brands {sorted(self.brands.keys())}"
                 )
             # Check primary data_key
             if ask.data_key and ask.data_key not in extraction_ids:
@@ -217,7 +265,7 @@ class ProjectConfig:
                 )
             # Check extra data_key references
             extra = ask.extra or {}
-            for nested_key in ("left", "right"):
+            for nested_key in ("left", "right", "top", "bottom"):
                 nested = extra.get(nested_key, {})
                 if isinstance(nested, dict) and nested.get("data_key"):
                     dk = nested["data_key"]
@@ -230,6 +278,26 @@ class ProjectConfig:
                 if dk and dk not in extraction_ids:
                     errors.append(
                         f"asks[{i}] ({ask.id}): extra.{ek} '{dk}' not found in extractions"
+                    )
+            # Validate renderer-specific required extra fields
+            _RENDERER_REQUIRED_EXTRA = {
+                "dual_bar_with_delta": ["left", "right"],
+                "dual_bar_compare": ["left", "right"],
+                "dual_bar_qoq": ["left", "right"],
+                "dual_abacus": ["left", "right"],
+                "hii_scorecard": ["categories"],
+                "heatmap_table": ["columns"],
+                "dual_doughnut": ["sections"],
+                "trended_scorecard": ["panels"],
+                "trended_activity": ["panels"],
+                "two_section_bar": ["top", "bottom"],
+            }
+            required_extra = _RENDERER_REQUIRED_EXTRA.get(ask.slide_type, [])
+            for req_key in required_extra:
+                if req_key not in extra:
+                    errors.append(
+                        f"asks[{i}] ({ask.id}): slide_type '{ask.slide_type}' "
+                        f"requires extra.{req_key}"
                     )
 
         return errors
@@ -283,8 +351,11 @@ def _validate_extraction(ex: dict, idx: int, yaml_path: str):
 
 def load_project_config(yaml_path: str) -> ProjectConfig:
     """Load a project YAML file into a ProjectConfig."""
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Malformed YAML in {yaml_path}: {e}") from e
 
     if not isinstance(raw, dict):
         raise ValueError(f"Config file must be a YAML mapping, got {type(raw).__name__}: {yaml_path}")
@@ -367,6 +438,13 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
             p = p.replace("{{wave}}", wave)
         if not os.path.isabs(p):
             p = os.path.join(project_dir, p)
+        # Prevent path traversal outside project directory
+        resolved = os.path.realpath(p)
+        if not resolved.startswith(os.path.realpath(project_dir)):
+            raise ValueError(
+                f"Path '{p}' resolves outside project directory "
+                f"(resolved: {resolved}, project: {project_dir})"
+            )
         return p
 
     data_path = _resolve_path(raw.get("data_source_path", ""))
@@ -404,6 +482,8 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
             multi_question_analysis_ids=synapse_raw.get("multi_question_analysis_ids", []),
             virtual_question_analysis_ids=synapse_raw.get("virtual_question_analysis_ids", []),
             segments=segment_cuts,
+            poll_interval=synapse_raw.get("poll_interval", 10),
+            max_wait=synapse_raw.get("max_wait", 300),
         )
 
     return ProjectConfig(
@@ -426,6 +506,7 @@ def load_project_config(yaml_path: str) -> ProjectConfig:
         context_path=ctx_path,
         section_icon_path=icon_path,
         raw_data_source_path=raw_data_path,
+        staleness_hours=project.get("staleness_hours", 24),
         synapse_api_url=raw.get("synapse_api_url", ""),
         synapse=synapse_cfg,
     )
