@@ -40,7 +40,7 @@ def _render_header(tbl, header_text: str, font_name: Optional[str] = None):
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = header_text
-    run.font.size = Pt(7)
+    run.font.size = Pt(8)
     run.font.bold = True
     run.font.color.rgb = C_WHITE
     run.font.name = font_name or FONT_TEXT
@@ -63,7 +63,7 @@ def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = text
-    run.font.size = Pt(8)
+    run.font.size = Pt(9)
     run.font.bold = True
     run.font.color.rgb = color
     run.font.name = font_name or FONT_TEXT

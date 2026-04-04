@@ -25,7 +25,7 @@ from ._shared import (
     DUAL_BC_SEP_X,
     DUAL_BC_R_CHART_L, DUAL_BC_R_CHART_W, DUAL_BC_R_DELTA_L, DUAL_BC_R_DELTA_W,
     # helpers
-    _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
+    _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _compute_row_h,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h, _auto_label_width, _vcenter_top,
     _alt_row_bg, _no_data_placeholder, _prepare_rows, _layout_blocks, _build_label_table,
     FONT_HDR, FONT_BODY,
@@ -165,9 +165,9 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     # Layout: [Label table] [Clustered bar (no cat labels)] [Delta col(s)]
     gap = 0.08
-    hdr_h = 0.30
+    hdr_h = 0.36
     max_body_h = FOOTER_TOP - CHART_TOP_STD - 0.55
-    row_h = min(0.42, max(0.28, max_body_h / max(n, 1)))
+    row_h = _compute_row_h(n, max_body_h, min_h=0.34, max_h=0.55)
     body_h = n * row_h
     content_h = hdr_h + body_h
     chart_top = _vcenter_top(content_h)
@@ -194,12 +194,12 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
     _, ltbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n,
                            label_l, chart_top)
     _style_tbl_cell(ltbl.cell(0, 0), "Attribute", bg=C_HDRGREY, fg=C_WHITE,
-                    fsize=8, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
+                    fsize=9, bold=True, align=PP_ALIGN.LEFT, font=font, ml=0.08, mr=0.05)
     for i, label in enumerate(labels):
         cell = ltbl.cell(i + 1, 0)
         _style_tbl_cell(cell, label,
                         bg=_alt_row_bg(i),
-                        fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
+                        fg=C_GREY, fsize=9, align=PP_ALIGN.LEFT, font=font,
                         ml=0.08, mr=0.05)
         cell.text_frame.word_wrap = True
 
@@ -217,11 +217,11 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
 
     set_series_color(ch.series[0], s1_color)
     set_series_no_border(ch.series[0])
-    enable_data_labels(ch.series[0], s1_color, fsize=7, font_name=font)
+    enable_data_labels(ch.series[0], s1_color, fsize=9, font_name=font)
 
     set_series_color(ch.series[1], s2_color)
     set_series_no_border(ch.series[1])
-    enable_data_labels(ch.series[1], s2_color, fsize=7, font_name=font)
+    enable_data_labels(ch.series[1], s2_color, fsize=9, font_name=font)
 
     hide_axis(ch, "val")
     hide_cat_labels(ch)

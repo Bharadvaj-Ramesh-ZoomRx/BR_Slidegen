@@ -18,7 +18,7 @@ from ._shared import (
     LABEL_MAX_SINGLE, LABEL_MAX_DUAL,
     ELEMENT_GAP, SIDE_MARGIN, FOOTER_BUFFER, ROW_H_MIN, ROW_H_MAX, HDR_H_STD,
     # helpers
-    _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend,
+    _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _compute_row_h,
     _cap_chart_h, _auto_label_width, _vcenter_top, _prepare_rows,
     _alt_row_bg, _no_data_placeholder, _layout_blocks, _build_label_table,
     FONT_HDR, FONT_BODY,
@@ -62,7 +62,7 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     chart_w = SLIDE_W - SIDE_MARGIN * 2 - label_w - delta_w - ELEMENT_GAP * 2
     hdr_h = HDR_H_STD
     max_body_h = FOOTER_TOP - CHART_TOP_STD - FOOTER_BUFFER
-    row_h = min(ROW_H_MAX, max(ROW_H_MIN, max_body_h / max(n, 1)))
+    row_h = _compute_row_h(n, max_body_h, min_h=ROW_H_MIN, max_h=ROW_H_MAX)
     body_h = n * row_h
     content_h = hdr_h + body_h
     chart_top = _vcenter_top(content_h)

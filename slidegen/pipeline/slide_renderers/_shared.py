@@ -100,6 +100,7 @@ FOOTER_BUFFER = 0.55            # space reserved above footer for legend + gap
 ROW_H_MIN = 0.25                # minimum per-row height in tables/charts
 ROW_H_MAX = 0.42                # maximum per-row height in tables/charts
 HDR_H_STD = 0.30                # standard header row height for chart label tables
+MIN_FILL_RATIO = 0.65           # body_h must fill at least 65% of available vertical space
 
 # Chart sizing constraints
 MAX_CHART_HEIGHT = 4.5
@@ -375,13 +376,20 @@ def _get_brand_colors(config: ProjectConfig, ask: AskConfig):
 
 
 def _compute_row_h(n_rows: int, available_h: float,
-                    min_h: float = 0.25, max_h: float = 0.42) -> float:
-    """Compute per-row height clamped to [min_h, max_h].
+                    min_h: float = 0.25, max_h: float = 0.42,
+                    min_fill: float = MIN_FILL_RATIO) -> float:
+    """Compute per-row height clamped to [min_h, max_h], ensuring the total
+    body height fills at least *min_fill* fraction of the available space.
 
-    Replaces the repeated pattern:
-        row_h = min(MAX, max(MIN, available_h / max(n, 1)))
+    When few rows would leave excessive whitespace, the row height is expanded
+    beyond max_h up to an absolute ceiling of 1.0" per row.
     """
-    return min(max_h, max(min_h, available_h / max(n_rows, 1)))
+    n = max(n_rows, 1)
+    row_h = min(max_h, max(min_h, available_h / n))
+    body_h = n * row_h
+    if body_h < available_h * min_fill:
+        row_h = min(1.0, (available_h * min_fill) / n)
+    return row_h
 
 
 def _sort_data(rows: list[dict], sort_by: str | None, sort_desc: bool = True) -> list[dict]:

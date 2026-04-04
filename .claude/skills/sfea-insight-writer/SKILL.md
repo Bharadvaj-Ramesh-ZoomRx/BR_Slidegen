@@ -327,13 +327,15 @@ For each arc, write headlines for the slides that will serve it. Each headline i
 
 The headline itself talks only about the metrics, brands, and numbers that belong on its slide.
 
-#### Headline Structure
+#### Headline Structure — Insight-First, Data-Light
+
+Headlines lead with the **strategic insight** — what the data means for the client's decision. Data appears as a parenthetical proof point, not as the headline structure. The chart shows the numbers; the headline tells you what they mean.
 
 Every headline has two parts:
 
 ```
-[Part 1 — What happened: brand, direction, metric, data anchor from validated_analysis.md]
-[Part 2 — Why it matters for THIS metric: interpretation informed by the arc, grounded in context]
+[Part 1 — Strategic insight: what happened and why it matters, naming brands and direction]
+[Part 2 — One parenthetical data anchor as proof — (X%, +Npp) — embedded naturally in the sentence]
 ```
 
 Use a **semicolon (;)** for additive or parallel findings within the slide.
@@ -342,31 +344,36 @@ Use an **em-dash (—)** when Part 2 is a sharp contrast, pivot, or implication.
 #### Headline Anatomy
 
 ```
-[Brand] [direction verb] [metric] [data anchor]
-— [interpretation of what this specific metric movement means, informed by arc context]
+[Strategic claim about what the metric movement means for the client]
+— [implication or contrast, with one data point as proof]
 ```
+
+The headline should read like a field strategy observation, not a data readout. A reader who never sees the chart should understand the business implication. A reader who only sees the chart should find the headline adds interpretive value the chart alone doesn't provide.
 
 #### Good vs. Bad Headlines — The Litmus Tests
 
-**Litmus test 1 — Data summary vs. strategic insight:**
+**Litmus test 1 — Data narration vs. strategic insight:**
 
-Same data, two framings:
+Same data, three framings:
 
-*Data summary (wrong):*
+*Data narration (wrong — reads like a spreadsheet):*
 > "TAG average ME surged from 62.6% to 69.6% (+7.0pp), nearly closing the effectiveness gap with RYB+LAZ (70.0%)"
 
-*Strategic insight (right — arc-informed, slide-specific):*
-> "TAG ME surged +7pp to near-parity with RYB (69.6% vs 70.0%) — broad-based gains across 9 of 10 messages suggest AZ's restructured messaging playbook is resonating, not just individual messages improving"
+*Data-reduced but still data-structured (wrong — numbers still drive the sentence):*
+> "TAG ME surged +7pp to near-parity with RYB (69.6% vs 70.0%) — broad-based gains across 9 of 10 messages suggest AZ's restructured messaging playbook is resonating"
 
-The difference: the second headline interprets *what kind of movement this is* (systematic, not random) — informed by the CONVERGENCE arc — while staying within the ME data shown on the slide.
+*Insight-first (right — strategic claim leads, one data anchor as proof):*
+> "AZ's restructured messaging playbook is resonating broadly — TAG ME improved across 9 of 10 messages to reach near-parity with RYB, suggesting a systematic messaging shift rather than isolated message improvement"
+
+The difference: the third headline tells you what the data *means* for the competitive landscape. The numbers are in the chart — the headline adds the interpretive layer.
 
 **Litmus test 2 — Arc leakage:**
 
 *Arc leakage (wrong — references data not on this slide):*
-> "TAG's ME surge to parity (+7pp to 69.6%) is the messaging dimension of a broader competitive shift — quality, intent, and now effectiveness all moved in AZ's favor in Q1"
+> "TAG's ME surge to parity is the messaging dimension of a broader competitive shift — quality, intent, and now effectiveness all moved in AZ's favor in Q1"
 
 *Arc-informed but slide-specific (right):*
-> "TAG ME surged +7pp to near-parity with RYB (69.6% vs 70.0%) — broad-based gains across 9 of 10 messages suggest AZ's restructured messaging playbook is resonating, not just individual messages improving"
+> "AZ's restructured messaging playbook is resonating broadly — TAG ME improved across 9 of 10 messages to reach near-parity with RYB, suggesting a systematic messaging shift rather than isolated message improvement"
 
 The difference: the first explicitly names quality and intent data that isn't on the ME slide. The second uses the arc's *interpretive lens* (this is systematic, not random) without importing other slides' data.
 
@@ -376,7 +383,7 @@ The difference: the first explicitly names quality and intent data that isn't on
 > "RYB+LAZ branded closing improved from 46% to 53% (+7pp) in Q1'26, nearly matching TAG Chemo's 55%"
 
 *Has "so what" (right):*
-> "RYB+LAZ branded closing improved +7pp to 53%, nearly matching TAG Chemo (55%) — the gain was concentrated in HII interactions (65%), confirming that high-quality calls are converting to business outcomes at a significantly higher rate"
+> "Q4's coaching emphasis on closing technique is paying off — RYB overtook TAG on branded close for the first time, with the gain concentrated in high-impact interactions where reps execute the full interaction sequence"
 
 #### Context Anchoring
 
@@ -426,10 +433,13 @@ Before writing each headline, look up the relevant context:
 - Reference the current wave explicitly: *"In Q1'26…"* or *"in Q1'26"*
 - Name both brands when comparing — never "the competitor"
 
-**Rule 4 — Numbers are mandatory but limited**
-- Every headline must include at least one specific % or pp value from validated_analysis.md
-- Limit to 2-3 numbers — pick the most telling; the chart shows the rest
-- Use `~` for approximate, `%` not "percent", `pp` for percentage points
+**Rule 4 — Data-light: the chart shows the numbers, the headline shows the meaning**
+- Headlines are insight-first. Lead with the strategic claim, not the data point.
+- Include **at most 1-2 numbers** as parenthetical proof — never more. The chart is right there.
+- If you find yourself writing three or more numbers in a headline, you're narrating data, not interpreting it. Remove numbers until the insight leads.
+- Use `~` for approximate, `%` not "percent", `pp` for percentage points.
+- Acceptable: "RYB overtook TAG on branded close for the first time (+7pp to 53%)" — one proof point.
+- Not acceptable: "RYB branded closing surged +7pp to 53% in Q1'26, overtaking TAG (44%, -11pp) — the 18pp swing validates coaching" — five numbers, reads like a ticker tape.
 
 **Rule 5 — "Directionally" for small n**
 - When n is small or delta is borderline: *"Directionally, [Brand] [finding]…"*
@@ -439,11 +449,13 @@ Before writing each headline, look up the relevant context:
 | Anti-pattern | Fix |
 |---|---|
 | Writing the predicted hypothesis as a finding | Write what the data confirmed, not what was predicted |
-| No data anchor | Add a specific % or pp value |
+| No data anchor at all | Add one specific % or pp value as parenthetical proof |
+| **Data-heavy headline (3+ numbers)** | **Strip to 1-2 numbers max. The chart shows the rest. If the headline reads like a data readout, rewrite it as a strategic claim with one proof point.** |
 | "Results were mixed" | Pick the dominant direction; flag the exception |
 | Missing brand or wave reference | Always name both |
 | Headline references data from another slide | Remove — interpret this slide's data through the arc lens instead |
-| Headline is just Part 1 (data) with no Part 2 (meaning) | Add the "so what" — what does this movement mean for the client? |
+| Headline is just Part 1 (data) with no Part 2 (meaning) | Flip the structure: lead with meaning, use data as proof |
+| **Headline structured as "[metric] [went] from X% to Y% (+Zpp)"** | **Restructure: lead with what this movement means for the client; embed one number as evidence** |
 
 ---
 
