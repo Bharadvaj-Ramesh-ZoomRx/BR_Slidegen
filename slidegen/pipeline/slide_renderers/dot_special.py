@@ -265,6 +265,7 @@ def render_dual_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict,
 
     extra = ask.extra or {}
     font  = config.font_body
+    display_font = config.font_display
 
     left_cfg  = extra.get("left", {})
     right_cfg = extra.get("right", {})
@@ -415,7 +416,8 @@ def render_dual_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict,
         for i in range(n)
     ]
     add_delta_table(slide, l_deltas, l_delta_l, panel_top, _DA_DELTA_W, row_h,
-                    header_text=l_delta_hdr, font_name=font)
+                    header_text=l_delta_hdr, font_name=font,
+                    display_font=display_font)
 
     # ── Vertical separator ──
     dashed_separator(slide, sep_x, panel_top, total_h,
@@ -448,7 +450,8 @@ def render_dual_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict,
         for i in range(n)
     ]
     add_delta_table(slide, r_deltas, r_delta_l, panel_top, _DA_DELTA_W, row_h,
-                    header_text=l_delta_hdr, font_name=font)
+                    header_text=l_delta_hdr, font_name=font,
+                    display_font=display_font)
 
     # Scale labels below charts
     lbl_y = chart_top + body_h + 0.04

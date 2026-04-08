@@ -28,7 +28,7 @@ from ._shared import (
     HEADER_ROW_HEIGHT_IN,
     LABEL_MAX_DUAL,
     # helpers
-    _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _prepare_rows, _vcenter_top,
+    _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _prepare_rows, _vcenter_top, _delta_legend_items,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h,
     _alt_row_bg, _no_data_placeholder,
     # pptx_utils
@@ -92,6 +92,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
 
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
+    display_font = config.font_display
     extra = ask.extra
 
     left_cfg = extra.get("left", {})
@@ -213,7 +214,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
             left=DUAL_T_MR_DELTA_L, top=chart_top_n,
             width=DUAL_T_MR_DELTA_W, row_height=row_h,
             header_text=left_delta_header, font_name=font,
-            show_header=False,
+            display_font=display_font, show_header=False,
         )
 
         # 5. Effectiveness chart (overlaid, no category labels)
@@ -228,7 +229,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
             left=DUAL_T_ME_DELTA_L, top=chart_top_n,
             width=DUAL_T_ME_DELTA_W, row_height=row_h,
             header_text=right_delta_header, font_name=font,
-            show_header=False,
+            display_font=display_font, show_header=False,
         )
 
         # 7. Callout boxes (stacked vertically)
@@ -262,11 +263,11 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         ly = ax_y + (0.24 if left_axis_label or right_axis_label else LEGEND_GAP)
         sample = config.sample_sizes.get(ask.brand or "primary")
         n_label = f" (n={sample.current})" if sample else ""
+        delta_items, delta_note = _delta_legend_items()
         _make_legend(slide, [
             (color_current, f"{config.period_current}{n_label}"),
-            (C_GREEN, "Positive Δ"),
-            (C_RED, "Negative Δ"),
-        ], 0, ly, font, center_over=(0, SLIDE_W))
+        ] + delta_items, 0, ly, font, center_over=(0, SLIDE_W),
+            note=delta_note)
 
     else:
         # ── WIDE MODE: existing shape-primitive layout ────────────────────
@@ -302,6 +303,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
             left=DUAL_MR_DELTA_LEFT, top=chart_body_top, width=DUAL_DELTA_WIDTH,
             row_height=delta_row_h,
             header_text=left_delta_header, font_name=font,
+            display_font=display_font,
         )
 
         sep_h = chart_h + hdr_row_h
@@ -319,6 +321,7 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
             left=DUAL_ME_DELTA_LEFT, top=chart_body_top, width=DUAL_DELTA_WIDTH,
             row_height=delta_row_h,
             header_text=right_delta_header, font_name=font,
+            display_font=display_font,
         )
 
         ax_y = chart_body_top + chart_h + 0.04
@@ -334,11 +337,11 @@ def render_dual_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, dat
         ly = chart_top + chart_h + (0.28 if left_axis_label or right_axis_label else LEGEND_GAP)
         sample = config.sample_sizes.get(ask.brand or "primary")
         n_label = f" (n={sample.current})" if sample else ""
+        delta_items, delta_note = _delta_legend_items()
         _make_legend(slide, [
             (color_current, f"{config.period_current}{n_label}"),
-            (C_GREEN, "Positive Δ"),
-            (C_RED, "Negative Δ"),
-        ], 0, ly, font, center_over=(0, SLIDE_W))
+        ] + delta_items, 0, ly, font, center_over=(0, SLIDE_W),
+            note=delta_note)
 
 
 def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
@@ -351,6 +354,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
 
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
+    display_font = config.font_display
     extra = ask.extra
 
     left_cfg = extra.get("left", {})
@@ -439,6 +443,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
         slide, left_deltas,
         left=_left_delta_l, top=chart_top, width=_qoq_delta_w, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=left_delta_header, font_name=font,
+        display_font=display_font,
     )
 
     # Right chart label
@@ -477,6 +482,7 @@ def render_dual_bar_qoq(slide, config: ProjectConfig, ask: AskConfig, data: dict
         slide, right_deltas,
         left=_right_delta_l, top=chart_top, width=_qoq_delta_w, row_height=row_h * ROW_SCALE_FACTOR,
         header_text=right_delta_header, font_name=font,
+        display_font=display_font,
     )
 
     # Legend

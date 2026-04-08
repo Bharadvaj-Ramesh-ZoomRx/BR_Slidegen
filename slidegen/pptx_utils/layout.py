@@ -88,35 +88,36 @@ def slide_header(slide, headline: str, module_label: str = "Personal Promotion M
 
     # Module label + badge (skip if module_label is empty)
     if module_label:
+        # Short badge label: drop trailing "Module" if present for cleaner fit
+        badge_label = module_label.replace(" Module", "").upper()
         textbox(slide, module_label,
-                5.5, 0.05, 7.70, 0.22,
-                fsize=7.5, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_text)
+                10.49, 0.02, 2.85, 0.25,
+                fsize=9, color=C_FTGREY, align=PP_ALIGN.RIGHT, font=f_display)
 
-        badge_w = 2.20
-        badge_h = 0.36
+        badge_w = 1.92
+        badge_h = 0.27
         badge_l = SLIDE_W_IN - badge_w - 0.10
-        badge_t = 0.91
+        badge_t = 1.06
         solidrect(slide, badge_l, badge_t, badge_w, badge_h, C_RED)
-        textbox(slide, module_label.upper(),
+        textbox(slide, badge_label,
                 badge_l, badge_t, badge_w, badge_h,
-                fsize=7, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER, font=f_text)
+                fsize=10, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER,
+                font=f_display)
 
-    # Headline
+    # Headline (full width — badge overlaps if needed)
     textbox(slide, headline,
-            0.20, 0.16, 10.55, 0.66,
+            0.20, 0.16, 12.08, 1.21,
             fsize=22, bold=True, color=C_RED, align=PP_ALIGN.LEFT, font=f_display)
 
 
 def slide_footer(slide, footer_text: str, font: Optional[str] = None) -> None:
     """Add standard footer text at bottom of slide.
 
-    Starts at x=2.70 to avoid overlapping the J&J logo on the slide master
-    (logo occupies x=0.32–2.61 at y=7.02). Text is vertically centered
-    within the box to align parallel with the J&J Medicine mark.
+    Full-width below the chart area. Font size 9pt for readability.
     """
     sh = textbox(slide, footer_text,
-                 2.70, 6.78, 10.20, 0.72,
-                 fsize=6.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
+                 0.20, 7.10, 12.70, 0.25,
+                 fsize=9.0, color=C_FTGREY, align=PP_ALIGN.LEFT, font=font or FONT_TEXT)
     _get_or_add(sh.text_frame._txBody, "a:bodyPr").set("anchor", "ctr")
 
 
@@ -197,7 +198,7 @@ def section_header_bar(slide, label: str, top: float = 1.40,
 
     textbox(slide, label.upper(),
             text_l, top + 0.03, bar_w - 0.35, bar_h - 0.06,
-            fsize=9, bold=True, color=C_GREY, font=font or FONT_TEXT)
+            fsize=12, bold=True, color=C_GREY, font=font or FONT_TEXT)
     return bg
 
 

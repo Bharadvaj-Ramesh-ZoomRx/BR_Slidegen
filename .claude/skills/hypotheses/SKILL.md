@@ -69,10 +69,15 @@ The required files are:
 | **Prior Wave Context** | `{project}/context/{wave}/prior_wave_context.md` | Required if exists |
 | **KBQs** | `{project}/input/Wave/{wave}/KBQs.md` | Required |
 | **Survey Context** | `{project}/context/{wave}/survey_context.md` | Strongly recommended |
+| **Qualitative Data** | `{project}/context/{wave}/qualitative_data.json` | Optional — enables QUALITATIVE hypotheses |
 
 If `prior_wave_context.md` is missing: proceed but flag — all prior-wave validation hypotheses will be based on narrative summaries in `project_context.md` only (less specific).
 
 If `survey_context.md` is missing: proceed but flag — "Test with:" lines will be analytical descriptions, not question-code references.
+
+If `qualitative_data.json` is missing: proceed with quantitative hypotheses only — no QUALITATIVE type hypotheses will be generated, and no `qual_callout` flags will be added. This is the normal path when no raw data file was provided.
+
+If `qualitative_data.json` exists: read the `_meta` summary to understand which verbatim questions are available, how many responses each has, and which sheets they come from. This enables QUALITATIVE hypotheses and `qual_callout` flags (see STEP 4).
 
 If either required file (`market_context.md`, `project_context.md`, `KBQs.md`) is missing: stop and tell the user which is absent.
 
@@ -86,8 +91,8 @@ Read every available file completely before generating anything. Do not proceed 
 - **Project Context** — study design (TP1/TP2), field intelligence (client-shared), methodology changes, open action items, wave-specific expectations
 - **Prior Wave Context** — structured domain-by-domain findings from the prior delivered report: headlines, specific metrics, segment splits (Academic vs Community), open action items, verbatim recommendations carried forward
 - **KBQs** — the organising structure; all business questions by domain
-- **Survey Context** — question codes, question text, response scales, tracked message list, segment operationalization
-- **Survey Context** provides: question codes, question text, response scales, tracked message labels, segment operationalization — used exclusively to write precise "Test with:" lines
+- **Survey Context** — question codes, question text, response scales, tracked message list, segment operationalization — used exclusively to write precise "Test with:" lines
+- **Qualitative Data** (if exists) — read `_meta` section only at this stage. Note: which verbatim question codes are available (e.g., Q1.53A perception change, Q1.88 interaction improvement, Q2.00 unaided recall, Q3.35 biomarker barriers), how many responses each has, which sheets they come from. Do NOT read individual responses yet — that happens during Stage 3 validation.
 
 ---
 
@@ -206,6 +211,41 @@ For every context item — wave change, prior wave finding, client action item, 
 - Every wave change (new message, new formulation, VA redesign, survey change) — at least one hypothesis
 - Every KBQ domain — at least one hypothesis
 
+### Qualitative hypotheses (only when `qualitative_data.json` exists)
+
+QUALITATIVE hypotheses are **separate** from quantitative hypotheses. They produce dedicated qualitative analysis slides (not just callouts on quant slides). Generate them only when:
+
+1. **The "Why" test passes** — the hypothesis asks why something happened, not just what happened. "Did LTIP improve?" is quant. "Why is OS recall flat despite VA placement?" needs qual.
+2. **The KBQ test passes** — the linked KBQ requires causal explanation, not just measurement.
+3. **The "not already explained" test passes** — no other quant metric explains the finding. If TAG ME explains the call quality gap, no qual needed.
+
+**Expect 5-8 QUALITATIVE hypotheses per wave, not more.** If you find yourself writing more than 10, you are overdoing it. Qual is for explaining the unexplained, not decorating the obvious.
+
+**Format for QUALITATIVE hypotheses:**
+
+```
+**HQ[N] — [What HCPs are expected to say about X — stated as a testable theme prediction]**
+[Rationale: why do we expect this theme to dominate? Reference the quant finding that creates the "why" question.]
+Test with: [verbatim question code] — "[abbreviated question text]" (n=[response count from qualitative_data.json])
+Qual analysis: Theme frequency + representative quotes
+Dedicated slide: Yes
+```
+
+**Additionally**, some quantitative hypotheses may benefit from a `qual_callout` — a verbatim quote on the quant slide that explains the "why" behind the number. Add this flag sparingly:
+
+```
+**H[N] — [Standard quant hypothesis]**
+[Rationale...]
+Test with: [quant question code]
+qual_callout: [verbatim question code] — surface dominant theme as callout on this slide
+```
+
+**`qual_callout` rules:**
+- Maximum 6-8 callouts across the entire hypothesis bank
+- Only where the verbatim directly explains the quant finding
+- The callout is a single quote + theme stat, not a full analysis
+- Never on methodology artifact hypotheses
+
 ### Hypothesis generation logic
 
 For each hypothesis, the reasoning chain is:
@@ -248,6 +288,37 @@ PRIOR WAVE VALIDATION — [persist / strengthen / reverse / diverge] [add only i
 ```
 
 Repeat H[N] blocks continuously across all domains. Number does not restart per domain.
+
+### Qualitative hypotheses section (only if `qualitative_data.json` exists)
+
+After all quantitative domain sections, add a separate section:
+
+```
+---
+
+## QUALITATIVE HYPOTHESES
+**Available verbatim questions:** [list from qualitative_data.json _meta]
+
+**HQ[N] — [Theme prediction about what HCPs say]**
+[Rationale referencing the quant finding that motivates the "why" question]
+KBQ: [linked KBQ]
+Test with: [verbatim Q code] — "[question text]" (n=[count])
+Qual analysis: Theme frequency + representative quotes
+Dedicated slide: Yes
+
+```
+
+### Quantitative hypotheses with qual_callout flags
+
+Within the regular quantitative hypothesis sections, add the `qual_callout` line where appropriate:
+
+```
+**H[N] — [Standard quant hypothesis]**
+[Rationale...]
+Test with: [quant Q code]
+qual_callout: [verbatim Q code] — surface [expected theme] as callout
+
+```
 
 ---
 

@@ -75,9 +75,12 @@ The required files are:
 | **Project Context** | `{project}/context/{wave}/project_context.md` | Required |
 | **Source Data** | `{project}/context/{wave}/source_data.json` | Required |
 | **Market Context** | `{project}/context/market_context.md` | Required |
+| **Qualitative Data** | `{project}/context/{wave}/qualitative_data.json` | Optional — enables qual validation |
 | **ES Format** | Ask user — A through H; default **A** | Optional |
 
 If any required file is missing (check auto-detected status above), stop and tell the user which is absent.
+
+If `qualitative_data.json` exists: it enables QUALITATIVE hypothesis validation and qual_callout enrichment in Phase 0, and qualitative evidence integration in Phase 1. If missing: all qual-related steps are skipped — the pipeline produces the same output as before.
 
 ---
 
@@ -110,6 +113,12 @@ Read all files completely before doing anything else.
 - For each question code referenced in the hypothesis bank: prior value, current value, and delta (current − prior in pp)
 - Segment splits where available (e.g., HII vs. non-HII, Community vs. Academic)
 - If a code is in the `_sheets` index but not yet fully extracted: note it as "extraction needed" — do not skip it
+
+**From `qualitative_data.json` (if exists) extract and hold:**
+- The `_meta` summary: which sheets have verbatim data, total response counts
+- For each QUALITATIVE hypothesis: read the verbatim responses for the referenced question code using the `sheets.{sheet_key}.questions.{q_key}.responses` array
+- For each `qual_callout` flag on a quant hypothesis: note the verbatim question code to analyze during Phase 0
+- Do NOT read all verbatim responses upfront — only read the specific question codes referenced by hypotheses
 
 ---
 
@@ -164,6 +173,48 @@ If a question code is not found in `source_data.json`:
 **Note:** Q code [X] not found in source_data.json — extraction may be needed before this hypothesis can be validated.
 ```
 
+### Qualitative hypothesis validation (only when `qualitative_data.json` exists and hypothesis bank contains HQ or qual_callout entries)
+
+For each **QUALITATIVE hypothesis (HQ[N]):**
+
+1. Read the verbatim responses for the referenced question code from `qualitative_data.json`
+2. Theme-code the responses: group them into 4-7 themes based on content similarity
+3. Count theme frequency: what % of responses mention each theme
+4. Select 2-3 representative quotes per theme: choose for clarity, specificity, and segment diversity
+5. Assess the hypothesis: does the dominant theme match the prediction?
+
+Output format for qualitative hypotheses:
+```
+### HQ[N]: [Hypothesis statement]
+**Status:** CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED
+**Qualitative Evidence:** ([verbatim Q code], n=[response count])
+**Theme analysis:**
+| Theme | Count | % | Representative quote |
+|-------|-------|---|---------------------|
+| [Theme 1 — dominant] | [N] | [%] | "[quote]" — [segment tag] |
+| [Theme 2] | [N] | [%] | "[quote]" — [segment tag] |
+| [Theme 3] | [N] | [%] | "[quote]" — [segment tag] |
+| [Other / misc] | [N] | [%] | |
+**Triangulation:** [How does the qual evidence relate to the quant findings? Convergent, divergent, or additive?]
+```
+
+For each **qual_callout flag** on a quantitative hypothesis:
+
+1. Read the verbatim responses for the referenced question code
+2. Identify the dominant theme relevant to the quant finding
+3. Select 1 representative quote that best explains the "why" behind the number
+4. Add a `Qual callout` block to that hypothesis's validation entry:
+
+```
+### H[N]: [Standard quant hypothesis]
+**Status:** [quant status]
+**Data:** [quant data as normal]
+**Qual callout:** ([verbatim Q code], n=[count])
+  Dominant theme: "[theme name]" ([%] of responses)
+  Quote: "[representative quote]" — [segment, HII status]
+  Triangulation: [one sentence — how the quote explains the quant finding]
+```
+
 Save as `{project}/context/{wave}/validated_analysis.md`.
 
 **→ No user gate after Phase 0.** Proceed directly to Phase 1.
@@ -199,6 +250,7 @@ The **KBQ** column is the primary organizing key — it maps every finding back 
 Also tag:
 - **Prior wave link**: Does this finding confirm or contradict a prior wave recommendation? (CLOSURE candidate)
 - **Cross-domain echo**: Does this finding's direction match findings in other domains for the same brand? (CONVERGENCE candidate)
+- **Qual evidence**: Does this finding have a validated QUALITATIVE hypothesis or qual_callout that explains the "why"? (enrichment candidate)
 
 Do NOT show this matrix to the user. It is an analytical working tool for Step B.
 
@@ -267,6 +319,9 @@ The arc sequence should read as a logical progression: outcome → message strat
   Must reference the specific client priority or competitive threat from the KBQ itself,
   grounded in project_context.md or market_context.md.]
 **Methodology caveats:** [Any ⚠ flags that affect findings in this arc] ← omit if none
+**Qual evidence:** [If any HQ or qual_callout findings support this arc — list them. Omit if none.]
+  - HQ[N]: [theme summary] — adds explanatory depth to H[x]
+  - H[N] qual_callout: "[quote]" — explains why [metric] is [direction]
 ```
 
 #### Example arcs (KBQ-governed)
@@ -659,6 +714,13 @@ Assemble all Phase 1 output into a single document:
 [N]. **[Headline text]**
     Hypotheses: H[x], H[y]
     Slide data: [which metrics/brands appear on this slide]
+    qual_callout: [verbatim Q code] — "[quote]" ([theme], [%]) ← only if H[x] or H[y] has a qual_callout
+
+[N]. **[Headline text — for a QUALITATIVE hypothesis slide]**
+    Hypotheses: HQ[x]
+    Slide type: qual_theme_analysis
+    Qual source: [verbatim Q code] (n=[count])
+    Themes: [top 3-5 theme names from validated_analysis.md]
 
 [N]. **[Headline text]**
     Hypotheses: H[z]
@@ -796,6 +858,14 @@ Before writing a headline, look up at least one of: competitive event, prior wav
 - [ ] Each motivating sentence names evidence from 2+ domains
 - [ ] Ordered by urgency (ACT NOW first)
 - [ ] CELEBRATE arcs have SUSTAIN/EXTEND recs
+
+**Qualitative (only if qualitative_data.json exists):**
+- [ ] Every QUALITATIVE hypothesis validated with theme analysis + representative quotes
+- [ ] Every qual_callout flag resolved with dominant theme + 1 representative quote
+- [ ] Qual evidence integrated into relevant arcs (not isolated)
+- [ ] Qual headlines use `qual_theme_analysis` slide type
+- [ ] 5-8 qual hypotheses max (not overdone)
+- [ ] 6-8 qual_callouts max across entire deck
 
 ---
 

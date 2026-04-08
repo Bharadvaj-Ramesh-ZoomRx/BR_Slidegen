@@ -21,6 +21,8 @@ from ._shared import (
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _compute_row_h,
     _cap_chart_h, _auto_label_width, _vcenter_top, _prepare_rows,
     _alt_row_bg, _no_data_placeholder, _layout_blocks, _build_label_table,
+    _chart_area_header, _derive_chart_header, _delta_legend_items,
+    _derive_axis_label, _render_axis_label,
     FONT_HDR, FONT_BODY,
     # pptx_utils
     C_GREEN, C_GREY, C_LBGREY, C_HDRGREY, C_WHITE, C_RED,
@@ -49,6 +51,7 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
 
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
+    display_font = config.font_display
 
     labels = [r.get("short") or r.get("desc", "") for r in rows]
     current_vals = [r.get("current") or 0 for r in rows]
@@ -58,7 +61,8 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
 
     # Layout: [Label table] [Bar chart (no cat labels)] [Delta col]
     delta_w = DELTA_COL_WIDTH
-    label_w = _auto_label_width(labels)
+    label_w = _auto_label_width(labels, fsize=FONT_BODY,
+                                is_display_font=(display_font != font))
     chart_w = SLIDE_W - SIDE_MARGIN * 2 - label_w - delta_w - ELEMENT_GAP * 2
     hdr_h = HDR_H_STD
     max_body_h = FOOTER_TOP - CHART_TOP_STD - FOOTER_BUFFER
@@ -71,8 +75,14 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
     block_w = label_w + ELEMENT_GAP + chart_w + ELEMENT_GAP + delta_w
     _, (label_l, chart_l, delta_l) = _layout_blocks(SLIDE_W, label_w, chart_w, delta_w)
 
-    # 1. Label table
-    _build_label_table(slide, labels, label_w, row_h, label_l, chart_top, font=font)
+    # 1. Label table (uses display font for readability)
+    _build_label_table(slide, labels, label_w, row_h, label_l, chart_top,
+                       font=font, display_font=display_font)
+
+    # 1b. Chart area header (continuous strip above chart)
+    _chart_area_header(slide, chart_l, chart_top, chart_w, hdr_h,
+                       text=_derive_chart_header(config, ask),
+                       font=font, display_font=display_font)
 
     # 2. Bar chart (no category labels)
     cf, ch = add_single_bar_chart(
@@ -91,17 +101,23 @@ def render_single_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, d
         left=delta_l, top=chart_top, width=delta_w,
         row_height=row_h,
         header_text="QoQ Δ", font_name=font,
+        display_font=display_font,
     )
 
-    # 4. Legend
-    ly = chart_top + hdr_h + body_h + LEGEND_GAP
+    # 4. Axis label below chart
+    axis_label = _derive_axis_label(ask)
+    ax_y = chart_top + hdr_h + body_h + 0.04
+    _render_axis_label(slide, axis_label, chart_l, ax_y, chart_w, font=font)
+
+    # 5. Legend with delta threshold note
+    ly = ax_y + (0.24 if axis_label else LEGEND_GAP)
     sample = config.sample_sizes.get(ask.brand or "primary")
     n_label = f" (n={sample.current})" if sample else ""
+    delta_items, delta_note = _delta_legend_items()
     _make_legend(slide, [
         (color_current, f"{config.period_current}{n_label}"),
-        (C_GREEN, "Positive Δ"),
-        (C_RED, "Negative Δ"),
-    ], 0, ly, font, center_over=(label_l, block_w))
+    ] + delta_items, 0, ly, font, center_over=(label_l, block_w),
+        note=delta_note)
 
 
 def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
@@ -114,6 +130,7 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
 
     color_current, color_prior = _get_brand_colors(config, ask)
     font = config.font_body
+    display_font = config.font_display
 
     labels = [r.get("desc", "")[:LABEL_MAX_DUAL] for r in rows]
     current_vals = [r.get("current") or 0 for r in rows]
@@ -164,14 +181,20 @@ def render_qoq_bar_with_delta(slide, config: ProjectConfig, ask: AskConfig, data
         slide, deltas,
         left=delta_left, top=chart_top, width=DELTA_COL_WIDTH, row_height=row_h * ROW_SCALE_FACTOR,
         header_text="QoQ Δ", font_name=font,
+        display_font=display_font,
     )
 
+    # Axis label below chart
+    axis_label = _derive_axis_label(ask)
+    ax_y = chart_top + chart_h + 0.04
+    _render_axis_label(slide, axis_label, chart_left, ax_y, qoq_chart_w, font=font)
+
     # Manual legend below chart
+    ly = ax_y + (0.24 if axis_label else LEGEND_GAP)
     _make_legend(slide, [
         (color_current, config.period_current),
         (color_prior, config.period_prior),
-    ], 0, chart_top + chart_h + LEGEND_GAP, font,
-        center_over=(chart_left, block_w))
+    ], 0, ly, font, center_over=(chart_left, block_w))
 
 
 def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, namer=None):
@@ -180,6 +203,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
 
     extra = ask.extra
     font = config.font_body
+    display_font = config.font_display
 
     # Estimate total content height for vertical centering
     _total_h = 0
@@ -242,6 +266,7 @@ def render_two_section_bar(slide, config: ProjectConfig, ask: AskConfig, data: d
                 left=_delta_left, top=y_offset, width=DELTA_COL_NARROW,
                 row_height=ch_h / max(n, 1) * ROW_SCALE_FACTOR,
                 header_text="Δ", font_name=font,
+                display_font=display_font,
             )
 
             y_offset += ch_h + 0.50

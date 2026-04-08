@@ -37,7 +37,8 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       │       ├── narrative_threads.md      # Stage 3 Phase 1: /sfea-insight-writer (arcs + headlines + ES + recs)
 │       │       ├── slide_plan.md             # Stage 4: /slide-plan (arc-informed)
 │       │       ├── source_data.json          # Auto-extracted from Excel (Tier 1 JSON cache)
-│       │       └── source_raw_data.json      # Auto-extracted from raw Excel (Tier 2 JSON cache)
+│       │       ├── source_raw_data.json      # Auto-extracted from raw Excel (Tier 2 JSON cache)
+│       │       └── qualitative_data.json     # Stage 0q: verbatim responses from raw Excel (auto, optional)
 │       ├── templates/         # Template decks — shared across waves (gitignored)
 │       ├── output/            # Generated deliverables (gitignored)
 │       │   └── Q1 2026/       # Wave-versioned output subfolder
@@ -47,7 +48,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
-│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), refresh_deck(), index_excel(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json(), fetch_all_raw(), load_cached_pkl()
+│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), refresh_deck(), index_excel(), index_qualitative(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json(), fetch_all_raw(), load_cached_pkl()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader + validate()
 │   │   ├── data_loaders.py    # 9 data extractors (5 Excel + mock + raw_aggregate + synapse_report + synapse_raw) + JSON auto-cache + _codes rich index
 │   │   ├── raw_data_loader.py # Respondent-level data parser (source_raw_data.xlsx) + 4 aggregation modes + quarter cache
@@ -55,9 +56,10 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   ├── synapse_json_loader.py # JSON-first data fetching — POST /reports/generate → slidegen format (bypasses Excel)
 │   │   ├── synapse_auth.py    # Synapse API token resolution (explicit key, env var, Azure AD auto-acquire + caching)
 │   │   ├── synapse_raw_fetcher.py # Raw data from Synapse API — survey responses + segments + VQs → local aggregation
-│   │   ├── slide_renderers/   # 20 slide type renderers (RENDERERS registry, +1 backward-compat alias)
+│   │   ├── qual_data_loader.py # Stage 0q: qualitative verbatim extraction from raw Excel → qualitative_data.json
+│   │   ├── slide_renderers/   # 22 slide type renderers (RENDERERS registry, +1 backward-compat alias)
 │   │   │   ├── __init__.py   #   Registry + exports
-│   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width
+│   │   │   ├── _shared.py    #   Layout constants, helpers, _auto_label_width, render_qual_callout
 │   │   │   ├── bar.py        #   single_bar, qoq_bar, two_section_bar
 │   │   │   ├── bar_dual.py   #   dual_bar_with_delta, dual_bar_qoq
 │   │   │   ├── compare.py    #   clustered_compare, stacked_order, dual_bar_compare, hii_scorecard, dual_doughnut
@@ -65,6 +67,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │   │   │   ├── line.py       #   trended_scorecard, trended_activity
 │   │   │   ├── quadrant.py   #   quadrant_scatter
 │   │   │   ├── heatmap.py    #   heatmap_table
+│   │   │   ├── qualitative.py #  qual_theme_analysis (theme bars + quote boxes)
 │   │   │   └── narrative.py  #   cover, executive_summary
 │   │   ├── orchestrator.py    # Pipeline entry + ShapeNamer + per-slide regen (by index or ask_id) + PPTX backup
 │   │   └── config_generator.py # Data discovery + config scaffolding + scaffold_config_from_plan()
@@ -161,6 +164,7 @@ load_all_data(config):
   └─ Tier 3: synapse_raw extractions → Synapse API raw data + VQs + segment cuts
                                       ↓
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
+              →  render_qual_callout(slide, config, ask)  (if ask.extra.qual_callout)
                                       ↓
                       output/{wave}/deck.pptx
                       output/{wave}/shape_registry.json   (shape state + lineage)
@@ -239,6 +243,7 @@ All tiers auto-cache to JSON with Excel file hash validation. Delete the JSON to
 | `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
 | `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
 | `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
+| `qual_theme_analysis` | Qualitative theme frequency bars (left) + representative quote boxes (right) |
 
 ## Data Source Layout
 
@@ -281,6 +286,8 @@ The `config.yaml` `sheets` section still provides the sheet-name-to-role mapping
 - **Renderer-data compatibility**: Most extractions produce simple `{desc, prior, current}` rows. Only `single_bar_with_delta`, `abacus`, and `executive_summary` work with this format. Renderers like `dual_bar_with_delta`, `clustered_compare`, `hii_scorecard`, and `heatmap_table` require specific field prefixes or `extra` config — do not assign them unless the extraction is configured to produce matching data.
 - **pct_mode auto-detection**: `_codes.value_range` in `source_data.json` distinguishes `decimal` (0-1) vs `whole` (0-100). Use `pct` for decimals, `straight` for whole. When header row looks like a base size but sub-rows are decimals, the indexer correctly classifies as `decimal`.
 - **T2B extraction**: For rep attributes (Q1_87Z), `question_code` pulls ALL scale distribution sub-rows (rated 1-7). To get T2B summary rows only, use `row_range` targeting the consolidated T2B block in the Excel.
+- **Qualitative callouts**: Any slide can have a `qual_callout` in `ask.extra` — the orchestrator calls `render_qual_callout()` after every renderer. It adds a compact quote box (bottom-right, 3.5" wide) with theme tag, verbatim quote, and attribution. No-ops if `qual_callout` is absent. Config keys: `quote`, `attribution`, `theme`, `pct`, `source`.
+- **Qualitative slides**: `qual_theme_analysis` renders theme frequency bars (left 55%) + representative quote boxes (right 45%). Data comes from `ask.extra.themes` and `ask.extra.quotes` (populated by Stage 3 theme coding). Dedicated slides are created for HQ-type hypotheses in the hypothesis bank.
 
 ## Dependencies
 
@@ -322,6 +329,12 @@ from slidegen.pipeline import index_excel
 index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
             "projects/{name}/context/{wave}/source_data.json")
 # Builds _sheets index + _codes rich index (sub_row_count, has_sub_codes, value_range)
+
+# ── Index qualitative data (Stage 0q — optional, if raw data exists) ──
+from slidegen.pipeline import index_qualitative
+index_qualitative("projects/{name}/input/wave/{wave}/source_raw_data.xlsx",
+                  "projects/{name}/context/{wave}/qualitative_data.json")
+# Extracts verbatim columns, hash-cached, graceful skip if no raw Excel
 
 # ── Fetch data from Synapse API ──
 from slidegen.pipeline import fetch_synapse_data, trigger_generation, wait_and_download
@@ -443,6 +456,15 @@ index_excel("projects/{name}/input/wave/{wave}/source_data.xlsx",
             "projects/{name}/context/{wave}/source_data.json")
 ```
 
+### Stage 0q — Index Qualitative Data (automatic, if raw data exists)
+Extracts verbatim/open-ended responses from `source_raw_data.xlsx` into `context/{wave}/qualitative_data.json`. Runs automatically during `generate_deck()` if `raw_data_source_path` exists. Hash-based caching — skips if Excel unchanged. Graceful degradation: if no raw data file, the entire qual path skips silently.
+```python
+from slidegen.pipeline import index_qualitative
+index_qualitative("projects/{name}/input/wave/{wave}/source_raw_data.xlsx",
+                  "projects/{name}/context/{wave}/qualitative_data.json")
+```
+**Downstream usage:** `qualitative_data.json` feeds Stage 2 (HQ-type hypotheses in `/hypotheses`), Stage 3 (theme coding in `/sfea-insight-writer`), and Stage 4 (`qual_theme_analysis` slides + `qual_callout` flags in `/slide-plan`). Theme coding happens at the skill level (Claude NLP in Stage 3), not in the Python extraction.
+
 ### Stages 0.5a/b/c — Parallel Context Generation
 
 **These three stages are independent and can run in parallel using background subagents:**
@@ -517,6 +539,7 @@ Executes the pipeline: loads config → extracts data (or reads JSON cache) → 
 ```
 INPUT FOLDER: input/wave/{wave}/
   source_data.xlsx          → Stage 0 only (auto)
+  source_raw_data.xlsx      → Stage 0q only (auto, optional — qual path)
   *prior wave files*        → Stage 0.5b only
   *survey draft*            → Stage 0.5c only
   KBQs.md                   → Stage 1 + Stage 2 (hand-written, no auto-gen)
@@ -524,6 +547,7 @@ INPUT FOLDER: input/wave/{wave}/
 
 ─────────────────────────────────────────────────── no gates ──
 Stage 0    index_excel()          →  context/{wave}/source_data.json
+Stage 0q   index_qualitative()    →  context/{wave}/qualitative_data.json  (if raw Excel exists)
 
 ┌─ Stage 0.5a /market-context     →  context/market_context.md          ─┐
 │  (skip if exists; NOT wave-versioned; one prompt: flagged claims only)  │

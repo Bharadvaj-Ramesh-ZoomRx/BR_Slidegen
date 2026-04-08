@@ -24,6 +24,7 @@ from pptx import Presentation
 from slidegen.pipeline.project_config import load_project_config, ProjectConfig, AskConfig, DataExtractionConfig
 from slidegen.pipeline.data_loaders import load_all_data
 from slidegen.pipeline.slide_renderers import RENDERERS
+from slidegen.pipeline.slide_renderers._shared import render_qual_callout
 from slidegen.pptx_utils.deck import (
     load_template as _load_template_impl,
     clear_slide as _clear_slide_impl,
@@ -438,6 +439,22 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
                 + "\n".join(f"  - {w}" for w in data_warnings)
             )
 
+    # 2c. Stage 0q — Index qualitative data (if raw data Excel exists)
+    if config.raw_data_source_path and os.path.isfile(config.raw_data_source_path):
+        try:
+            from slidegen.pipeline.qual_data_loader import index_qualitative
+            qual_json = os.path.join(config.context_path, "qualitative_data.json")
+            qual_result = index_qualitative(config.raw_data_source_path, qual_json)
+            if qual_result:
+                n_qs = sum(len(s.get("questions", {})) for s in qual_result.get("sheets", {}).values())
+                n_resp = sum(
+                    sum(q.get("n_responses", 0) for q in s.get("questions", {}).values())
+                    for s in qual_result.get("sheets", {}).values()
+                )
+                logger.info("Stage 0q: qualitative index — %d questions, %d responses", n_qs, n_resp)
+        except Exception as e:
+            logger.warning("Stage 0q skipped (qualitative indexing failed): %s", e)
+
     # 3. Create presentation from template (preserves master logos/fonts)
     logger.info("Creating presentation...")
     prs, blank_layout = _load_template(config)
@@ -471,6 +488,7 @@ def generate_deck(yaml_path: str, output_path: str | None = None,
         )
         try:
             renderer(slide, config, ask, data, namer=namer)
+            render_qual_callout(slide, config, ask)
             namer.name_remaining(slide)
             slide_registries[str(slide_num)] = namer.slide_metadata
             # Add speaker notes with question codes and descriptions
@@ -586,6 +604,7 @@ def regenerate_slide(yaml_path: str, slide_index: int | str,
         last_data_pull=last_data_pull,
     )
     renderer(slide, config, ask, data, namer=namer)
+    render_qual_callout(slide, config, ask)
     namer.name_remaining(slide)
     # Add speaker notes with question codes and descriptions
     notes_text = _build_speaker_notes(ask, config, data)

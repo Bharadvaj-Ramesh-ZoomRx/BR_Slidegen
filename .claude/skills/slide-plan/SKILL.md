@@ -162,6 +162,7 @@ If a hypothesis cluster is too large for one slide, split it. If two clusters te
 | `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) | Activity metrics with time trends + volume breakdown |
 | `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) | Two-dimensional attribute scores (x=stated, y=derived) |
 | `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns | Matrix data: rows × columns with values + deltas per cell |
+| `qual_theme_analysis` | Theme frequency bars + representative quote boxes | Verbatim responses from qualitative_data.json, theme-coded in validated_analysis.md |
 
 **Selection decision tree:**
 ```
@@ -199,6 +200,10 @@ Scorecard / multi-section metric table?
 
 Text-only insights / qualitative findings?
   → executive_summary — populate ask.extra.insights as list of strings
+
+Qualitative theme analysis (from QUALITATIVE hypotheses)?
+  → qual_theme_analysis — theme bars + quote boxes from qualitative_data.json
+  ⚠ Only for dedicated qual slides (HQ hypotheses). For callouts on quant slides, use qual_callout config instead.
 ```
 
 **⚠ CRITICAL — Data compatibility check before assigning slide_type:**
@@ -323,8 +328,22 @@ Place methodology artifact slides adjacent to the substantive slide they affect 
 - [Q code] — "[Question text from Survey Context]"
 - [Q code] — "[Question text from Survey Context]"
 **Cuts needed:** [QoQ / Practice Setting / HII vs Others / etc.]
+**qual_callout:** [verbatim Q code] — "[quote]" ([theme], [%]) ← only if narrative_threads.md specifies a qual_callout for this slide
 METHODOLOGY ARTIFACT — [brief description] [only if applicable]
 [ACTION ITEM] — [brief description] [only if applicable]
+
+### Slide [N] — [Qualitative Slide Title]  ← for QUALITATIVE hypothesis slides only
+**Arc:** [Thread N — Arc title]
+**Role in arc:** [One sentence: what this slide contributes to the arc's argument]
+**Driving question:** [The single analytical question this slide must answer]
+**Hypotheses tested:** HQ[x]
+**Validation status:** CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED
+**Headline:** [Verbatim from narrative_threads.md — do not rewrite]
+**slide_type:** `qual_theme_analysis`
+**Chart description:** Left panel: theme frequency bars ranked by % of responses. Right panel: 2-3 representative quote boxes with respondent segment tags.
+**Qual source:** [verbatim Q code] (n=[count], from [sheet_key])
+**Themes:** [Top 3-5 theme names from validated_analysis.md, with % frequencies]
+**Quotes:** [2-3 representative quotes selected for clarity, specificity, and segment diversity]
 ```
 
 Slide numbers do not restart per section.

@@ -50,6 +50,7 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         return
 
     font = config.font_body
+    display_font = config.font_display
     extra = ask.extra or {}
 
     # Custom field names (default: "current" / "prior")
@@ -169,7 +170,8 @@ def render_abacus(slide, config: ProjectConfig, ask: AskConfig, data: dict, *, n
         for i in range(n)
     ]
     add_delta_table(slide, deltas, delta_l, abs_top, _ABS_DELTA_W, row_h,
-                    header_text=delta_header, font_name=font)
+                    header_text=delta_header, font_name=font,
+                    display_font=display_font)
 
     # Legend — use custom labels from extra if provided
     legend_current = extra.get("legend_current")

@@ -29,7 +29,8 @@ def _cell_vcenter(cell) -> None:
 
 # ── Shared helpers ───────────────────────────────────────────────────────────
 
-def _render_header(tbl, header_text: str, font_name: Optional[str] = None):
+def _render_header(tbl, header_text: str, font_name: Optional[str] = None,
+                   display_font: Optional[str] = None):
     """Style row 0 as a dark header with centered white bold text."""
     tbl.rows[0].height = Inches(HEADER_ROW_HEIGHT_IN)
     hc = tbl.cell(0, 0)
@@ -40,10 +41,10 @@ def _render_header(tbl, header_text: str, font_name: Optional[str] = None):
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = header_text
-    run.font.size = Pt(8)
+    run.font.size = Pt(11)
     run.font.bold = True
     run.font.color.rgb = C_WHITE
-    run.font.name = font_name or FONT_TEXT
+    run.font.name = display_font or font_name or FONT_TEXT
     _cell_vcenter(hc)
 
 
@@ -63,22 +64,40 @@ def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = text
-    run.font.size = Pt(9)
+    run.font.size = Pt(11)
     run.font.bold = True
     run.font.color.rgb = color
     run.font.name = font_name or FONT_TEXT
     _cell_vcenter(cell)
 
 
-def _delta_text_color(d: float | None) -> tuple[str, RGBColor]:
-    """Return (display_text, color) for a delta value."""
+def _delta_text_color(d: float | None, *,
+                      threshold: float = 5.0,
+                      show_pct: bool = True) -> tuple[str, RGBColor]:
+    """Return (display_text, color) for a delta value.
+
+    Args:
+        d: Delta value in percentage points (or None for N/A).
+        threshold: Minimum absolute delta to apply green/red coloring.
+            Deltas below this threshold render in neutral grey (no false
+            signal). Set to 0 to color all non-zero deltas.
+        show_pct: If True, append '%' suffix and show as integer.
+    """
     if d is None:
         return "N/A", C_FTGREY
-    if d > 0:
-        return f"+{d:.1f}", C_GREEN
-    if d < 0:
-        return f"{d:.1f}", C_RED
-    return "0.0", C_GREY
+    suffix = "%" if show_pct else ""
+    if show_pct:
+        text = f"+{d:.0f}{suffix}" if d > 0 else (f"{d:.0f}{suffix}" if d < 0 else f"0{suffix}")
+    else:
+        text = f"+{d:.1f}" if d > 0 else (f"{d:.1f}" if d < 0 else "0.0")
+    # Color only if magnitude meets threshold
+    if abs(d) >= threshold:
+        color = C_GREEN if d > 0 else C_RED
+    elif d == 0:
+        color = C_GREY
+    else:
+        color = C_GREY  # below threshold — neutral
+    return text, color
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -131,14 +150,19 @@ def add_delta_col(slide, deltas: list[float | None],
 def add_delta_table(slide, deltas: list[float | None],
                     left: float, top: float, width: float, row_height: float,
                     header_text: str = "QoQ \u0394", font_name: Optional[str] = None,
-                    show_header: bool = True):
-    """Add a single-column delta table with green/red conditional coloring.
+                    display_font: Optional[str] = None,
+                    show_header: bool = True,
+                    delta_threshold: float = 5.0,
+                    show_pct: bool = True):
+    """Add a single-column delta table with conditional coloring.
 
     Args:
-        deltas: list of float/None values
-        row_height: height of each data row in inches
-        show_header: if False, omit the header row (use when header is
-            already in a chart_header_row above).
+        deltas: list of float/None values (percentage points).
+        row_height: height of each data row in inches.
+        show_header: if False, omit the header row.
+        delta_threshold: minimum |delta| to apply green/red coloring.
+            Below this threshold, deltas render in neutral grey.
+        show_pct: if True, format as integer with '%' suffix (e.g. "+7%").
     Returns the table shape.
     """
     n = len(deltas)
@@ -155,13 +179,14 @@ def add_delta_table(slide, deltas: list[float | None],
     tbl = tbl_shape.table
 
     if show_header:
-        _render_header(tbl, header_text, font_name)
+        _render_header(tbl, header_text, font_name, display_font=display_font)
         data_offset = 1
     else:
         data_offset = 0
 
     for i, d in enumerate(deltas):
-        text, color = _delta_text_color(d)
+        text, color = _delta_text_color(d, threshold=delta_threshold,
+                                        show_pct=show_pct)
         _render_data_row(tbl, i + data_offset, text, color, row_height, font_name,
                          data_idx=i)
 

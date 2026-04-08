@@ -1,0 +1,64 @@
+Visuals
+ - Two charts in same slide, both charts should have same axis scales
+ - Two charts in same slide, if they come from different questions, both charts should have axis titles clearly specified (unless both axes have same values Ex: message recall / effectiveness)
+
+
+Data
+ - Available data - Correctness in fetching (from Source data)
+ - Available data - Correctness in applying
+ - Missing data - Rendering input from alternate sources if the data is missing (needs to be weaved into the process)
+	 - Generates Mock data for nearly 50% charts
+	 - 
+ - Data validation to ensure audit and traceability
+ - 
+Formatting
+ - Font size minimum is 9. Chart labels, lists, table elements font shoudl be higher 11 atleast (depends on customizations)
+ - Chart's axis title (% of interactions, Top 2 ratings (% of interactions), % of HCPs, % of Patients etc., )
+ - Footer of the slide to have notes for low sample size (less than 30), Industry average definition if IA is added to slide,  etc., 
+	 - Low sample flag if any of the samples mentioned are lower than 30
+	 - Add these notes compulsorily - Question text in speaker notes |^Sample size in speaker notes 
+	 - Industry average definition - if IAs exist in the slide
+	 - Stat sig symbol with definition if stat sig exist between time periods for the client company and/or between client and ocmpetitor company - Place appropriate symbol against the value that has stat sig
+ - Delta values should be represented as - non-decimal; ONly values >=5% change in green, <=-5% change in red, rest in grey
+ - All QoQ charts should have legend for sample size for each quarter (atleast in the footer note)
+ - Speaker note question text should have full question text (currently some seem to be cut-off)
+
+Additional elements
+- Addition of industry average
+- Inclusion of RFSOV data from LITE
+- LITE based additional question summary
+- Statistical significance for values present against comparative aspects
+- Voice response question analysis and charts
+- Message highlighter question analysis and slides
+- Augmenting with real time segmentation
+
+
+Process wise
+ - Need workflow for rendering data from Source_data first, if unavailable, using alternate source data (raw data) ofr both validation and slide updates
+ - 
+
+
+
+
+ **Rationale for why validated analysis contains data but not the slide generation**
+ Excellent question — and it exposes the real issue.
+
+  source_data.json DOES have the data. That's exactly how validated_analysis.md got its numbers — the Stage 3 insight writer read source_data.json directly
+  and pulled every value it needed.
+
+  The gap isn't in the data. The gap is in Stage 5 — the config scaffolder.
+
+  scaffold_config_from_plan() tries to auto-generate extraction YAML by matching question codes from the slide plan against the _codes index. It fails and
+  falls back to mocks when:
+
+  - Code format mismatch — slide plan says Q1.85b but _codes has C1_85BZ
+  - Segment columns — HII vs Others or Academic vs Community require row_range with specific col_map pointing to columns 9/10, 13/14, etc. — the scaffolder
+  doesn't know which columns are which segments
+  - Impact module — questions on the TP2 & MS module or NPP sheets may not have been fully mapped
+  - Derived metrics — geometric mean ME, SOV calculations, scorecards that combine data from multiple question codes
+
+  So it had the data right there, but couldn't auto-wire the extraction config — and instead copy-pasted the numbers from validated_analysis as mock
+  literals.
+
+  This means the fix is more straightforward than I initially framed it. We can use source_data.json (already fully indexed) to build proper extraction
+  configs for each mock, rather than manually hunting through the Excel. Want me to start?

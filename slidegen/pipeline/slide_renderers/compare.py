@@ -28,6 +28,7 @@ from ._shared import (
     _resolve_template, _slide_chrome, _get_brand_colors, _sort_data, _make_legend, _compute_row_h,
     _pptx_table, _style_tbl_cell, _cell_bottom_border, _cap_chart_h, _auto_label_width, _vcenter_top,
     _alt_row_bg, _no_data_placeholder, _prepare_rows, _layout_blocks, _build_label_table,
+    _chart_area_header, _derive_chart_header, _delta_legend_items,
     FONT_HDR, FONT_BODY,
     # pptx_utils
     C_GREEN, C_WHITE, C_GREY, C_FTGREY, C_LBGREY, C_HDRGREY, C_RED,
@@ -112,6 +113,7 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         return
 
     font = config.font_body
+    display_font = config.font_display
 
     # Determine series fields and colors — three config patterns supported:
     #   1. extra.series: [{field, label, color}, ...] — explicit series config
@@ -203,6 +205,11 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
                         ml=0.08, mr=0.05)
         cell.text_frame.word_wrap = True
 
+    # 1b. Chart area header
+    _chart_area_header(slide, chart_l, chart_top, chart_w, hdr_h,
+                       text=_derive_chart_header(config, ask),
+                       font=font, display_font=display_font)
+
     # 2. Clustered bar (no category labels)
     cd = CategoryChartData()
     cd.categories = [f"R{i}" for i in range(n)]
@@ -237,17 +244,17 @@ def render_clustered_compare(slide, config: ProjectConfig, ask: AskConfig, data:
         add_delta_table(slide, d1, left=delta1_l, top=chart_top, width=DELTA_COL_WIDTH,
                         row_height=row_h,
                         header_text=s1_label.split("(")[0].strip() + " Δ",
-                        font_name=font)
+                        font_name=font, display_font=display_font)
         add_delta_table(slide, d2, left=delta2_l, top=chart_top, width=DELTA_COL_WIDTH,
                         row_height=row_h,
                         header_text=s2_label.split("(")[0].strip() + " Δ",
-                        font_name=font)
+                        font_name=font, display_font=display_font)
     else:
         gaps = [round((c1 or 0) - (c2 or 0), 1) for c1, c2 in zip(s1_current, s2_current)]
         header = extra.get("gap_header", "Gap (pp)")
         add_delta_table(slide, gaps, left=delta1_l, top=chart_top, width=DELTA_COL_WIDTH,
                         row_height=row_h, header_text=header,
-                        font_name=font)
+                        font_name=font, display_font=display_font)
 
     # 4. Legend
     ly = chart_top + hdr_h + body_h + LEGEND_GAP
@@ -272,6 +279,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
 
     color_current, _ = _get_brand_colors(config, ask)
     font = config.font_body
+    display_font = config.font_display
     extra = ask.extra or {}
 
     # Take top 10
@@ -320,6 +328,11 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
                         fg=C_GREY, fsize=7.5, align=PP_ALIGN.LEFT, font=font,
                         ml=0.08, mr=0.05)
         cell.text_frame.word_wrap = True
+
+    # 1b. Chart area header
+    _chart_area_header(slide, chart_l, chart_top, chart_w, hdr_h,
+                       text=_derive_chart_header(config, ask),
+                       font=font, display_font=display_font)
 
     # 2. Stacked bar chart — no category labels (table provides them)
     cd = CategoryChartData()
@@ -381,6 +394,7 @@ def render_stacked_order(slide, config: ProjectConfig, ask: AskConfig, data: dic
         slide, qoq_deltas,
         left=delta_l, top=chart_top, width=delta_w, row_height=row_h,
         header_text="QoQ Δ", font_name=font,
+        display_font=display_font,
     )
 
     # 5. Manual legend below
@@ -417,6 +431,7 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
 
     extra = ask.extra or {}
     font = config.font_body
+    display_font = config.font_display
     left_cfg = extra.get("left", {})
     right_cfg = extra.get("right", {})
 
@@ -529,7 +544,7 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
         left=left_delta_l, top=chart_top,
         width=DUAL_BC_L_DELTA_W, row_height=row_h,
         header_text=left_delta_header, font_name=font,
-        show_header=False,
+        display_font=display_font, show_header=False,
     )
 
     # 7. Vertical separator
@@ -565,7 +580,7 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
         left=right_delta_l, top=chart_top,
         width=DUAL_BC_R_DELTA_W, row_height=row_h,
         header_text=right_delta_header, font_name=font,
-        show_header=False,
+        display_font=display_font, show_header=False,
     )
 
     # 10. Axis sub-labels below both charts
@@ -583,13 +598,12 @@ def render_dual_bar_compare(slide, config: ProjectConfig, ask: AskConfig, data: 
 
     # 11. Legend — use configured labels (not brand name) for generality
     ly = ax_y + (0.24 if axis_label else LEGEND_GAP)
+    delta_items, delta_note = _delta_legend_items()
     legend_items = [
         (left_color,  left_label),
         (right_color, right_label),
-        (C_GREEN, "Positive Δ"),
-        (C_RED,   "Negative Δ"),
-    ]
-    _make_legend(slide, legend_items, 0, ly, font,
+    ] + delta_items
+    _make_legend(slide, legend_items, 0, ly, font, note=delta_note,
         center_over=(DUAL_BC_CAT_LEFT, right_delta_l + DUAL_BC_R_DELTA_W - DUAL_BC_CAT_LEFT))
 
     # 12. Insight callout box (optional — dashed border box below the legend)

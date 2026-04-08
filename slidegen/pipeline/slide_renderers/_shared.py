@@ -55,9 +55,16 @@ SLIDE_W = 13.33             # slide width (inches)
 # Chart dimensions (inches) — generic
 SINGLE_BAR_WIDTH = 9.0
 CLUSTERED_BAR_WIDTH = 8.5
-DELTA_COL_WIDTH = 0.65
-DELTA_COL_NARROW = 0.55
+DELTA_COL_WIDTH = 0.85
+DELTA_COL_NARROW = 0.70
 CHART_DELTA_GAP = 0.10      # gap between chart and delta column
+
+# Font size scheme — use these instead of inline magic numbers
+# Calibrated for presentation readability (not screen-density)
+FONT_HDR = 11.0       # table headers, delta headers
+FONT_BODY = 10.0      # table body cells, data labels
+FONT_LABEL = 10.0     # chart axis labels, legend
+FONT_SMALL = 8.0      # footnotes, secondary annotations
 
 # Dual bar (Archetype 3 — MR+ME) positions from spec
 DUAL_HEADER_ROW_TOP = 1.40   # red header row Y (just below section bar)
@@ -300,21 +307,28 @@ DUAL_BRAND = _DualBrandCompareLayout()
 
 # ── Dynamic label width ──────────────────────────────────────────────────────
 
-def _auto_label_width(labels: list[str], fsize: float = 7.5,
-                      min_w: float = 2.50, max_w: float = 5.50,
-                      max_line_chars: int = 45) -> float:
+def _auto_label_width(labels: list[str], fsize: float = FONT_BODY,
+                      min_w: float = 3.00, max_w: float = 7.50,
+                      max_line_chars: int = 45,
+                      is_display_font: bool = True) -> float:
     """Calculate optimal label table width based on longest label text.
 
-    At ~7.5pt Calibri, ~13 chars per inch. Labels longer than max_line_chars
-    are assumed to wrap to 2 lines — width is based on half the length.
+    Measures at the actual display font size. Display fonts (e.g. Johnson
+    Display) are ~15% wider per character than body fonts (Calibri).
+    Labels longer than max_line_chars wrap to 2 lines — width uses half.
     """
     if not labels:
         return min_w
     max_len = max(len(l) for l in labels)
-    cpi = 13.0 * (7.5 / max(fsize, 5.0))
+    # Base CPI: ~13 chars/inch at 7.5pt Calibri. Scale inversely with font size.
+    # Display fonts are wider — apply a 0.85 factor (fewer chars per inch).
+    base_cpi = 13.0
+    font_scale = 7.5 / max(fsize, 5.0)
+    width_factor = 0.85 if is_display_font else 1.0
+    cpi = base_cpi * font_scale * width_factor
     # If text would wrap to 2 lines, use half the length for width calc
     line_len = (max_len + 1) // 2 if max_len > max_line_chars else max_len
-    width = line_len / cpi + 0.25  # add cell margin padding
+    width = line_len / cpi + 0.30  # cell margin padding
     return max(min_w, min(max_w, round(width, 2)))
 
 
@@ -430,23 +444,46 @@ def _vcenter_top(content_h: float, has_legend: bool = True,
 
 
 def _make_legend(slide, items: list[tuple], left: float, top: float, font_name: str = None,
-                 center_over: tuple[float, float] | None = None):
+                 center_over: tuple[float, float] | None = None,
+                 note: str = ""):
     """Add a manual legend row. items: [(color, label), ...]
 
     If center_over=(block_left, block_width), the legend row is horizontally
     centered over that block and the ``left`` parameter is ignored.
+    If note is provided, it's appended as italic grey text after the swatches.
     """
     item_w = 2.0   # horizontal advance per legend item
+    note_w = 3.0 if note else 0
+    total_content_w = len(items) * item_w + note_w
     if center_over is not None:
         block_left, block_width = center_over
-        total_legend_w = len(items) * item_w
-        left = block_left + (block_width - total_legend_w) / 2
+        left = block_left + (block_width - total_content_w) / 2
     x = left
     for color, label in items:
         solidrect(slide, x, top, 0.18, 0.12, color)
         textbox(slide, label, x + 0.25, top - 0.02, 1.8, 0.18,
-                fsize=7, color=C_GREY, font=font_name)
+                fsize=FONT_SMALL, color=C_GREY, font=font_name)
         x += item_w
+    if note:
+        textbox(slide, note, x + 0.10, top - 0.02, note_w, 0.18,
+                fsize=FONT_SMALL - 1, color=C_FTGREY, font=font_name)
+
+
+def _delta_legend_items(threshold: float = 5.0) -> tuple[list[tuple], str]:
+    """Return standard delta legend items and threshold note.
+
+    Returns:
+        (items, note) — items are [(color, label), ...], note is the threshold caveat.
+    """
+    items = [
+        (C_GREEN, "Positive Δ"),
+        (C_RED, "Negative Δ"),
+    ]
+    if threshold > 0:
+        note = f"(Δ < {threshold:.0f}pp shown in grey)"
+    else:
+        note = ""
+    return items, note
 
 
 def _add_dot(slide, cx: float, cy: float, r: float, color):
@@ -524,13 +561,6 @@ def _cell_bottom_border(cell, hex_rgb, w_emu=6350):
 
 # ── Shared DRY helpers (Phase 3 refactoring) ────────────────────────────────
 
-# Font size scheme — use these instead of inline magic numbers
-FONT_HDR = 8.0
-FONT_BODY = 7.5
-FONT_LABEL = 7.0
-FONT_SMALL = 6.5
-
-
 def _alt_row_bg(i: int):
     """Return alternating row background color: grey for even rows, white for odd."""
     return C_LBGREY if i % 2 == 0 else C_WHITE
@@ -586,23 +616,186 @@ def _layout_blocks(slide_w: float, *block_widths: float,
     return origin, positions
 
 
+def render_qual_callout(slide, config, ask):
+    """Render a qualitative verbatim callout box on any slide.
+
+    Reads ask.extra["qual_callout"] which should contain:
+        quote:       str  — the representative verbatim quote
+        attribution: str  — respondent segment tag (e.g. "Community HCP, Southeast")
+        theme:       str  — coded theme name (e.g. "Efficacy concerns")
+        pct:         float — theme frequency percentage (optional)
+        source:      str  — question source label (e.g. "Q1.53A (n=68)")
+
+    Positions a compact callout in the bottom-right of the slide, above the
+    footer. Safe to call on any slide type — no-ops if qual_callout is absent.
+    """
+    extra = ask.extra or {}
+    qc = extra.get("qual_callout")
+    if not qc or not isinstance(qc, dict):
+        return
+
+    quote = qc.get("quote", "").strip()
+    if not quote:
+        return
+
+    attribution = qc.get("attribution", "")
+    theme = qc.get("theme", "")
+    pct = qc.get("pct")
+    source = qc.get("source", "")
+
+    # ── Layout: bottom-right corner, above footer ──
+    _CALLOUT_W = 3.50
+    _CALLOUT_L = SLIDE_W - _CALLOUT_W - 0.30   # right-aligned with margin
+    _CALLOUT_H = 0.90
+    _CALLOUT_TOP = FOOTER_TOP - _CALLOUT_H - 0.12
+
+    # Resolve accent color from brand config
+    brand_color = config.primary.color_current if config.primary else RGBColor(0xF7, 0x58, 0x24)
+
+    # ── Background box (rounded rectangle) ──
+    fill_color = RGBColor(0xF8, 0xF8, 0xF8)
+    border_color = RGBColor(0xD0, 0xD0, 0xD0)
+    box = slide.shapes.add_shape(
+        5,  # ROUNDED_RECTANGLE
+        Inches(_CALLOUT_L), Inches(_CALLOUT_TOP),
+        Inches(_CALLOUT_W), Inches(_CALLOUT_H))
+    box.fill.solid()
+    box.fill.fore_color.rgb = fill_color
+    box.line.color.rgb = border_color
+    box.line.width = Pt(0.5)
+
+    # ── Left accent bar ──
+    accent_w = 0.04
+    solidrect(slide, _CALLOUT_L, _CALLOUT_TOP, accent_w, _CALLOUT_H,
+              fill=brand_color)
+
+    # ── Theme + pct header line ──
+    text_l = _CALLOUT_L + 0.12
+    text_w = _CALLOUT_W - 0.20
+    header_parts = []
+    if theme:
+        header_parts.append(theme)
+    if pct is not None:
+        header_parts.append(f"({pct:.0f}%)")
+    if header_parts:
+        header_text = " ".join(header_parts)
+        textbox(slide, header_text,
+                text_l, _CALLOUT_TOP + 0.04, text_w, 0.18,
+                fsize=7, bold=True, color=brand_color,
+                font=getattr(config, 'font_body', None))
+
+    # ── Quote text ──
+    q_display = f"\u201c{quote}\u201d"
+    quote_top = _CALLOUT_TOP + (0.22 if header_parts else 0.06)
+    quote_h = _CALLOUT_H - (0.46 if header_parts else 0.30)
+    textbox(slide, q_display,
+            text_l, quote_top, text_w, quote_h,
+            fsize=7, italic=True, color=RGBColor(0x33, 0x33, 0x33),
+            font=getattr(config, 'font_body', None))
+
+    # ── Attribution + source line ──
+    attr_parts = []
+    if attribution:
+        attr_parts.append(f"\u2014 {attribution}")
+    if source:
+        attr_parts.append(source)
+    if attr_parts:
+        attr_text = "  |  ".join(attr_parts) if len(attr_parts) > 1 else attr_parts[0]
+        textbox(slide, attr_text,
+                text_l, _CALLOUT_TOP + _CALLOUT_H - 0.20, text_w, 0.16,
+                fsize=6, italic=False, color=RGBColor(0x80, 0x80, 0x80),
+                align=PP_ALIGN.RIGHT,
+                font=getattr(config, 'font_body', None))
+
+    logger.debug("Qual callout rendered on %s: theme=%s", ask.id, theme)
+
+
+def _chart_area_header(slide, left: float, top: float, width: float,
+                       height: float = HDR_H_STD,
+                       text: str = "",
+                       font: str | None = None,
+                       display_font: str | None = None):
+    """Render a dark header strip above the chart area.
+
+    Creates visual continuity with adjacent label/delta table headers.
+    Auto-derives text from config/ask if not explicitly provided.
+
+    Args:
+        text: header text — typically period + unit, e.g. "Q1 2026 (%)"
+    """
+    solidrect(slide, left, top, width, height, C_HDRGREY)
+    textbox(slide, text,
+            left, top, width, height,
+            fsize=FONT_HDR, bold=True, color=C_WHITE,
+            align=PP_ALIGN.CENTER, font=display_font or font)
+
+
+def _derive_chart_header(config, ask) -> str:
+    """Auto-derive chart area header text from config and ask metadata.
+
+    Priority:
+      1. ask.extra.chart_header — explicit override
+      2. period_current + unit suffix from ask context
+    """
+    extra = ask.extra or {}
+    if extra.get("chart_header"):
+        return _resolve_template(extra["chart_header"], config)
+    # Default: period + unit
+    unit = extra.get("chart_unit", "%")
+    return f"{config.period_current} ({unit})"
+
+
+def _derive_axis_label(ask) -> str:
+    """Auto-derive X-axis label from ask metadata.
+
+    Priority:
+      1. ask.extra.axis_label — explicit override
+      2. ask.extra.chart_unit context → "% of HCPs" for percentage charts
+      3. Empty string if axis_label explicitly set to false/empty
+    """
+    extra = ask.extra or {}
+    # Explicit override
+    if "axis_label" in extra:
+        return extra["axis_label"] or ""
+    # Auto-derive: percentage charts get a default label
+    unit = extra.get("chart_unit", "%")
+    if unit == "%":
+        return "% of HCPs"
+    return ""
+
+
+def _render_axis_label(slide, text: str, left: float, top: float, width: float,
+                       font: str | None = None):
+    """Render an X-axis label below the chart area."""
+    if not text:
+        return
+    textbox(slide, text, left, top, width, 0.20,
+            fsize=FONT_SMALL, color=C_FTGREY, align=PP_ALIGN.CENTER, font=font)
+
+
 def _build_label_table(slide, labels: list[str], label_w: float, row_h: float,
                        left: float, top: float, header_text: str = "Message",
-                       font: str | None = None, hdr_h: float = HDR_H_STD):
+                       font: str | None = None, display_font: str | None = None,
+                       hdr_h: float = HDR_H_STD):
     """Build a label column table with header + alternating-row styling.
+
+    Uses display_font (heading font) for label text if provided — display
+    fonts are wider/bolder and read better at presentation distance.
+    Falls back to font (body font) if display_font is not set.
 
     Returns the (shape, table) tuple for further customization.
     """
+    label_font = display_font or font
     n = len(labels)
     shape, tbl = _pptx_table(slide, [label_w], [hdr_h] + [row_h] * n, left, top)
     _style_tbl_cell(tbl.cell(0, 0), header_text, bg=C_HDRGREY, fg=C_WHITE,
-                    fsize=FONT_HDR, bold=True, align=PP_ALIGN.LEFT, font=font,
+                    fsize=FONT_HDR, bold=True, align=PP_ALIGN.LEFT, font=label_font,
                     ml=0.08, mr=0.05)
     for i, label in enumerate(labels):
         cell = tbl.cell(i + 1, 0)
         _style_tbl_cell(cell, label,
                         bg=_alt_row_bg(i),
-                        fg=C_GREY, fsize=FONT_BODY, align=PP_ALIGN.LEFT, font=font,
-                        ml=0.08, mr=0.05)
+                        fg=C_GREY, fsize=FONT_BODY, align=PP_ALIGN.LEFT,
+                        font=label_font, ml=0.08, mr=0.05)
         cell.text_frame.word_wrap = True
     return shape, tbl

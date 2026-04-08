@@ -33,6 +33,7 @@ from .dot_special import render_dual_abacus, render_followup_rep, render_message
 from .line import render_trended_scorecard, render_trended_activity
 from .quadrant import render_quadrant_scatter
 from .heatmap import render_heatmap_table
+from .qualitative import render_qual_theme_analysis
 
 # REGISTRY — maps slide_type string → renderer function
 RENDERERS = {
@@ -57,6 +58,7 @@ RENDERERS = {
     "trended_activity": render_trended_activity,
     "quadrant_scatter": render_quadrant_scatter,
     "heatmap_table": render_heatmap_table,
+    "qual_theme_analysis": render_qual_theme_analysis,
 }
 
 __all__ = [
@@ -80,4 +82,5 @@ __all__ = [
     "render_trended_activity",
     "render_quadrant_scatter",
     "render_heatmap_table",
+    "render_qual_theme_analysis",
 ]
