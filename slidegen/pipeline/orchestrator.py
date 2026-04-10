@@ -177,6 +177,13 @@ def _build_speaker_notes(ask: AskConfig, config: ProjectConfig, data: dict) -> s
     for ek in ("primary_key", "comp_key"):
         if extra.get(ek):
             data_keys.append(extra[ek])
+    # followup_rep / dual renderers may use second_data_key
+    if extra.get("second_data_key"):
+        data_keys.append(extra["second_data_key"])
+    # hii_scorecard, heatmap may use additional data_keys in sections
+    for section in extra.get("sections", []):
+        if isinstance(section, dict) and section.get("data_key"):
+            data_keys.append(section["data_key"])
 
     # Build extraction lookup: id → DataExtractionConfig
     ext_map: dict[str, DataExtractionConfig] = {
@@ -193,6 +200,11 @@ def _build_speaker_notes(ask: AskConfig, config: ProjectConfig, data: dict) -> s
                 desc = row.get("desc", "")
                 if code and desc and code not in sheets_lookup:
                     sheets_lookup[code] = desc
+
+    # Build role → actual sheet name mapping for row_range/nested_ordinal lookups
+    role_to_sheet: dict[str, str] = {}
+    for role_key, sheet_cfg in config.sheets.items():
+        role_to_sheet[role_key] = sheet_cfg.name
 
     lines = []
     seen_codes = set()
@@ -222,16 +234,68 @@ def _build_speaker_notes(ask: AskConfig, config: ProjectConfig, data: dict) -> s
                 codes_for_ex.append(code)
 
         elif ex.method == "row_range":
-            sheet_name = ex.sheet
+            # Look up actual question codes within the row range from _sheets
+            # Try role key first (extract_from_excel index), then resolved name (index_excel)
             row_start = params.get("row_start", 0)
             row_end = params.get("row_end", 0)
-            lines.append(f"[{dk}] sheet={sheet_name}, rows {row_start}-{row_end}")
-            continue
+            resolved_name = role_to_sheet.get(ex.sheet, "")
+            sheet_rows = sheets_index.get(ex.sheet, []) or sheets_index.get(resolved_name, [])
+            if isinstance(sheet_rows, list):
+                for row in sheet_rows:
+                    r_idx = row.get("row", -1)
+                    if row_start <= r_idx <= row_end:
+                        code = row.get("code", "")
+                        if code and code not in codes_for_ex:
+                            codes_for_ex.append(code)
+
+            if not codes_for_ex:
+                lines.append(f"[{dk}] sheet={ex.sheet}, rows {row_start}-{row_end}")
+                continue
 
         elif ex.method == "nested_ordinal":
+            # Look up actual question codes within the row range from _sheets
             row_start = params.get("row_start", 0)
             row_end = params.get("row_end", 0)
-            lines.append(f"[{dk}] nested_ordinal, rows {row_start}-{row_end}")
+            resolved_name = role_to_sheet.get(ex.sheet, "")
+            sheet_rows = sheets_index.get(ex.sheet, []) or sheets_index.get(resolved_name, [])
+            if isinstance(sheet_rows, list):
+                for row in sheet_rows:
+                    r_idx = row.get("row", -1)
+                    if row_start <= r_idx <= row_end:
+                        code = row.get("code", "")
+                        if code and code not in codes_for_ex:
+                            codes_for_ex.append(code)
+
+            if not codes_for_ex:
+                lines.append(f"[{dk}] nested_ordinal, rows {row_start}-{row_end}")
+                continue
+
+        elif ex.method == "raw_aggregate" or ex.method == "synapse_raw":
+            # Extract question codes from raw_aggregate / synapse_raw params
+            raw_mode = params.get("mode", "single")
+            if raw_mode == "multi_code":
+                for entry in params.get("codes", []):
+                    code = entry.get("code", "")
+                    if code:
+                        codes_for_ex.append(code)
+            else:
+                code = params.get("code", "")
+                if code:
+                    codes_for_ex.append(code)
+                # by_segment has a segment_code too
+                seg_code = params.get("segment_code", "")
+                if seg_code:
+                    codes_for_ex.append(seg_code)
+                # by_hii has quality_code and ltip_code
+                for extra_key in ("quality_code", "ltip_code"):
+                    ec = params.get(extra_key, "")
+                    if ec:
+                        codes_for_ex.append(ec)
+
+        elif ex.method == "synapse_report":
+            # Synapse report extractions use analysis_id, not question codes
+            analysis_id = params.get("analysis_id", "")
+            lines.append(f"[{dk}] synapse_report (analysis_id={analysis_id})")
             continue
 
         elif ex.method == "mock":
@@ -248,6 +312,15 @@ def _build_speaker_notes(ask: AskConfig, config: ProjectConfig, data: dict) -> s
                 lines.append(f"{code}: {desc}")
             else:
                 lines.append(f"{code}")
+
+    # Handle qualitative slides with qual_source in extra
+    qual_source = extra.get("qual_source", "")
+    if qual_source:
+        lines.append(f"Source: {qual_source}")
+    # Also check for qual_callout source
+    qual_callout = extra.get("qual_callout", {})
+    if isinstance(qual_callout, dict) and qual_callout.get("source"):
+        lines.append(f"Qual callout source: {qual_callout['source']}")
 
     if not lines:
         return ""

@@ -178,7 +178,7 @@ def index_excel(excel_path: str, json_path: str) -> dict:
                 header_rows.append(row)
                 continue
             code = str(row[0]).strip() if row[0] is not None else ""
-            desc = str(row[1]).strip()[:120] if len(row) > 1 and row[1] is not None else ""
+            desc = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
             if code or desc:
                 data_cols = row[2:] if len(row) > 2 else ()
                 data_vals = [v for v in data_cols if v is not None and str(v).strip() != ""]
@@ -467,7 +467,7 @@ def _extract_all_from_excel(config) -> dict:
                 code = df.iloc[i, 0]
                 desc = df.iloc[i, 1] if df.shape[1] > 1 else None
                 code_str = str(code).strip() if pd.notna(code) else ""
-                desc_str = str(desc).strip()[:120] if pd.notna(desc) else ""
+                desc_str = str(desc).strip() if pd.notna(desc) else ""
                 if code_str or desc_str:
                     rows.append({"row": i, "code": code_str, "desc": desc_str})
             raw_index[sheet_key] = rows

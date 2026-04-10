@@ -300,7 +300,7 @@ Every data slide includes:
 1. `slide_header(slide, headline)` — accent line + headline + badge + separator
 2. `section_header_bar(slide, label, top=1.40)` — gray strip with chart title
 3. `slide_footer(slide, footer_text)` — source footnote at bottom
-4. **Speaker notes** — auto-generated with question codes and question text used to create the slide
+4. **Speaker notes** — auto-generated with full (untruncated) question codes and question text. Covers all extraction methods (`question_code`, `row_range`, `nested_ordinal`, `raw_aggregate`, `synapse_raw`, `synapse_report`, `mock`). Qualitative slides include `qual_source`. All extra data keys (`second_data_key`, `primary_key`/`comp_key`, left/right, section) are collected.
 
 ## Table-Based Layout Features
 
