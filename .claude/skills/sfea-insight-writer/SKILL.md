@@ -177,24 +177,36 @@ If a question code is not found in `source_data.json`:
 
 For each **QUALITATIVE hypothesis (HQ[N]):**
 
-1. Read the verbatim responses for the referenced question code from `qualitative_data.json`
-2. Theme-code the responses: group them into 4-7 themes based on content similarity
-3. Count theme frequency: what % of responses mention each theme
-4. Select 2-3 representative quotes per theme: choose for clarity, specificity, and segment diversity
-5. Assess the hypothesis: does the dominant theme match the prediction?
+1. Read the verbatim responses for the referenced question code from `qualitative_data.json` — include AI probe pair responses (generative_prompt_1, _2) if available, as they provide deeper explanatory detail per respondent
+2. Theme-code the responses: assign each response a PRIMARY theme (single-code). Group into 4-8 themes based on content similarity
+3. **COMPLETENESS RULE:** Theme percentages MUST sum to 100%. Code ALL responses:
+   - Substantive responses → assign to a named theme
+   - Non-informative responses ("yes", "data", "good", single-word non-answers) → code as "Non-specific / no detail"
+   - Themes with <5% individually → bucket as "Others" (combine with non-specific if needed)
+   - INVALID_RESPONSE entries → exclude from denominator, note in source line
+4. Count theme frequency: count / total_coded_responses × 100. Verify sum = 100% (±1% rounding)
+5. Select **4 representative quotes** (not 2-3) per hypothesis. Quote selection criteria:
+   - **Minimum 15 words** — prefer explanatory quotes that describe reasoning, not labels
+   - **Competitive comparison** preferred where available (e.g., "X is easier to manage than Y because...")
+   - **Clinical detail** valued (trial names, specific data points, mechanism of action)
+   - **Theme diversity** — each quote should represent a different theme
+   - **Probe responses are valid sources** — AI probe follow-ups often yield the most detailed verbatims
+6. Assess the hypothesis: does the dominant theme match the prediction?
 
 Output format for qualitative hypotheses:
 ```
 ### HQ[N]: [Hypothesis statement]
 **Status:** CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED
 **Qualitative Evidence:** ([verbatim Q code], n=[response count])
+**Qual subtitle:** [Short question context, e.g., "Prescribing Conversion – Rationale (Unaided)"]
 **Theme analysis:**
 | Theme | Count | % | Representative quote |
 |-------|-------|---|---------------------|
 | [Theme 1 — dominant] | [N] | [%] | "[quote]" — [segment tag] |
 | [Theme 2] | [N] | [%] | "[quote]" — [segment tag] |
 | [Theme 3] | [N] | [%] | "[quote]" — [segment tag] |
-| [Other / misc] | [N] | [%] | |
+| [Others / non-specific] | [N] | [%] | |
+| **Total** | **[N]** | **100%** | |
 **Triangulation:** [How does the qual evidence relate to the quant findings? Convergent, divergent, or additive?]
 ```
 
@@ -720,7 +732,10 @@ Assemble all Phase 1 output into a single document:
     Hypotheses: HQ[x]
     Slide type: qual_theme_analysis
     Qual source: [verbatim Q code] (n=[count])
-    Themes: [top 3-5 theme names from validated_analysis.md]
+    Qual subtitle: [Short question context, e.g., "Prescribing Conversion – Rationale (Unaided)"]
+    Qual sample: [e.g., "n = 47" or "n = 91 of 189" if filtered]
+    Themes: [ALL theme names from validated_analysis.md — must sum to 100%, include "Others" bucket]
+    Quotes: [4 representative quotes — ≥15 words, explanatory, diverse themes]
 
 [N]. **[Headline text]**
     Hypotheses: H[z]
@@ -861,9 +876,12 @@ Before writing a headline, look up at least one of: competitive event, prior wav
 
 **Qualitative (only if qualitative_data.json exists):**
 - [ ] Every QUALITATIVE hypothesis validated with theme analysis + representative quotes
+- [ ] Theme percentages sum to 100% on every HQ (include "Others / non-specific" bucket)
+- [ ] Each HQ has exactly 4 representative quotes (≥15 words each, explanatory, diverse themes)
+- [ ] Each HQ includes `Qual subtitle` (short question context) and sample size
 - [ ] Every qual_callout flag resolved with dominant theme + 1 representative quote
 - [ ] Qual evidence integrated into relevant arcs (not isolated)
-- [ ] Qual headlines use `qual_theme_analysis` slide type
+- [ ] Qual headlines use `qual_theme_analysis` slide type with all new fields (subtitle, sample, full themes, 4 quotes)
 - [ ] 5-8 qual hypotheses max (not overdone)
 - [ ] 6-8 qual_callouts max across entire deck
 

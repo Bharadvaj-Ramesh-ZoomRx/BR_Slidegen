@@ -243,7 +243,7 @@ All tiers auto-cache to JSON with Excel file hash validation. Delete the JSON to
 | `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
 | `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
 | `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
-| `qual_theme_analysis` | Qualitative theme frequency bars (left) + representative quote boxes (right) |
+| `qual_theme_analysis` | Native PPT bar chart + label TABLE + sub-title + 4 grouped quote boxes (client-ready) |
 
 ## Data Source Layout
 
@@ -287,7 +287,7 @@ The `config.yaml` `sheets` section still provides the sheet-name-to-role mapping
 - **pct_mode auto-detection**: `_codes.value_range` in `source_data.json` distinguishes `decimal` (0-1) vs `whole` (0-100). Use `pct` for decimals, `straight` for whole. When header row looks like a base size but sub-rows are decimals, the indexer correctly classifies as `decimal`.
 - **T2B extraction**: For rep attributes (Q1_87Z), `question_code` pulls ALL scale distribution sub-rows (rated 1-7). To get T2B summary rows only, use `row_range` targeting the consolidated T2B block in the Excel.
 - **Qualitative callouts**: Any slide can have a `qual_callout` in `ask.extra` — the orchestrator calls `render_qual_callout()` after every renderer. It adds a compact quote box (bottom-right, 3.5" wide) with theme tag, verbatim quote, and attribution. No-ops if `qual_callout` is absent. Config keys: `quote`, `attribution`, `theme`, `pct`, `source`.
-- **Qualitative slides**: `qual_theme_analysis` renders theme frequency bars (left 55%) + representative quote boxes (right 45%). Data comes from `ask.extra.themes` and `ask.extra.quotes` (populated by Stage 3 theme coding). Dedicated slides are created for HQ-type hypotheses in the hypothesis bank.
+- **Qualitative slides**: `qual_theme_analysis` renders a native PPT BAR_CLUSTERED chart (left ~55%) with a label TABLE for theme names + sub-title table + "% of respondents" x-axis label, and 4 grouped quote boxes (right ~45%) with attribution above a line separator. Data comes from `ask.extra.themes`, `ask.extra.quotes`, `ask.extra.qual_source`, `ask.extra.qual_subtitle`, and `ask.extra.qual_sample`. **Theme percentages MUST sum to 100%** (include "Others / non-specific" bucket). **4 quotes required** (≥15 words, explanatory, diverse themes). Dedicated slides are created for HQ-type hypotheses in the hypothesis bank.
 
 ## Dependencies
 

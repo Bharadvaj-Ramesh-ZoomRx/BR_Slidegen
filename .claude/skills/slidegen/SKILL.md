@@ -244,6 +244,7 @@ Import everything via: `from slidegen.pptx_utils import textbox, BRAND, LAYOUTS,
 | `trended_activity` | Side-by-side line + stacked column panels (reach/SOV/frequency) |
 | `quadrant_scatter` | 2×2 quadrant scatter chart (stated vs derived importance) |
 | `heatmap_table` | Heatmap table with green gradient fills + QoQ delta columns |
+| `qual_theme_analysis` | Native PPT bar chart + label TABLE + sub-title + 4 grouped quote boxes |
 
 ### slide_type → extra Fields
 
@@ -267,6 +268,7 @@ Each `slide_type` expects specific `extra` fields in the ask config:
 | `hii_scorecard` | `sections: [{label, subtitle, summary, items}]`, `series: [{field, label, color}]`, `insight_text` | Multi-section clustered column scorecard |
 | `dual_doughnut` | `left/right: {label, items: [{brand_label, current, prior, color, color_prior, sample_current/prior}]}` | QoQ doughnut rings per brand per segment |
 | `message_mbd` | `series: [{field, label, color}]`, `ce_field`, `ce_prior_field`, `ce_header`, `scale_label` | MBD dot chart with composite effectiveness |
+| `qual_theme_analysis` | `themes: [{theme, pct, count}]`, `quotes: [{text, attribution}]`, `qual_source`, `qual_subtitle`, `qual_sample` | Native PPT bar chart (left) + label TABLE + sub-title with question text + "% of respondents" x-axis label. 4 grouped quote boxes (right) with attribution above line separator. Themes MUST sum to 100% (include "Others" bucket). 4 quotes required (≥15 words, explanatory, diverse themes). |
 
 ---
 

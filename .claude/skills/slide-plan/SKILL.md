@@ -202,7 +202,9 @@ Text-only insights / qualitative findings?
   → executive_summary — populate ask.extra.insights as list of strings
 
 Qualitative theme analysis (from QUALITATIVE hypotheses)?
-  → qual_theme_analysis — theme bars + quote boxes from qualitative_data.json
+  → qual_theme_analysis — native PPT bar chart + label TABLE + 4 grouped quote boxes
+  Config fields: ask.extra.themes (must sum to 100%), ask.extra.quotes (4 quotes, ≥15 words each),
+    ask.extra.qual_subtitle, ask.extra.qual_sample, ask.extra.qual_source
   ⚠ Only for dedicated qual slides (HQ hypotheses). For callouts on quant slides, use qual_callout config instead.
 ```
 
@@ -340,10 +342,12 @@ METHODOLOGY ARTIFACT — [brief description] [only if applicable]
 **Validation status:** CONFIRMED / PARTIALLY CONFIRMED / NOT CONFIRMED
 **Headline:** [Verbatim from narrative_threads.md — do not rewrite]
 **slide_type:** `qual_theme_analysis`
-**Chart description:** Left panel: theme frequency bars ranked by % of responses. Right panel: 2-3 representative quote boxes with respondent segment tags.
+**Chart description:** Left panel: native PPT bar chart (BAR_CLUSTERED) with theme label TABLE + sub-title + "% of respondents" x-axis. Right panel: 4 grouped quote boxes with attribution above line separator.
 **Qual source:** [verbatim Q code] (n=[count], from [sheet_key])
-**Themes:** [Top 3-5 theme names from validated_analysis.md, with % frequencies]
-**Quotes:** [2-3 representative quotes selected for clarity, specificity, and segment diversity]
+**Qual subtitle:** [Short question context, e.g., "Prescribing Conversion – Rationale (Unaided)"]
+**Qual sample:** [e.g., "n = 47" or "n = 91 of 189" if filtered to actionable responses]
+**Themes:** [ALL themes from validated_analysis.md — MUST sum to 100%. Include "Others / non-specific" bucket for uncoded/small themes]
+**Quotes:** [4 representative quotes — each ≥15 words, explanatory (not labels), diverse themes, competitive reasoning preferred]
 ```
 
 Slide numbers do not restart per section.
