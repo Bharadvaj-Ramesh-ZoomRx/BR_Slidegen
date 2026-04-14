@@ -340,7 +340,7 @@ def _validate_extraction(ex: dict, idx: int, yaml_path: str):
                 f"Missing required field '{field_name}' in extractions[{idx}] "
                 f"(id={ex.get('id', '?')}) in {yaml_path}"
             )
-    if ex.get("method") not in ("mock", "synapse_report", "synapse_raw") and "sheet" not in ex:
+    if ex.get("method") not in ("mock", "synapse_report", "synapse_raw", "raw_data_first") and "sheet" not in ex:
         raise ValueError(
             f"Missing required field 'sheet' in extractions[{idx}] "
             f"(id={ex.get('id', '?')}) in {yaml_path}"

@@ -427,7 +427,7 @@ def _extract_all_from_excel(config) -> dict:
     or stale.
     """
     # Check if any extraction actually needs Excel (skip for all-mock / all-synapse configs)
-    _SKIP_EXCEL_METHODS = {"mock", "synapse_report", "synapse_raw", "raw_aggregate"}
+    _SKIP_EXCEL_METHODS = {"mock", "synapse_report", "synapse_raw", "raw_aggregate", "raw_data_first"}
     needs_excel = any(ex.method not in _SKIP_EXCEL_METHODS for ex in config.extractions)
 
     # Load Excel sheets (only if needed)
@@ -923,6 +923,35 @@ def load_all_data(config, force_fresh: bool = False) -> dict:
                 logger.info("No Synapse API token available — synapse_raw extractions skipped")
             if not config.synapse:
                 logger.info("No synapse config — synapse_raw extractions skipped")
+
+    # ── Raw-data-first extractions (synapse-cli aggregator) ──
+    rdf_extractions = [ex for ex in config.extractions if ex.method == "raw_data_first"]
+    if rdf_extractions:
+        from slidegen.pipeline.synapse_auth import resolve_api_key as _resolve_rdf_key
+        try:
+            rdf_api_key = _resolve_rdf_key()
+        except ValueError:
+            rdf_api_key = ""
+        if rdf_api_key and config.synapse:
+            try:
+                from slidegen.pipeline.raw_data_first import (
+                    fetch_raw_data_first, aggregate_extraction,
+                )
+                rdf_raw = fetch_raw_data_first(config, api_key=rdf_api_key)
+                for ex in rdf_extractions:
+                    result = aggregate_extraction(rdf_raw, ex, config)
+                    data[ex.id] = result
+                    logger.info("  %s: %d rows (raw_data_first/%s)",
+                                ex.id, len(result), ex.params.get("mode", "single"))
+            except ImportError as e:
+                logger.warning("synapse-cli not installed — skipping raw_data_first extractions: %s", e)
+            except (RuntimeError, OSError, ValueError, KeyError) as e:
+                logger.warning("Raw-data-first fetch failed: %s — skipping raw_data_first extractions", e)
+        else:
+            if not rdf_api_key:
+                logger.info("No Synapse API token available — raw_data_first extractions skipped")
+            if not config.synapse:
+                logger.info("No synapse config — raw_data_first extractions skipped")
 
     # Always attach sample sizes from config (not stored in JSON)
     data["_sample_sizes"] = config.sample_sizes

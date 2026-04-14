@@ -64,17 +64,54 @@ def _validate_config():
         sys.exit(0)
 
 
+def _fetch_raw_first():
+    """Download ALL survey responses + VQs + segments via raw-data-first.
+
+    Uses synapse-cli's NDJSON downloader: 1-2 API calls, cached locally.
+    """
+    if len(sys.argv) < 2:
+        print("Usage: python -m slidegen fetch-raw-first <config.yaml>")
+        sys.exit(1)
+
+    yaml_path = sys.argv[1]
+    if not os.path.exists(yaml_path):
+        print(f"Error: file not found: {yaml_path}")
+        sys.exit(1)
+
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    from slidegen.pipeline.project_config import load_project_config
+    from slidegen.pipeline.raw_data_first import fetch_raw_data_first
+
+    config = load_project_config(yaml_path)
+    raw_data = fetch_raw_data_first(config)
+
+    meta = raw_data.get("_meta", {})
+    codes = sorted(raw_data.get("code_map", {}).keys())
+    print(f"\nRaw-data-first download complete:")
+    print(f"  Respondents: {meta.get('respondent_count', '?')}")
+    print(f"  Codes:       {meta.get('code_count', '?')}")
+    print(f"  Quarters:    {meta.get('quarters', [])}")
+    print(f"  API calls:   {meta.get('api_calls', '?')}")
+    print(f"  Cached at:   {os.path.join(config.context_path or 'context', 'raw_data_first.json')}")
+    if codes:
+        print(f"\n  Sample codes: {', '.join(codes[:20])}" +
+              (f" ... (+{len(codes)-20} more)" if len(codes) > 20 else ""))
+
+
 def main():
     usage = (
         "Usage: python -m slidegen <command> [args]\n"
         "\n"
         "Commands:\n"
-        "  create        Create a demo slide (or import SlideBuilder for custom)\n"
-        "  edit          Interactive live editor (requires open PowerPoint)\n"
-        "  reconcile     Sync registry from live PowerPoint state\n"
-        "  validate      Validate a project config.yaml (no deck generation)\n"
-        "  fetch-synapse Fetch banner plan data from Synapse API → source_data.xlsx\n"
-        "  fetch-raw     Fetch raw respondent data from Synapse API → source_raw_data.xlsx\n"
+        "  create          Create a demo slide (or import SlideBuilder for custom)\n"
+        "  edit            Interactive live editor (requires open PowerPoint)\n"
+        "  reconcile       Sync registry from live PowerPoint state\n"
+        "  validate        Validate a project config.yaml (no deck generation)\n"
+        "  fetch-synapse   Fetch banner plan data from Synapse API → source_data.xlsx\n"
+        "  fetch-raw       Fetch raw respondent data from Synapse API → source_raw_data.xlsx\n"
+        "  fetch-raw-first Download ALL responses + VQs + segments via raw-data-first (synapse-cli)\n"
         "\n"
         "Examples:\n"
         "  python -m slidegen create\n"
@@ -83,6 +120,7 @@ def main():
         "  python -m slidegen validate projects/jnj_rybrevant/config.yaml\n"
         "  python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml --url <url>\n"
         "  python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml\n"
+        "  python -m slidegen fetch-raw-first projects/jnj_rybrevant/config.yaml\n"
     )
 
     if len(sys.argv) < 2:
@@ -110,6 +148,8 @@ def main():
     elif cmd == "fetch-raw":
         from slidegen.pipeline.synapse_raw_fetcher import _cli
         _cli()
+    elif cmd == "fetch-raw-first":
+        _fetch_raw_first()
     else:
         print(f"Unknown command: {cmd}\n")
         print(usage)

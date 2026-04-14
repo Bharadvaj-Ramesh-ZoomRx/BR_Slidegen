@@ -92,6 +92,11 @@ def resolve_api_key(api_key: Optional[str] = None) -> str:
     if env_key:
         return env_key
 
+    # 2.5. Cached token from `synapse login` (synapse-cli device code flow)
+    token = _try_cli_cached_token()
+    if token:
+        return token
+
     # 3. Azure AD client credentials flow
     token = _acquire_azure_token()
     if token:
@@ -100,10 +105,34 @@ def resolve_api_key(api_key: Optional[str] = None) -> str:
     raise ValueError(
         f"No Synapse API token available. Options:\n"
         f"  1. Set {_ENV_KEY_NAME} environment variable\n"
-        f"  2. Set AZURE_TENANT_ID + AZURE_CLIENT_ID + AZURE_CLIENT_SECRET + AZURE_SCOPE\n"
+        f"  2. Run `synapse login` (if synapse-cli is installed) for device code flow\n"
+        f"  3. Set AZURE_TENANT_ID + AZURE_CLIENT_ID + AZURE_CLIENT_SECRET + AZURE_SCOPE\n"
         f"     for automatic Azure AD token acquisition\n"
-        f"  3. Pass api_key= directly to the function"
+        f"  4. Pass api_key= directly to the function"
     )
+
+
+# ── synapse-cli cached token (from `synapse login`) ──────────────────────
+
+def _try_cli_cached_token() -> Optional[str]:
+    """Try to read a cached token from synapse-cli's device code flow.
+
+    Returns the access_token string, or None if synapse-cli is not installed
+    or no cached token exists.
+    """
+    try:
+        from synapse_cli.auth import resolve_api_key as _cli_resolve
+        # synapse-cli's resolve_api_key checks: explicit → env → cached token → Azure AD.
+        # We already checked explicit + env above, so if _cli_resolve finds
+        # something it's either the cached device-code token or its own Azure flow.
+        # We only want the cached token here (Azure is handled below), but
+        # calling _cli_resolve(None) is safe — worst case it finds the same
+        # env var we already returned above, or falls through to Azure which
+        # we also handle.  The net effect is: if `synapse login` cached a token,
+        # we pick it up.
+        return _cli_resolve(None)
+    except (ImportError, ValueError):
+        return None
 
 
 # ── Azure AD client credentials ───────────────────────────────────────────
