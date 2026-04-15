@@ -48,7 +48,7 @@ Currently configured for **Rybrevant (RYB) + Lazcluze** vs **Tagrisso (TAG)** �
 │       └── config_history/    # Timestamped config backups (gitignored)
 ├── slidegen/                  # SlideGen system
 │   ├── pipeline/              # ★ Generic deck generation pipeline
-│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), refresh_deck(), index_excel(), index_qualitative(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json(), fetch_all_raw(), load_cached_pkl()
+│   │   ├── __init__.py        # Exports: generate_deck(), regenerate_slide(), refresh_deck(), index_excel(), index_qualitative(), fetch_synapse_data(), trigger_generation(), wait_and_download(), fetch_data_as_json(), fetch_all_raw(), fetch_raw_data_first(), load_cached_pkl()
 │   │   ├── project_config.py  # ProjectConfig dataclasses + YAML loader + validate()
 │   │   ├── data_loaders.py    # 9 data extractors (5 Excel + mock + raw_aggregate + synapse_report + synapse_raw) + JSON auto-cache + _codes rich index
 │   │   ├── raw_data_loader.py # Respondent-level data parser (source_raw_data.xlsx) + 4 aggregation modes + quarter cache
@@ -137,8 +137,9 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fr
 python -m slidegen create                   # Demo slide creation
 python -m slidegen edit <filename.pptx>     # Interactive live editor
 python -m slidegen reconcile <filename.pptx> # Sync registry from PowerPoint
-python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml  # Fetch banner plan from Synapse API
-python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml      # Fetch raw respondent data from Synapse API
+python -m slidegen fetch-synapse projects/jnj_rybrevant/config.yaml     # Fetch banner plan from Synapse API (Tracks A + B)
+python -m slidegen fetch-raw projects/jnj_rybrevant/config.yaml         # Fetch raw respondent Excel from Synapse API (Track C, legacy)
+python -m slidegen fetch-raw-first projects/jnj_rybrevant/config.yaml   # Fetch raw NDJSON via synapse-cli (Track D, preferred)
 
 # ── Legacy (archived) ──
 python archive/src/generate_asks.py        # Monolithic 14-slide deck (POC)
@@ -148,10 +149,12 @@ python archive/scripts/discover_data.py    # Data exploration
 ## Pipeline Architecture
 
 ```
-[Track A — JSON-First]  Synapse /reports/generate  →  fetch_data_as_json()  →  source_data.json directly
-[Track B — Excel]       Synapse /banner-plans       →  trigger_generation() + wait_and_download()  →  source_data.xlsx
-[Track C — Raw API]     Synapse /surveys/download-responses + /virtual-questions/export + /segments/list
-                        → fetch_all_raw() → source_raw_data.xlsx + VQ data + segment defs
+[Track A — JSON-First]      Synapse /reports/generate  →  fetch_data_as_json()  →  source_data.json directly
+[Track B — Excel]           Synapse /banner-plans      →  trigger_generation() + wait_and_download()  →  source_data.xlsx
+[Track C — Raw API, legacy] Synapse /surveys/download-responses + /virtual-questions/export + /segments/list
+                            → fetch_all_raw() → source_raw_data.xlsx + VQ data + segment defs
+[Track D — Raw-data-first]  synapse-cli NDJSON stream + segment join (1–2 API calls)
+                            → fetch_raw_data_first() → context/{wave}/raw_data_first.json (columnar)
                                                                                                        ↓
 projects/jnj_rybrevant/config.yaml  →  ProjectConfig (dataclasses)  →  validate()  →  errors or proceed
                                       ↓
@@ -161,7 +164,8 @@ load_all_data(config):
   │   └─ Excel-based extractions → pandas extraction (fallback)
   │   Cache invalidates on Excel hash change OR extraction params hash change
   ├─ Tier 2: raw_aggregate extractions → source_raw_data.xlsx (respondent-level, local Excel)
-  └─ Tier 3: synapse_raw extractions → Synapse API raw data + VQs + segment cuts
+  ├─ Tier 3: synapse_raw extractions → Synapse API raw Excel + VQs + segment cuts (legacy)
+  └─ Tier 4: raw_data_first extractions → synapse-cli NDJSON → raw_data_first.json (preferred)
                                       ↓
 orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
               →  render_qual_callout(slide, config, ask)  (if ask.extra.qual_callout)
@@ -171,19 +175,22 @@ orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
                       output/{wave}/backups/               (PPTX backups)
 ```
 
-### Data Loading (Three-Tier Auto-JSON + Three-Track Fetching)
+### Data Loading (Four-Tier Auto-JSON + Four-Track Fetching)
 
-**Three-Track Data Fetching:**
+**Four-Track Data Fetching:**
 - **Track A — JSON-First**: For `synapse_report` extractions, calls Synapse `/reports/generate` API directly → JSON. Bypasses Excel entirely. **Only activates when `SYNAPSE_API_KEY` env var is set.**
 - **Track B — Excel** (default): Uses local `source_data.xlsx` with pandas extraction. **This is the default path — if no Synapse API key is present, the pipeline proceeds entirely with the provided Excel file.**
-- **Track C — Raw API**: For `synapse_raw` extractions, fetches raw respondent-level data from Synapse API (`/surveys/download-responses`), auto-discovers and merges all project virtual questions, applies segment cuts (groupby/filter), and aggregates locally. **Only activates when `SYNAPSE_API_KEY` is set AND config has `synapse` section.**
-- All tracks produce the same `{desc, prior, current}` format — renderers don't change.
+- **Track C — Raw API (legacy)**: For `synapse_raw` extractions, fetches raw respondent-level data from Synapse API (`/surveys/download-responses`), auto-discovers and merges all project virtual questions, applies segment cuts (groupby/filter), and aggregates locally. Still supported but superseded by Track D for new work.
+- **Track D — Raw-data-first (preferred for respondent-level)**: For `raw_data_first` extractions, downloads ALL survey responses + VQs + segments via `synapse-cli` in **1–2 API calls**, caches a columnar structure (`columns`, `code_map`, `respondents`, `quarters`) at `context/{wave}/raw_data_first.json`, and aggregates per-extraction on demand. Cache invalidates on `synapse` config hash change (no Excel file in the loop). Requires `pip install -e /path/to/synapse-cli`. Auth fallback chain: explicit key → `SYNAPSE_API_KEY` → Azure AD → **CLI cached token (`synapse login`)**.
+- All tracks produce the same `{desc, prior, current, delta}` format — renderers don't change.
 
 **Tier 1 (aggregated):** On first run, data is extracted from Excel and saved as `context/{wave}/source_data.json`. Subsequent runs read the JSON directly — no pandas, no column indices, no question-code walking. The JSON auto-invalidates when the Excel file changes (hash check) **or** when extraction params change (extractions hash check). Delete `source_data.json` to force re-extraction.
 
 **Tier 2 (respondent-level, local):** When extractions use `method: raw_aggregate`, individual respondent rows are parsed from `source_raw_data.xlsx` and cached as `source_raw_data.json`. Same hash-based invalidation. Aggregation functions: `top2box`, `yes_pct`, `recall_pct`, `mean`.
 
-**Tier 3 (respondent-level, API):** When extractions use `method: synapse_raw`, the pipeline calls Synapse API to: (1) download raw survey responses as Excel, (2) auto-discover and export all project virtual questions, (3) fetch segment definitions. VQ data is merged into respondent data, segment filters applied per config, then aggregated locally using the same functions as Tier 2. Config specifies segment mode per segment: `groupby` (break out by segment) or `filter` (restrict to specific values).
+**Tier 3 (respondent-level, API — legacy):** When extractions use `method: synapse_raw`, the pipeline calls Synapse API to: (1) download raw survey responses as Excel, (2) auto-discover and export all project virtual questions, (3) fetch segment definitions. VQ data is merged into respondent data, segment filters applied per config, then aggregated locally using the same functions as Tier 2. Config specifies segment mode per segment: `groupby` (break out by segment) or `filter` (restrict to specific values).
+
+**Tier 4 (respondent-level, NDJSON — preferred):** When extractions use `method: raw_data_first`, `fetch_raw_data_first()` streams all responses + every VQ column through one NDJSON call, joins segments in a second call, and parses into a columnar structure. `aggregate_extraction()` then runs the same 4 modes as Tier 2/3 (`single`, `multi_code`, `cross_brand`, `by_segment`) on that in-memory structure. Cache key is a hash of the `synapse` config section, not a file hash — there is no intermediate Excel. `get_available_codes(config)` lists every code in the raw data for config scaffolding.
 
 **`_codes` Rich Index:** `index_excel()` now builds a `_codes` section per sheet with per-question-code metadata: `sub_row_count`, `has_sub_codes`, `sample_values`, `value_range` (decimal vs whole). Used by `scaffold_config_from_plan()` for auto-detecting extraction methods and pct_mode.
 
@@ -209,15 +216,23 @@ orchestrator  →  RENDERERS[slide_type](slide, config, ask, data, namer)
 
 Raw aggregate supports 4 modes via `params.mode`: `single` (one code, prior/current), `multi_code` (multiple codes, one row each), `cross_brand` (primary vs competitor for same code), `by_segment` (segment respondents by a segment_code value).
 
-**Tier 3 — Respondent-level, API** (Synapse API → local aggregation):
+**Tier 3 — Respondent-level, API, legacy** (Synapse API → local aggregation):
 
 | Method | Use Case |
 |--------|----------|
-| `synapse_raw` | Fetch raw data from Synapse API, auto-merge VQs, apply segment cuts, aggregate locally |
+| `synapse_raw` | Fetch raw Excel from Synapse API, auto-merge VQs, apply segment cuts, aggregate locally |
 
 Synapse raw supports the same 4 modes as `raw_aggregate` (`single`, `multi_code`, `cross_brand`, `by_segment`). Additionally auto-fetches all project virtual questions and applies segment cuts from config (`groupby` splits results, `filter` restricts respondents).
 
-All tiers auto-cache to JSON with Excel file hash validation. Delete the JSON to force re-extraction.
+**Tier 4 — Respondent-level, raw-data-first, preferred** (synapse-cli NDJSON → in-memory aggregation):
+
+| Method | Use Case |
+|--------|----------|
+| `raw_data_first` | Download all responses + VQs + segments via `synapse-cli` (1–2 API calls), cache columnar JSON at `context/{wave}/raw_data_first.json`, aggregate per-extraction on demand |
+
+`raw_data_first` supports the same 4 modes as `raw_aggregate` and `synapse_raw`. Params: `code` or `codes`, `agg_fn` (`recall_pct` / `top2box` / `yes_pct` / `mean`, default `recall_pct`), `mode` (default `single`), `quarter_current` / `quarter_prior` (default from `project.period_*`), optional `segment_column` + `segment_value` (or `primary_*` / `comp_*` / `segment_values` by mode). `get_available_codes(config)` returns `[{code, text, column_count, sample_values}, ...]` for discovery during config scaffolding.
+
+Tiers 1–3 auto-cache to JSON with Excel file hash validation. Tier 4 caches on `synapse` config hash (no Excel file involved). Delete the JSON to force re-extraction.
 
 ### Slide Type Renderers
 
@@ -352,12 +367,25 @@ excel_path = wait_and_download(config, history_id, api_key="...")  # blocking po
 from slidegen.pipeline import fetch_data_as_json
 data = fetch_data_as_json(config, api_key="...")  # same dict format as load_all_data()
 
-# Option D: Raw respondent data from Synapse API (replaces banner plan for synapse_raw extractions)
+# Option D: Raw respondent data from Synapse API (legacy — Track C, synapse_raw extractions)
 from slidegen.pipeline import fetch_all_raw
 result = fetch_all_raw(config, api_key="...")
 # result: {excel_path, segments, vq_questions, vq_data}
 # Downloads raw survey Excel + auto-discovers VQs + fetches segment defs
 # VQ data merged into respondent data, segment cuts applied per config
+
+# Option E: Raw-data-first via synapse-cli (preferred — Track D, raw_data_first extractions)
+from slidegen.pipeline import fetch_raw_data_first
+raw_data = fetch_raw_data_first(config, api_key="...")
+# raw_data: {columns, code_map, respondents, quarters, _meta}
+# 1–2 API calls total. Cached at context/{wave}/raw_data_first.json.
+# Invalidates on synapse config hash change, not Excel hash.
+# Requires: pip install -e /path/to/synapse-cli
+
+# Discover available codes in raw data (for config scaffolding)
+from slidegen.pipeline.raw_data_first import get_available_codes
+codes = get_available_codes(config, api_key="...")
+# codes: [{code, text, column_count, sample_values}, ...]
 
 # ── Auto-scaffold config from slide plan ──
 from slidegen.pipeline.config_generator import scaffold_config_from_plan
@@ -427,10 +455,11 @@ When the user says **"Create slides for projects/{name}"** or **"Run the full cr
 **Gate structure: Stages 0 through 0.5c run automatically without individual gates — each sub-skill asks only one lightweight file-list confirmation before extracting. The single user validation gate is at the end of Stage 1: the user reviews ALL generated context files before Stage 2 begins. Stages 5–6 are internal — no gate.**
 
 ### Stage -1 — Fetch Synapse Data (optional, on demand)
-Three tracks available:
+Four tracks available:
 - **Track A — JSON-First**: For `synapse_report` extractions, calls `/reports/generate` directly → JSON. No Excel needed.
 - **Track B — Excel**: Downloads `source_data.xlsx` via banner plan API. Supports non-blocking split: `trigger_generation()` returns immediately, `wait_and_download()` blocks later — lets Stages 0.5–1 run in parallel.
-- **Track C — Raw API**: For `synapse_raw` extractions, fetches raw respondent Excel + auto-discovers VQs + segment definitions from Synapse API. VQ data merged into respondent data, segment cuts applied per config.
+- **Track C — Raw API (legacy)**: For `synapse_raw` extractions, fetches raw respondent Excel + auto-discovers VQs + segment definitions from Synapse API. VQ data merged into respondent data, segment cuts applied per config. Still supported but superseded by Track D.
+- **Track D — Raw-data-first (preferred for respondent-level)**: For `raw_data_first` extractions, downloads all responses + VQs + segments via `synapse-cli` in 1–2 API calls, caches columnar JSON at `context/{wave}/raw_data_first.json`, aggregates per-extraction on demand.
 ```python
 # Track A (JSON-first)
 from slidegen.pipeline import fetch_data_as_json
@@ -442,10 +471,16 @@ history_id = trigger_generation(config, api_key="...")
 # ... run other stages in parallel ...
 excel_path = wait_and_download(config, history_id, api_key="...")
 
-# Track C (Raw API — respondent-level + VQs + segments)
+# Track C (Raw API — respondent-level + VQs + segments, legacy)
 from slidegen.pipeline import fetch_all_raw
 result = fetch_all_raw(config, api_key="...")
 # Downloads source_raw_data.xlsx, auto-fetches VQs and segment definitions
+
+# Track D (Raw-data-first — preferred for respondent-level)
+from slidegen.pipeline import fetch_raw_data_first
+raw_data = fetch_raw_data_first(config, api_key="...")
+# 1–2 API calls via synapse-cli. Returns columnar {columns, code_map, respondents, quarters}.
+# Requires: pip install -e /path/to/synapse-cli
 ```
 
 ### Stage 0 — Index Excel → JSON (automatic, always)
