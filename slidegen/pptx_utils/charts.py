@@ -45,6 +45,124 @@ CHART_PATTERNS = {
         "label_fsize": 6,
         "label_pos": "ctr",
     },
+
+    # ── Patterns derived from real-deck analysis (32 PET decks) ──
+    # Each pattern below reflects observed OOXML defaults, so renderers
+    # built on top get client-quality output without per-renderer tuning.
+    # Source: experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md §8
+
+    # 1,511 occurrences (35% of all PET charts). Horizontal bar chart with
+    # inverted category axis and labels hidden (labels live in companion table).
+    "bar_clustered_horizontal": {
+        "bar_dir": "bar",
+        "grouping": "clustered",
+        "gap": 80,
+        "overlap": 0,
+        "invert_cat_axis": True,
+        "hide_cat_labels": True,
+        "label_pos": "inEnd",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 324 occurrences. Horizontal 100% stacked for composition/intent.
+    "bar_stacked_100_horizontal": {
+        "bar_dir": "bar",
+        "grouping": "percentStacked",
+        "gap": 80,
+        "overlap": 100,
+        "invert_cat_axis": True,
+        "hide_cat_labels": True,
+        "label_pos": "ctr",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 486 occurrences (11% of PET charts). Vertical 100% stacked.
+    "column_stacked_100_vertical": {
+        "bar_dir": "col",
+        "grouping": "percentStacked",
+        "gap": 100,
+        "overlap": 100,
+        "invert_cat_axis": False,
+        "hide_cat_labels": False,
+        "label_pos": "ctr",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 119 occurrences. Side-by-side vertical bars for QoQ comparison.
+    "column_clustered_vertical": {
+        "bar_dir": "col",
+        "grouping": "clustered",
+        "gap": 100,
+        "overlap": -20,
+        "invert_cat_axis": False,
+        "hide_cat_labels": False,
+        "label_pos": "outEnd",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 595 occurrences (14% of PET charts). Multi-wave trend lines.
+    "line_markers_trended": {
+        "grouping": "standard",
+        "label_pos": "t",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "marker_symbol": "circle",
+        "marker_size": 7,
+        "line_width_emu": 25400,     # 2pt (827 occurrences)
+    },
+
+    # 743 occurrences (17% of PET charts). Scatter for abacus / MBD /
+    # quadrant plots.
+    "xy_scatter_abacus": {
+        "label_pos": "t",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "marker_symbol": "circle",
+        "marker_size": 10,
+        "hide_val_labels": False,
+        "hide_cat_labels": False,
+    },
+
+    # 138 occurrences. Segment composition breakdowns.
+    "doughnut_default": {
+        "label_pos": "ctr",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "hole_size": 50,
+        "series_no_border": True,
+    },
 }
 
 

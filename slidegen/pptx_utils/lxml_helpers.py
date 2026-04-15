@@ -375,6 +375,115 @@ def set_chart_plot_area(chart, x: float = 0.0, y: float = 0.0,
         elem.set("val", val)
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# Helpers derived from real-deck analysis (experiments/deck_analysis, 32 decks)
+# ════════════════════════════════════════════════════════════════════════════
+#
+# These are thin convenience wrappers over properties that appear frequently
+# enough in client PET decks to warrant a named helper. Observed frequencies
+# are cited in each docstring. See ACTIONABLE_FINDINGS.md §2 for the backing
+# data.
+
+
+def set_invert_if_negative(chart, value: bool = False) -> None:
+    """Toggle <c:invertIfNegative> on all series.
+
+    Defaults to False — disables Excel's auto-color-flip on negative values.
+    Observed in 13,550 series across real decks; overwhelmingly expected to
+    be disabled so that negative delta values keep their expected color.
+    """
+    for ser in chart._chartSpace.findall(".//" + qn("c:ser")):
+        iin = _get_or_add(ser, "c:invertIfNegative")
+        iin.set("val", "1" if value else "0")
+
+
+def invert_val_axis(chart) -> None:
+    """Set value axis orientation to ``maxMin`` (top-down).
+
+    Rare — observed in only 115 charts across 32 decks. Used for quadrant
+    scatters where "higher importance" should render at top.
+    """
+    ax = chart.value_axis._element
+    scaling = _get_or_add(ax, "c:scaling")
+    orient = _get_or_add(scaling, "c:orientation")
+    orient.set("val", "maxMin")
+
+
+def hide_val_labels(chart) -> None:
+    """Hide value-axis tick labels via ``tickLblPos="none"``.
+
+    Less common than hide_cat_labels (48 charts), but used on scatter charts
+    where the companion table carries the values.
+    """
+    ax = chart.value_axis._element
+    tlp = _get_or_add(ax, "c:tickLblPos")
+    tlp.set("val", "none")
+
+
+def set_datalabel_pos_center(series) -> None:
+    """Set data label position to ``ctr`` (center).
+
+    Most common position overall — 4,508 occurrences. Standard for stacked
+    bar charts where the value is centered inside each band.
+    """
+    _set_data_label_pos(series, "ctr")
+
+
+def set_datalabel_pos_top(series) -> None:
+    """Set data label position to ``t`` (top).
+
+    2,778 occurrences. Common for scatter/line markers with labels above.
+    """
+    _set_data_label_pos(series, "t")
+
+
+def set_datalabel_pos_inside_end(series) -> None:
+    """Set data label position to ``inEnd`` (inside end of bar).
+
+    143 occurrences. Used on horizontal bars where the label sits inside
+    the bar with white text, preventing overflow when bars are wide.
+    """
+    _set_data_label_pos(series, "inEnd")
+
+
+def _set_data_label_pos(series, pos: str) -> None:
+    """Internal helper that sets <c:dLblPos val="{pos}"> on a series."""
+    dlbls = _get_or_add(series._element, "c:dLbls")
+    # Remove any existing dLblPos so we set a clean value
+    existing = dlbls.find(qn("c:dLblPos"))
+    if existing is not None:
+        dlbls.remove(existing)
+    # dLblPos must come before show* toggles — insert at start
+    dlp = etree.SubElement(dlbls, qn("c:dLblPos"))
+    dlp.set("val", pos)
+
+
+def set_val_axis_pct_format(chart) -> None:
+    """Apply ``"0%"`` format to value axis (96% of PET chart formats)."""
+    set_val_axis_number_format(chart.value_axis, "0%")
+
+
+def set_val_axis_int_format(chart) -> None:
+    """Apply ``"0"`` (integer) format to value axis. 13% of PET charts."""
+    set_val_axis_number_format(chart.value_axis, "0")
+
+
+def set_datalabel_format(series, fmt: str = "0%") -> None:
+    """Apply a number format to a series' data labels.
+
+    Common formats:
+
+      - ``"0%"``  — integer percent (96% of labels)
+      - ``"0"``   — integer count
+      - ``"0.0"`` — one-decimal
+      - ``r"0%;\\-0%;\\ "`` — percent with conditional sign (delta columns)
+    """
+    dlbls = _get_or_add(series._element, "c:dLbls")
+    nf = _get_or_add(dlbls, "c:numFmt")
+    nf.set("formatCode", fmt)
+    nf.set("sourceLinked", "0")
+
+
 def set_val_axis_scale(chart, min_val: float = 0, max_val: float = 100) -> None:
     """Set explicit min/max scale on the value axis.
 

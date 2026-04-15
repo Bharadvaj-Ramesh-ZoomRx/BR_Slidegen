@@ -71,7 +71,88 @@ LAYOUTS = {
         "total_col_left": 10.35,
         "total_col_w": 0.65,
     },
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Layouts derived from real-deck coordinate analysis (32 PET decks).
+    # Each entry lists the median coordinates from its signature cluster.
+    # Use these as the default geometry; renderers can override specific
+    # fields at call time if a deck needs tweaking.
+    # Source: experiments/deck_analysis/outputs/layout_clusters.md
+    # ────────────────────────────────────────────────────────────────────────
+
+    # 145 slides — canonical label-table + bar-chart pattern
+    "observed_1chart_1table": {
+        "chart_rect": {"left": 1.62, "top": 2.02, "width": 5.41, "height": 4.29},
+        "table_rect": {"left": 1.48, "top": 1.82, "width": 6.79, "height": 4.55},
+        "delta_col_rect": {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.50},
+        "_source": "1_chart_1_table signature, 145 slides",
+    },
+
+    # 110 slides — clustered compare (chart right + two tables left)
+    "observed_1chart_2table": {
+        "chart_rect": {"left": 6.75, "top": 2.04, "width": 3.81, "height": 4.30},
+        "primary_table_rect": {"left": 3.11, "top": 1.98, "width": 3.88, "height": 4.17},
+        "secondary_table_rect": {"left": 7.09, "top": 1.98, "width": 3.88, "height": 4.17},
+        "_source": "1_chart_2_table signature, 110 slides",
+    },
+
+    # 68 slides — dual bar comparison (two charts + two tables)
+    "observed_2chart_2table": {
+        "left_chart_rect": {"left": 2.60, "top": 2.25, "width": 3.00, "height": 3.69},
+        "right_chart_rect": {"left": 6.84, "top": 2.42, "width": 3.00, "height": 3.69},
+        "left_table_rect": {"left": 2.60, "top": 2.25, "width": 2.92, "height": 3.66},
+        "right_table_rect": {"left": 3.84, "top": 2.25, "width": 2.92, "height": 3.66},
+        "_source": "2_chart_2_table signature, 68 slides",
+    },
+
+    # 139 slides — large single table (Executive Summary / Recommendations)
+    "observed_full_width_table": {
+        "table_rect": {"left": 0.91, "top": 1.52, "width": 11.11, "height": 4.92},
+        "_source": "1_table signature, 139 slides",
+    },
+
+    # 45 slides — 3-panel scorecard
+    "observed_three_metric_scorecard": {
+        "label_table_rect": {"left": 0.39, "top": 2.17, "width": 3.85, "height": 3.76},
+        "chart_panel_template": {"left": 7.02, "top": 2.36, "width": 2.57, "height": 3.87},
+        "chart_panel_count": 3,
+        "chart_panel_gap": 0.10,
+        "_source": "3_chart_1_table signature, 45 slides",
+    },
+
+    # 44 slides — two charts, no tables (side-by-side comparison)
+    "observed_dual_chart_no_table": {
+        "left_chart_rect": {"left": 2.40, "top": 2.33, "width": 4.19, "height": 3.67},
+        "right_chart_rect": {"left": 6.89, "top": 2.33, "width": 4.19, "height": 3.67},
+        "_source": "2_chart signature, 44 slides",
+    },
 }
+
+
+# ── Universal positions (from deck analysis) ────────────────────────────────
+# Applicable to most slides regardless of content type.
+
+HEADLINE_RECT = {"left": 0.20, "top": 0.30, "width": 12.80, "height": 0.90}
+FOOTER_RECT = {"left": 0.20, "top": 7.00, "width": 12.80, "height": 0.40}
+
+# Narrow delta-column positions observed in real decks (top 5, most common first).
+# Each has width ≤ 1.0", height ≥ 3.0" — canonical delta-column geometry.
+OBSERVED_DELTA_COL_POSITIONS = [
+    {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.50, "_occurrences": 40},
+    {"left": 11.46, "top": 2.08, "width": 0.47, "height": 4.58, "_occurrences": 22},
+    {"left": 7.96,  "top": 2.07, "width": 0.49, "height": 4.58, "_occurrences": 19},
+    {"left": 10.59, "top": 2.06, "width": 0.53, "height": 4.52, "_occurrences": 18},
+    {"left": 12.07, "top": 2.03, "width": 0.64, "height": 4.47, "_occurrences": 17},
+]
+
+
+def get_layout(slide_type: str) -> dict:
+    """Look up a layout preset by slide type."""
+    if slide_type not in LAYOUTS:
+        raise KeyError(
+            f"Unknown slide_type {slide_type!r}. Available: {sorted(LAYOUTS.keys())}"
+        )
+    return LAYOUTS[slide_type]
 
 
 # ── Slide chrome functions ───────────────────────────────────────────────────
