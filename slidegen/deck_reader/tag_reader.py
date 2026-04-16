@@ -39,15 +39,17 @@ from slidegen.slide_spec.schema import (
 
 # ── Constants matching galen-powerpoint/Constants.cs ShapeTags ────────────────
 
-TAG_REPORT_CONFIG_HASH = "ReportConfigHash"
-TAG_PIVOT_CONFIG_HASH = "DataFrameConfigHash"
-TAG_MAPPING_CONFIG = "MappingConfig"
-TAG_REFRESH_ERROR = "RefreshErrorMsg"
-TAG_LAST_REFRESH = "LastRefreshTime"
-TAG_COLUMN_KEY_LABEL_MAP = "ColumnKeyLabelMap"
-TAG_ANALYSIS_TYPE = "AnalysisType"
-TAG_SPLIT_GROUP_ID = "SplitGroupId"
-TAG_SPLIT_ORDER = "SplitOrder"
+# Tag names — UPPERCASE in real PPTX files (Galen-PowerPoint Connector convention).
+# Comparison is case-insensitive throughout tag_reader to handle mixed-case edge cases.
+TAG_REPORT_CONFIG_HASH = "REPORTCONFIGHASH"
+TAG_PIVOT_CONFIG_HASH = "DATAFRAMECONFIGHASH"
+TAG_MAPPING_CONFIG = "MAPPINGCONFIG"
+TAG_REFRESH_ERROR = "REFRESHERRORMSG"
+TAG_LAST_REFRESH = "LASTREFRESHTIME"
+TAG_COLUMN_KEY_LABEL_MAP = "COLUMNKEYLABELMAP"
+TAG_ANALYSIS_TYPE = "ANALYSISTYPE"
+TAG_SPLIT_GROUP_ID = "SPLITGROUPID"
+TAG_SPLIT_ORDER = "SPLITORDER"
 
 # Custom XML Part store keys (matching Constants.CustomXMLStore.Keys)
 XML_STORE_REPORT_CONFIG = "ReportConfig"
@@ -107,14 +109,11 @@ def _get_shape_tag(shape, tag_name: str) -> Optional[str]:
         # Shape._element may have <p:extLst> with custom data
         from pptx.oxml.ns import qn
 
-        # Method 1: Check for custDataLst links to tag parts
-        # The shape may have a <p:custDataLst> child with <p:tags r:id="rIdN"/>
-        cust_data = sp.findall(qn('p:custDataLst'))
-        if not cust_data:
-            # Shapes sometimes have tags in an extension list
-            ext_lst = sp.findall(qn('p:extLst'))
-            for ext in ext_lst:
-                cust_data.extend(ext.findall('.//' + qn('p:custDataLst')))
+        # Method 1: Check for custDataLst links to tag parts.
+        # <p:custDataLst> lives inside <p:nvPr> which is nested inside
+        # <p:nvSpPr> (for sp shapes) or <p:nvGraphicFramePr> (for charts/tables).
+        # Search recursively to handle all shape types.
+        cust_data = sp.findall('.//' + qn('p:custDataLst'))
 
         if not cust_data:
             return None
@@ -129,8 +128,11 @@ def _get_shape_tag(shape, tag_name: str) -> Optional[str]:
 
                 # Resolve the tag part via the slide's relationships
                 try:
+                    # Resolve via slide part's relationship collection
+                    # (NOT shape.part.related_parts which doesn't exist)
                     slide_part = shape.part
-                    tag_part = slide_part.related_parts.get(r_id)
+                    rel = slide_part.rels[r_id]
+                    tag_part = rel.target_part
                     if tag_part is None:
                         continue
 
@@ -139,7 +141,7 @@ def _get_shape_tag(shape, tag_name: str) -> Optional[str]:
                     for tag_el in tag_xml:
                         name = tag_el.get('name', '')
                         val = tag_el.get('val', '')
-                        if name == tag_name:
+                        if name.upper() == tag_name.upper():
                             return val if val else None
                 except Exception:
                     continue
@@ -156,10 +158,8 @@ def _get_shape_tags_all(shape) -> dict[str, str]:
         from pptx.oxml.ns import qn
         sp = shape._element
 
-        cust_data_lists = sp.findall(qn('p:custDataLst'))
-        ext_lst = sp.findall(qn('p:extLst'))
-        for ext in ext_lst:
-            cust_data_lists.extend(ext.findall('.//' + qn('p:custDataLst')))
+        # Search recursively — custDataLst is nested inside nvPr
+        cust_data_lists = sp.findall('.//' + qn('p:custDataLst'))
 
         for cdl in cust_data_lists:
             for tag_ref in cdl:
@@ -168,7 +168,8 @@ def _get_shape_tags_all(shape) -> dict[str, str]:
                     continue
                 try:
                     slide_part = shape.part
-                    tag_part = slide_part.related_parts.get(r_id)
+                    rel = slide_part.rels[r_id]
+                    tag_part = rel.target_part
                     if tag_part is None:
                         continue
                     tag_xml = ET.fromstring(tag_part.blob)
@@ -176,7 +177,7 @@ def _get_shape_tags_all(shape) -> dict[str, str]:
                         name = tag_el.get('name', '')
                         val = tag_el.get('val', '')
                         if name:
-                            tags[name] = val
+                            tags[name.upper()] = val
                 except Exception:
                     continue
     except Exception:
@@ -184,7 +185,7 @@ def _get_shape_tags_all(shape) -> dict[str, str]:
     return tags
 
 
-def _parse_custom_xml_parts(prs: Presentation) -> dict[str, dict]:
+def _parse_custom_xml_parts(prs: Presentation, pptx_path: Optional[Path] = None) -> dict[str, dict]:
     """Parse Custom XML Parts from the presentation.
 
     The Connector stores config DTOs in Custom XML Parts keyed by SHA256 hash.
@@ -197,7 +198,64 @@ def _parse_custom_xml_parts(prs: Presentation) -> dict[str, dict]:
     result = {XML_STORE_REPORT_CONFIG: {}, XML_STORE_PIVOT_CONFIG: {}}
 
     try:
-        # Access the package-level Custom XML parts
+        # Access Custom XML parts. python-pptx's iter_parts() may yield
+        # properties XML rather than the data XML. Fall back to zipfile
+        # approach if needed — read customXml/itemN.xml directly from the PPTX.
+        import zipfile
+        if pptx_path is None:
+            pptx_path = getattr(prs.part.package, '_pkg_file', None)
+            if pptx_path and hasattr(pptx_path, 'name'):
+                pptx_path = pptx_path.name
+
+        # Try zipfile approach first (more reliable for Custom XML)
+        if pptx_path:
+            try:
+                with zipfile.ZipFile(pptx_path, 'r') as z:
+                    for name in z.namelist():
+                        if name.startswith('customXml/item') and name.endswith('.xml'):
+                            try:
+                                blob = z.read(name)
+                                root = ET.fromstring(blob)
+                                for store_key in [XML_STORE_REPORT_CONFIG, XML_STORE_PIVOT_CONFIG]:
+                                    store_node = None
+                                    for child in root.iter():
+                                        tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                                        if tag == store_key:
+                                            store_node = child
+                                            break
+                                    if store_node is None:
+                                        continue
+                                    for entry in store_node:
+                                        entry_hash = entry.get('key') or entry.get('hash')
+                                        if not entry_hash:
+                                            continue
+                                        data_node = None
+                                        for child in entry:
+                                            child_tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                                            if child_tag == 'Data':
+                                                data_node = child
+                                                break
+                                        if data_node is not None:
+                                            json_text = data_node.text
+                                            if not json_text or not json_text.strip():
+                                                for val_child in data_node:
+                                                    vt = val_child.tag.split('}')[-1] if '}' in val_child.tag else val_child.tag
+                                                    if vt == 'Value' and val_child.text:
+                                                        json_text = val_child.text
+                                                        break
+                                            if json_text and json_text.strip():
+                                                try:
+                                                    config = json.loads(json_text.strip())
+                                                    result[store_key][entry_hash] = config
+                                                except json.JSONDecodeError:
+                                                    pass
+                            except Exception:
+                                continue
+                return result
+            except Exception:
+                pass
+
+        # Fallback: python-pptx iter_parts
         package = prs.part.package
         for part in package.iter_parts():
             content_type = getattr(part, 'content_type', '')
@@ -265,12 +323,27 @@ def _parse_custom_xml_parts(prs: Presentation) -> dict[str, dict]:
                                     data_node = child
                                     break
 
-                        if data_node is not None and data_node.text:
-                            try:
-                                config = json.loads(data_node.text.strip())
-                                result[store_key][entry_hash] = config
-                            except json.JSONDecodeError:
-                                pass
+                        if data_node is not None:
+                            # JSON may be in data_node.text directly, OR inside
+                            # a <Value> child (Galen Connector uses CDATA in <Value>)
+                            json_text = data_node.text
+                            if not json_text or not json_text.strip():
+                                # Check for <Value> child (with or without namespace)
+                                value_el = None
+                                for child in data_node:
+                                    child_tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                                    if child_tag == 'Value':
+                                        value_el = child
+                                        break
+                                if value_el is not None and value_el.text:
+                                    json_text = value_el.text
+
+                            if json_text and json_text.strip():
+                                try:
+                                    config = json.loads(json_text.strip())
+                                    result[store_key][entry_hash] = config
+                                except json.JSONDecodeError:
+                                    pass
 
             except Exception:
                 continue
@@ -416,7 +489,7 @@ def read_tagged_shapes(
     prs = Presentation(str(pptx_path))
 
     # Parse Custom XML Parts for config lookup
-    xml_configs = _parse_custom_xml_parts(prs)
+    xml_configs = _parse_custom_xml_parts(prs, pptx_path=pptx_path)
     report_configs = xml_configs.get(XML_STORE_REPORT_CONFIG, {})
     pivot_configs = xml_configs.get(XML_STORE_PIVOT_CONFIG, {})
 
