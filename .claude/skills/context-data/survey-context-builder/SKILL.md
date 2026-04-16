@@ -177,7 +177,7 @@ text = open(r'{EXTRACTED_TEXT_PATH}', encoding='utf-8').read()
 # Impact Q1.15, Retention Q1.00, S0.65, Q27, Q20
 code_pattern = re.compile(
     r'\b((?:NPP|ME|Impact|Retention|Screener|S)\s+)?'
-    r'(Q\d+(?:\.\d+)?[a-zA-Z]?)\b'
+    r'(Q\d+(?:.\d+)?[a-zA-Z]?)\b'
 )
 
 # ── Scale detection ───────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ for item in found_codes:
     if item['code'] not in seen:
         seen.add(item['code'])
         print(f\"CODE: {item['code']}\")
-        print(f\"CONTEXT:\\n{item['context']}\")
+        print(f\"CONTEXT:n{item['context']}\")
         print('---')
 "
 ```

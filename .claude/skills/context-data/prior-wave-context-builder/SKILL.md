@@ -131,8 +131,8 @@ for i, slide in enumerate(prs.slides, 1):
                 if t:
                     texts.append(t)
     if texts:
-        print(f"\\n--- Slide {i} ---")
-        print("\\n".join(texts))
+        print(f"n--- Slide {i} ---")
+        print("n".join(texts))
 ```
 
 Run as:

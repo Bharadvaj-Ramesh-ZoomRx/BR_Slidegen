@@ -1,0 +1,53 @@
+{
+  "_comment": "Pattern 5/10: bar_stacked_100_horizontal — 7% of real PET charts. Horizontal composition — each row shows how a category breaks down across segments. Label table used for row labels since category axis is typically hidden.",
+  "_pattern": "bar_stacked_100_horizontal",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_cta",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Call to Action",
+  "layout": "observed_1chart_1table",
+
+  "headline": {"text": "'Discuss at next tumor board' is the most-used closing — up 4pp QoQ"},
+  "subheadline": {"text": "Rep-driven call to action used during rep interactions — Q1 '26"},
+  "footer": {"text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. Rows sum to 100%."},
+
+  "components": [
+    {
+      "type": "label_table",
+      "position": {"left": 0.30, "top": 1.85, "width": 3.20, "height": 4.50},
+      "labels": ["Overall Q4'25", "Overall Q1'26", "Academic Q1'26", "Community Q1'26", "High-Impact Q1'26"],
+      "alternating_rows": true,
+      "wrap": true
+    },
+    {
+      "type": "chart",
+      "position": {"left": 3.60, "top": 1.85, "width": 9.40, "height": 4.50},
+      "chart_pattern": "bar_stacked_100_horizontal",
+      "data": {
+        "categories": ["Overall Q4'25", "Overall Q1'26", "Academic Q1'26", "Community Q1'26", "High-Impact Q1'26"],
+        "series": [
+          {"name": "Discuss at next tumor board", "values": [0.26, 0.30, 0.35, 0.27, 0.40], "color": "{brand.primary_current}"},
+          {"name": "Refer for molecular testing", "values": [0.24, 0.23, 0.22, 0.24, 0.25], "color": "{brand.primary_prior}"},
+          {"name": "Review with next patient", "values": [0.20, 0.19, 0.18, 0.21, 0.15], "color": "{brand.secondary}"},
+          {"name": "No specific action", "values": [0.30, 0.28, 0.25, 0.28, 0.20], "color": "#BFBFBF"}
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "ctr", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": true
+      }
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["cta-tumor-board-growth"],
+    "arc": "MONITOR: Rep behavior shift"
+  }
+}

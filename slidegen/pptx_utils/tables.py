@@ -30,7 +30,7 @@ def _cell_vcenter(cell) -> None:
 # ── Shared helpers ───────────────────────────────────────────────────────────
 
 def _render_header(tbl, header_text: str, font_name: Optional[str] = None,
-                   display_font: Optional[str] = None):
+                   display_font: Optional[str] = None, font_size_pt: float = 11.0):
     """Style row 0 as a dark header with centered white bold text."""
     tbl.rows[0].height = Inches(HEADER_ROW_HEIGHT_IN)
     hc = tbl.cell(0, 0)
@@ -41,7 +41,7 @@ def _render_header(tbl, header_text: str, font_name: Optional[str] = None,
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = header_text
-    run.font.size = Pt(11)
+    run.font.size = Pt(font_size_pt)
     run.font.bold = True
     run.font.color.rgb = C_WHITE
     run.font.name = display_font or font_name or FONT_TEXT
@@ -50,7 +50,7 @@ def _render_header(tbl, header_text: str, font_name: Optional[str] = None,
 
 def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
                      row_height_in: float, font_name: Optional[str] = None,
-                     data_idx: Optional[int] = None):
+                     data_idx: Optional[int] = None, font_size_pt: float = 11.0):
     """Style a single data row: alternating bg, centered colored bold text."""
     tbl.rows[row_idx].height = Inches(row_height_in)
     cell = tbl.cell(row_idx, 0)
@@ -64,7 +64,7 @@ def _render_data_row(tbl, row_idx: int, text: str, color: RGBColor,
     suppress_para_bullets(p._p)
     run = p.add_run()
     run.text = text
-    run.font.size = Pt(11)
+    run.font.size = Pt(font_size_pt)
     run.font.bold = True
     run.font.color.rgb = color
     run.font.name = font_name or FONT_TEXT
@@ -104,7 +104,10 @@ def _delta_text_color(d: float | None, *,
 
 def add_delta_col(slide, deltas: list[float | None],
                   left: float, top: float, width: float, height: float,
-                  header: str, hdr_h_frac: float = 0.06):
+                  header: str, hdr_h_frac: float = 0.06,
+                  font_size_pt: float = 11.0,
+                  header_font_size_pt: Optional[float] = None,
+                  font_name: Optional[str] = None):
     """Add a single-column delta table aligned with a chart.
 
     Args:
@@ -112,6 +115,9 @@ def add_delta_col(slide, deltas: list[float | None],
         left/top/width/height: inches — match chart dimensions exactly
         header: column header string (e.g. 'MR Delta')
         hdr_h_frac: header row as fraction of total height (default 0.06)
+        font_size_pt: font size for data cells (default 11pt, back-compat)
+        header_font_size_pt: font size for header cell (defaults to font_size_pt)
+        font_name: override font family for all cells
 
     Returns: the table object
     """
@@ -119,6 +125,7 @@ def add_delta_col(slide, deltas: list[float | None],
     hdr_h = height * hdr_h_frac
     body_h = height - hdr_h
     row_h = body_h / n
+    hdr_size = header_font_size_pt if header_font_size_pt is not None else font_size_pt
 
     tbl = slide.shapes.add_table(
         n + 1, 1,
@@ -127,7 +134,7 @@ def add_delta_col(slide, deltas: list[float | None],
 
     # Header row (custom height for proportional mode)
     tbl.rows[0].height = Emu(int(hdr_h * EMU_PER_IN))
-    _render_header(tbl, header)
+    _render_header(tbl, header, font_name=font_name, font_size_pt=hdr_size)
 
     # Data rows (use integer-rounded delta format for proportional mode)
     for i, d in enumerate(deltas):
@@ -141,7 +148,8 @@ def add_delta_col(slide, deltas: list[float | None],
             text, color = "0", C_GREY
         row_idx = i + 1
         tbl.rows[row_idx].height = Emu(int(row_h * EMU_PER_IN))
-        _render_data_row(tbl, row_idx, text, color, row_h, data_idx=i)
+        _render_data_row(tbl, row_idx, text, color, row_h,
+                         data_idx=i, font_name=font_name, font_size_pt=font_size_pt)
 
     tbl.columns[0].width = Inches(width)
     return tbl

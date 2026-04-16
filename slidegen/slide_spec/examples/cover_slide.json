@@ -1,0 +1,49 @@
+{
+  "_comment": "Composition variant 1/10: cover_slide — cluster signature 'empty' (291 real slides, the largest cluster). Title/cover slide with textbox(es) only — no chart, no table. Uses brand color tokens for a polished client-facing cover.",
+  "_cluster_coverage": 291,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_cover",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Cover",
+  "layout": "observed_full_width_table",
+
+  "headline": {
+    "text": "Rybrevant + Lazcluze Prescriber Experience Tracker",
+    "style": "default"
+  },
+  "footer": {
+    "text": "CONFIDENTIAL — Prepared for J&J Innovative Medicine by ZoomRx",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "textbox",
+      "position": {"left": 1.0, "top": 2.8, "width": 11.3, "height": 2.0},
+      "text": "Rybrevant + Lazcluze\nPrescriber Experience Tracker (PET)\nQ1 2026 Wave Report",
+      "font_size_pt": 36.0,
+      "font_color": "{brand.primary_current}",
+      "bold": true,
+      "alignment": "center"
+    },
+    {
+      "type": "textbox",
+      "position": {"left": 1.0, "top": 5.0, "width": 11.3, "height": 1.0},
+      "text": "J&J Innovative Medicine — NSCLC Franchise\nWave: Q1 2026 (vs Q4 2025)  |  n = 312 oncologists",
+      "font_size_pt": 14.0,
+      "font_color": "#666666",
+      "bold": false,
+      "alignment": "center"
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": [],
+    "arc": null,
+    "role_in_arc": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_comment": "Composition variant 10/10: title_with_image — cluster signature '1_picture' (31 real slides). Title slide with an embedded image. ImageComponent uses 'source' for the image path — placeholder path used here (slide-creator skips missing images with a warning).",
+  "_cluster_coverage": 31,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_title_img",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Cover",
+  "layout": "observed_1picture",
+
+  "headline": {
+    "text": "Rybrevant + Lazcluze: Q1 2026 Prescriber Experience Tracker",
+    "style": "default"
+  },
+  "footer": {
+    "text": "CONFIDENTIAL — Prepared for J&J Innovative Medicine by ZoomRx",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "textbox",
+      "position": {"left": 1.0, "top": 1.60, "width": 11.3, "height": 1.0},
+      "text": "Q1 2026 Prescriber Experience Tracker\nRybrevant + Lazcluze — EGFRm NSCLC",
+      "font_size_pt": 20.0,
+      "font_color": "{brand.primary_current}",
+      "bold": true,
+      "alignment": "center"
+    },
+    {
+      "type": "image",
+      "position": {"left": 2.50, "top": 3.00, "width": 8.00, "height": 3.50},
+      "source": "templates/title_image.png"
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": [],
+    "arc": null,
+    "role_in_arc": null
+  }
+}

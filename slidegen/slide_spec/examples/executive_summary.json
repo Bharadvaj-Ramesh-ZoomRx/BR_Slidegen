@@ -1,0 +1,77 @@
+{
+  "_comment": "Composition variant 3/10: executive_summary — cluster signature '1_table' (139 real slides). Text-heavy exec summary with multiple textbox components carrying bullet insights. Citations tracked in metadata. No data-bound chart or label_table.",
+  "_cluster_coverage": 139,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_es",
+  "slide_index": 1,
+  "brand": "RYBREVANT",
+  "section": "Executive Summary",
+  "layout": "observed_full_width_table",
+
+  "headline": {
+    "text": "Executive Summary: Rybrevant momentum builds on efficacy messaging but safety concerns emerging",
+    "style": "default"
+  },
+  "footer": {
+    "text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers.",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "textbox",
+      "position": {"left": 0.50, "top": 1.60, "width": 12.30, "height": 0.80},
+      "text": "1. Efficacy message recall dipped 3pp QoQ (42% vs 45%), driven by reduced rep reach in academic centers. Safety message recall ticked up 2pp — see Slide 5.",
+      "font_size_pt": 11.0,
+      "font_color": "#333333",
+      "bold": false,
+      "alignment": "left"
+    },
+    {
+      "type": "textbox",
+      "position": {"left": 0.50, "top": 2.50, "width": 12.30, "height": 0.80},
+      "text": "2. Prescription intent for Rybrevant+Lazcluze in 1L EGFRm NSCLC rose to 68% (T2B), up 4pp QoQ — the strongest single-wave gain in 6 waves. Tagrisso intent flat at 72% — see Slides 8-9.",
+      "font_size_pt": 11.0,
+      "font_color": "#333333",
+      "bold": false,
+      "alignment": "left"
+    },
+    {
+      "type": "textbox",
+      "position": {"left": 0.50, "top": 3.40, "width": 12.30, "height": 0.80},
+      "text": "3. Rep quality scores remain strong (82% T2B) but frequency of visits declined in community settings, mirroring access restrictions flagged in Q4 — see Slide 12.",
+      "font_size_pt": 11.0,
+      "font_color": "#333333",
+      "bold": false,
+      "alignment": "left"
+    },
+    {
+      "type": "textbox",
+      "position": {"left": 0.50, "top": 4.30, "width": 12.30, "height": 0.80},
+      "text": "4. Patient allocation shifted +5pp toward Rybrevant (30% vs 25%) at Tagrisso's expense (-3pp). Other EGFRi therapies stable — see Slide 14.",
+      "font_size_pt": 11.0,
+      "font_color": "#333333",
+      "bold": false,
+      "alignment": "left"
+    },
+    {
+      "type": "textbox",
+      "position": {"left": 0.50, "top": 5.20, "width": 12.30, "height": 0.80},
+      "text": "5. High-impact interactions drove disproportionate recall lift: HCPs with ≥2 high-impact touches showed 15pp higher efficacy recall vs low-touch cohort — see Slide 16.",
+      "font_size_pt": 11.0,
+      "font_color": "#333333",
+      "bold": false,
+      "alignment": "left"
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": ["H12", "H05", "H08", "H14", "H16"],
+    "arc": "OVERVIEW",
+    "role_in_arc": "convergence",
+    "speaker_notes": "ES covers 5 key findings across message recall, Rx intent, rep performance, patient allocation, and HII impact. Citations: slides 5, 8-9, 12, 14, 16."
+  }
+}

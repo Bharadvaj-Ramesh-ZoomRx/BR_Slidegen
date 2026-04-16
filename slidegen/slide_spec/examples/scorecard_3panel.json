@@ -1,0 +1,134 @@
+{
+  "_comment": "Composition variant 7/10: scorecard_3panel — cluster signature '3_chart_1_table' (45 real slides). Three-panel scorecard: one category label table on the left + 3 mini charts on the right, one per metric. Each chart shows 4 waves for the same 4 brands/segments. Chart patterns vary by metric for visual variety.",
+  "_cluster_coverage": 45,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_scorecard",
+  "slide_index": 10,
+  "brand": "RYBREVANT",
+  "section": "Rep Activity Scorecard",
+  "layout": "observed_three_metric_scorecard",
+
+  "headline": {
+    "text": "Reach holding steady; SOV declining in community; visit frequency flat across waves",
+    "style": "default"
+  },
+  "subheadline": {
+    "text": "Rep activity metrics — Q2 '25 through Q1 '26 among NSCLC prescribers (n=312)",
+    "style": "context"
+  },
+  "footer": {
+    "text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers.",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "label_table",
+      "position": {"left": 0.39, "top": 2.17, "width": 3.85, "height": 3.76},
+      "labels": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+      "alternating_rows": true,
+      "font_size_pt": 9.0,
+      "wrap": true
+    },
+    {
+      "_comment": "Panel 1: Reach (line chart with markers)",
+      "type": "chart",
+      "position": {"left": 4.40, "top": 2.17, "width": 2.80, "height": 3.76},
+      "chart_pattern": "line_markers_trended",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {
+            "name": "Reach (%)",
+            "values": [0.72, 0.74, 0.73, 0.74],
+            "color": "{brand.primary_current}",
+            "marker": "circle"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": false},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "above"},
+        "value_axis": {"show": false, "format": "0%", "min": 0.50, "max": 0.90}
+      }
+    },
+    {
+      "_comment": "Panel 2: Share of Voice (clustered bar)",
+      "type": "chart",
+      "position": {"left": 7.30, "top": 2.17, "width": 2.80, "height": 3.76},
+      "chart_pattern": "bar_clustered_horizontal",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {
+            "name": "SOV (%)",
+            "values": [0.28, 0.26, 0.25, 0.23],
+            "color": "{brand.primary_current}"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": false},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "inEnd", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": true
+      }
+    },
+    {
+      "_comment": "Panel 3: Frequency (stacked column)",
+      "type": "chart",
+      "position": {"left": 10.20, "top": 2.17, "width": 2.80, "height": 3.76},
+      "chart_pattern": "column_stacked_100_vertical",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {
+            "name": "1-2 visits",
+            "values": [0.45, 0.44, 0.46, 0.47],
+            "color": "#BAB0AC"
+          },
+          {
+            "name": "3-4 visits",
+            "values": [0.35, 0.36, 0.34, 0.33],
+            "color": "{brand.primary_prior}"
+          },
+          {
+            "name": "5+ visits",
+            "values": [0.20, 0.20, 0.20, 0.20],
+            "color": "{brand.primary_current}"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": false},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "ctr", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": false
+      }
+    }
+  ],
+
+  "data_lineage": {
+    "data_source": "Rybrevant/Q1_rep_activity",
+    "extraction_method": "question_code",
+    "question_codes": ["Q1_reach", "Q1_sov", "Q1_freq"],
+    "segment_codes": [],
+    "source_file": "input/wave/Q1 2026/source_data.xlsx",
+    "last_data_pull": "2026-04-16T14:30:00"
+  },
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": ["H20", "H21"],
+    "arc": "MONITOR: Rep activity decline",
+    "role_in_arc": "evidence"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_comment": "Pattern 4/10: column_stacked_100_vertical — 11% of real PET charts. Composition view showing share distribution across categories. Category axis visible (x-axis shows the things being composed).",
+  "_pattern": "column_stacked_100_vertical",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_intent",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Prescribing Intent",
+  "layout": "observed_full_width_table",
+
+  "headline": {"text": "First-line intent has shifted 8pp toward Rybrevant, driven by Academic HCPs"},
+  "subheadline": {"text": "Likelihood to prescribe for 1L EGFRm NSCLC — Q1 '26 vs Q4 '25, by segment"},
+  "footer": {"text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. Scale: % of each segment."},
+
+  "components": [
+    {
+      "type": "chart",
+      "position": {"left": 1.00, "top": 1.85, "width": 11.00, "height": 4.80},
+      "chart_pattern": "column_stacked_100_vertical",
+      "data": {
+        "categories": ["Overall Q4'25", "Overall Q1'26", "Academic Q1'26", "Community Q1'26"],
+        "series": [
+          {"name": "Rybrevant + Lazcluze", "values": [0.22, 0.30, 0.38, 0.26], "color": "{brand.primary_current}"},
+          {"name": "Tagrisso", "values": [0.58, 0.52, 0.45, 0.55], "color": "#7030A0"},
+          {"name": "Other / no preference", "values": [0.20, 0.18, 0.17, 0.19], "color": "#BFBFBF"}
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "ctr", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": false
+      }
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["intent-1l-rybrevant-gain"],
+    "arc": "CELEBRATE: 1L intent shift"
+  }
+}

@@ -53,3 +53,14 @@ experiments/deck_analysis/outputs/*
 # ── IDE ──────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
+
+# Generated test output (reproducible from specs; don't track binaries)
+experiments/deck_analysis/outputs/generated/*.pptx
+tests/track1/*.pptx
+tests/track3/*.pptx
+
+# OneDrive archives
+*.zip
+
+# synapse data loader (auto-generated, not manually authored)
+slidegen/pipeline/synapse_data_loader.py

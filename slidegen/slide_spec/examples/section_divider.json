@@ -1,0 +1,36 @@
+{
+  "_comment": "Composition variant 2/10: section_divider — cluster signature 'empty' (291 real slides). Section break slide: single large textbox with section name. No chart or table components.",
+  "_cluster_coverage": 291,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_divider_mr",
+  "slide_index": 1,
+  "brand": "RYBREVANT",
+  "section": "Message Recall",
+  "layout": "observed_full_width_table",
+
+  "headline": {
+    "text": "Message Recall",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "textbox",
+      "position": {"left": 0.60, "top": 2.30, "width": 9.0, "height": 3.0},
+      "text": "Message Recall\n& Effectiveness",
+      "font_size_pt": 36.0,
+      "font_color": "{brand.primary_current}",
+      "bold": true,
+      "alignment": "left"
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": [],
+    "arc": null,
+    "role_in_arc": null
+  }
+}

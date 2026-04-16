@@ -2,7 +2,7 @@
 
 **Purpose:** Reverse-engineer 10-15 PET slide decks across clients to improve `pptx_utils` composition primitives and the skill library for SlideGen.
 
-**Branch:** `vijay/deck-analysis`
+**Branch:** `vijay-slidegen`
 
 ---
 

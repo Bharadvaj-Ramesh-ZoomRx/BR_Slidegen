@@ -80,29 +80,53 @@ LAYOUTS = {
     # Source: experiments/deck_analysis/outputs/layout_clusters.md
     # ────────────────────────────────────────────────────────────────────────
 
-    # 145 slides — canonical label-table + bar-chart pattern
+    # 145 slides — canonical label-table + bar-chart + delta-column pattern
+    # NOTE: raw cluster medians produced overlapping chart+table rects (because
+    # the 145 "1_chart_1_table" slides aggregate heterogeneous layouts: some
+    # put the table above the chart, some below, some alongside). Coords below
+    # model the *canonical* bar_clustered_horizontal pattern: label table LEFT,
+    # chart CENTER, delta column RIGHT. When a fresh cluster analysis with
+    # per-topology clustering lands, these can be revisited.
     "observed_1chart_1table": {
-        "chart_rect": {"left": 1.62, "top": 2.02, "width": 5.41, "height": 4.29},
-        "table_rect": {"left": 1.48, "top": 1.82, "width": 6.79, "height": 4.55},
-        "delta_col_rect": {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.50},
-        "_source": "1_chart_1_table signature, 145 slides",
+        "table_rect":     {"left": 0.30, "top": 1.85, "width": 2.80, "height": 4.50},
+        "chart_rect":     {"left": 3.20, "top": 1.85, "width": 8.80, "height": 4.50},
+        "delta_col_rect": {"left": 12.10, "top": 1.85, "width": 1.00, "height": 4.50},
+        "_source": "1_chart_1_table signature, 145 slides (medians overridden — non-overlapping canonical layout)",
+        "_raw_medians": {
+            "chart_rect": {"left": 1.62, "top": 2.02, "width": 5.41, "height": 4.29},
+            "table_rect": {"left": 1.48, "top": 1.82, "width": 6.79, "height": 4.55},
+            "delta_col_rect": {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.50},
+        },
     },
 
-    # 110 slides — clustered compare (chart right + two tables left)
+    # 110 slides — clustered compare (label table left + chart center + value table right)
+    # Raw medians again overlap; using canonical layout derived from common pattern.
     "observed_1chart_2table": {
-        "chart_rect": {"left": 6.75, "top": 2.04, "width": 3.81, "height": 4.30},
-        "primary_table_rect": {"left": 3.11, "top": 1.98, "width": 3.88, "height": 4.17},
-        "secondary_table_rect": {"left": 7.09, "top": 1.98, "width": 3.88, "height": 4.17},
-        "_source": "1_chart_2_table signature, 110 slides",
+        "primary_table_rect":   {"left": 0.30, "top": 1.85, "width": 2.80, "height": 4.50},
+        "chart_rect":           {"left": 3.20, "top": 1.85, "width": 7.50, "height": 4.50},
+        "secondary_table_rect": {"left": 10.80, "top": 1.85, "width": 2.20, "height": 4.50},
+        "_source": "1_chart_2_table signature, 110 slides (medians overridden — non-overlapping canonical layout)",
+        "_raw_medians": {
+            "chart_rect": {"left": 6.75, "top": 2.04, "width": 3.81, "height": 4.30},
+            "primary_table_rect": {"left": 3.11, "top": 1.98, "width": 3.88, "height": 4.17},
+            "secondary_table_rect": {"left": 7.09, "top": 1.98, "width": 3.88, "height": 4.17},
+        },
     },
 
     # 68 slides — dual bar comparison (two charts + two tables)
+    # Raw medians again collide; using a clean left-panel + right-panel split.
     "observed_2chart_2table": {
-        "left_chart_rect": {"left": 2.60, "top": 2.25, "width": 3.00, "height": 3.69},
-        "right_chart_rect": {"left": 6.84, "top": 2.42, "width": 3.00, "height": 3.69},
-        "left_table_rect": {"left": 2.60, "top": 2.25, "width": 2.92, "height": 3.66},
-        "right_table_rect": {"left": 3.84, "top": 2.25, "width": 2.92, "height": 3.66},
-        "_source": "2_chart_2_table signature, 68 slides",
+        "left_table_rect":  {"left": 0.30, "top": 1.85, "width": 2.40, "height": 4.50},
+        "left_chart_rect":  {"left": 2.80, "top": 1.85, "width": 3.50, "height": 4.50},
+        "right_table_rect": {"left": 6.50, "top": 1.85, "width": 2.40, "height": 4.50},
+        "right_chart_rect": {"left": 9.00, "top": 1.85, "width": 3.50, "height": 4.50},
+        "_source": "2_chart_2_table signature, 68 slides (medians overridden — non-overlapping canonical layout)",
+        "_raw_medians": {
+            "left_chart_rect": {"left": 2.60, "top": 2.25, "width": 3.00, "height": 3.69},
+            "right_chart_rect": {"left": 6.84, "top": 2.42, "width": 3.00, "height": 3.69},
+            "left_table_rect": {"left": 2.60, "top": 2.25, "width": 2.92, "height": 3.66},
+            "right_table_rect": {"left": 3.84, "top": 2.25, "width": 2.92, "height": 3.66},
+        },
     },
 
     # 139 slides — large single table (Executive Summary / Recommendations)
@@ -125,6 +149,30 @@ LAYOUTS = {
         "left_chart_rect": {"left": 2.40, "top": 2.33, "width": 4.19, "height": 3.67},
         "right_chart_rect": {"left": 6.89, "top": 2.33, "width": 4.19, "height": 3.67},
         "_source": "2_chart signature, 44 slides",
+    },
+
+    # 55 slides — two charts sharing one label table on the left
+    "observed_2chart_1table": {
+        "label_table_rect": {"left": 0.30, "top": 1.85, "width": 2.70, "height": 4.50},
+        "left_chart_rect":  {"left": 3.10, "top": 1.85, "width": 4.80, "height": 4.50},
+        "right_chart_rect": {"left": 8.00, "top": 1.85, "width": 4.90, "height": 4.50},
+        "_source": "2_chart_1_table signature, 55 slides (canonical non-overlapping layout)",
+    },
+
+    # 36 slides — dense information slide: small chart + 4 companion tables
+    "observed_1chart_4table": {
+        "label_table_rect":      {"left": 0.30, "top": 1.85, "width": 2.50, "height": 4.50},
+        "chart_rect":            {"left": 2.90, "top": 1.85, "width": 4.00, "height": 4.50},
+        "prior_table_rect":      {"left": 7.00, "top": 1.85, "width": 2.00, "height": 4.50},
+        "current_table_rect":    {"left": 9.10, "top": 1.85, "width": 2.00, "height": 4.50},
+        "delta_table_rect":      {"left": 11.20, "top": 1.85, "width": 1.80, "height": 4.50},
+        "_source": "1_chart_4_table signature, 36 slides (canonical non-overlapping layout)",
+    },
+
+    # 31 slides — title with picture/image
+    "observed_1picture": {
+        "image_rect": {"left": 2.50, "top": 2.00, "width": 8.00, "height": 4.50},
+        "_source": "1_picture signature, 31 slides",
     },
 }
 

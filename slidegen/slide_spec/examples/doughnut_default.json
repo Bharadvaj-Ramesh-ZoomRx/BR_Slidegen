@@ -1,0 +1,58 @@
+{
+  "_comment": "Pattern: doughnut_default — 3% of real PET charts. Segment composition showing patient allocation share across treatment options. Doughnut takes ONE series with per-category values summing to 100%. Slice colors padded from brand palette if needed.",
+  "_pattern": "doughnut_default",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_alloc",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Patient Allocation",
+  "layout": "observed_full_width_table",
+
+  "headline": {"text": "Rybrevant+Lazcluze captures 30% of new 1L NSCLC patient allocation, up 5pp QoQ"},
+  "subheadline": {"text": "Allocation of new EGFRm NSCLC patients among treatment options — Q1 '26"},
+  "footer": {"text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. Base: newly diagnosed EGFRm NSCLC patients."},
+
+  "components": [
+    {
+      "type": "chart",
+      "position": {"left": 3.00, "top": 1.85, "width": 7.00, "height": 4.80},
+      "chart_pattern": "doughnut_default",
+      "data": {
+        "categories": ["Rybrevant + Lazcluze", "Tagrisso", "Other EGFRi", "Chemo + IO"],
+        "series": [
+          {
+            "name": "Patient Allocation",
+            "values": [0.30, 0.45, 0.15, 0.10],
+            "color": "{brand.primary_current}"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "ctr", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": false
+      }
+    }
+  ],
+
+  "data_lineage": {
+    "data_source": "Rybrevant/Q3_alloc",
+    "extraction_method": "question_code",
+    "question_codes": ["Q3_alloc"],
+    "segment_codes": [],
+    "source_file": "input/wave/Q1 2026/source_data.xlsx",
+    "last_data_pull": "2026-04-16T14:30:00",
+    "last_refresh_error": null,
+    "config_hash": "d0e1f2a3b4c5"
+  },
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["alloc-rybrevant-share-gain"],
+    "arc": "CELEBRATE: Patient allocation shift"
+  }
+}

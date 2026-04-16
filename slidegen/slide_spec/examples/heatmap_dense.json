@@ -1,0 +1,116 @@
+{
+  "_comment": "Composition variant 9/10: heatmap_dense — cluster signature '1_chart_4_table' (36 real slides). Information-dense slide with a small chart + 4 companion tables: label_table, prior_values, current_values, delta. All 5 components use narrow widths to avoid overlap.",
+  "_cluster_coverage": 36,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_heatmap",
+  "slide_index": 11,
+  "brand": "RYBREVANT",
+  "section": "Message Recall — Dense View",
+  "layout": "observed_1chart_4table",
+
+  "headline": {
+    "text": "Dense recall view: efficacy dipped 3pp while safety and convenience showed small gains",
+    "style": "default"
+  },
+  "subheadline": {
+    "text": "Top-2-box recall with prior/current/delta — Q1 '26 vs Q4 '25 (n=312)",
+    "style": "context"
+  },
+  "footer": {
+    "text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers.",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "type": "label_table",
+      "position": {"left": 0.30, "top": 1.85, "width": 2.50, "height": 4.50},
+      "labels": ["Efficacy", "Safety", "Convenience", "Access", "Innovation"],
+      "alternating_rows": true,
+      "font_size_pt": 8.0,
+      "wrap": true
+    },
+    {
+      "type": "chart",
+      "position": {"left": 2.90, "top": 1.85, "width": 4.00, "height": 4.50},
+      "chart_pattern": "bar_clustered_horizontal",
+      "data": {
+        "categories": ["Efficacy", "Safety", "Convenience", "Access", "Innovation"],
+        "series": [
+          {
+            "name": "Q4 '25",
+            "values": [0.45, 0.38, 0.30, 0.28, 0.22],
+            "color": "{brand.primary_prior}"
+          },
+          {
+            "name": "Q1 '26",
+            "values": [0.42, 0.40, 0.32, 0.27, 0.24],
+            "color": "{brand.primary_current}"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": false},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "inEnd", "font_color": "#FFFFFF"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": true
+      }
+    },
+    {
+      "type": "value_table",
+      "position": {"left": 7.00, "top": 1.85, "width": 2.00, "height": 4.50},
+      "headers": ["Q4 '25"],
+      "rows": [
+        ["45%"],
+        ["38%"],
+        ["30%"],
+        ["28%"],
+        ["22%"]
+      ],
+      "alternating_rows": true
+    },
+    {
+      "type": "value_table",
+      "position": {"left": 9.10, "top": 1.85, "width": 2.00, "height": 4.50},
+      "headers": ["Q1 '26"],
+      "rows": [
+        ["42%"],
+        ["40%"],
+        ["32%"],
+        ["27%"],
+        ["24%"]
+      ],
+      "alternating_rows": true
+    },
+    {
+      "type": "delta_column",
+      "position": {"left": 11.20, "top": 1.85, "width": 1.80, "height": 4.50},
+      "header": "QoQ",
+      "values": [-0.03, 0.02, 0.02, -0.01, 0.02],
+      "format": "delta_pp",
+      "positive_color": "{brand.positive}",
+      "negative_color": "{brand.negative}",
+      "alternating_rows": true
+    }
+  ],
+
+  "data_lineage": {
+    "data_source": "Rybrevant/Q2_10",
+    "extraction_method": "question_code",
+    "question_codes": ["Q2_10"],
+    "segment_codes": [],
+    "source_file": "input/wave/Q1 2026/source_data.xlsx",
+    "last_data_pull": "2026-04-16T14:30:00"
+  },
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": ["H12"],
+    "arc": "ACT NOW: Efficacy drift",
+    "role_in_arc": "evidence"
+  }
+}

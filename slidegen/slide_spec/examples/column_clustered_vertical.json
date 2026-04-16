@@ -1,0 +1,44 @@
+{
+  "_comment": "Pattern 6/10: column_clustered_vertical — 7% of real PET charts. Side-by-side QoQ comparison or segment comparison. Category axis visible on x-axis.",
+  "_pattern": "column_clustered_vertical",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_segment_compare",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "HII Scorecard",
+  "layout": "observed_full_width_table",
+
+  "headline": {"text": "High-Impact Interactions drive 2x the message recall vs standard calls"},
+  "subheadline": {"text": "Message recall by interaction type — Q1 '26"},
+  "footer": {"text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. HII = High-Impact Interaction."},
+
+  "components": [
+    {
+      "type": "chart",
+      "position": {"left": 1.00, "top": 1.85, "width": 11.00, "height": 4.80},
+      "chart_pattern": "column_clustered_vertical",
+      "data": {
+        "categories": ["Efficacy-in-1L", "Safety profile", "Convenience", "Access"],
+        "series": [
+          {"name": "Standard call", "values": [0.28, 0.22, 0.18, 0.15], "color": "{brand.primary_prior}"},
+          {"name": "High-Impact Interaction", "values": [0.55, 0.42, 0.34, 0.28], "color": "{brand.primary_current}"}
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "outEnd"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": false
+      }
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["hii-recall-multiplier"],
+    "arc": "CELEBRATE: HII effectiveness"
+  }
+}

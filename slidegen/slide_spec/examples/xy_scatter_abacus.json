@@ -1,0 +1,64 @@
+{
+  "_comment": "Pattern 2/10: xy_scatter_abacus — 17% of real PET charts. Multi-attribute dot plot comparing prior vs current across messages/attributes. Each category is a row; prior marker and current marker on the same horizontal line.",
+  "_pattern": "xy_scatter_abacus",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_abacus",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Message Effectiveness",
+  "layout": "observed_1chart_2table",
+
+  "headline": {"text": "Motivation holds steady; Believability shows early lift in Efficacy-in-1L"},
+  "subheadline": {"text": "Top-2-box effectiveness among NSCLC prescribers — Q1 '26 vs Q4 '25"},
+  "footer": {"text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. Scale: 0-100%."},
+
+  "components": [
+    {
+      "type": "label_table",
+      "position": {"left": 0.30, "top": 1.85, "width": 2.80, "height": 4.50},
+      "labels": ["Efficacy-in-1L", "Safety profile", "Administration convenience", "Dosing simplicity", "Access/affordability"],
+      "alternating_rows": true,
+      "wrap": true
+    },
+    {
+      "type": "chart",
+      "position": {"left": 3.20, "top": 1.85, "width": 7.50, "height": 4.50},
+      "chart_pattern": "xy_scatter_abacus",
+      "data": {
+        "categories": ["Efficacy-in-1L", "Safety profile", "Administration convenience", "Dosing simplicity", "Access/affordability"],
+        "series": [
+          {"name": "Q4 '25", "values": [0.52, 0.48, 0.35, 0.42, 0.30], "color": "{brand.primary_prior}"},
+          {"name": "Q1 '26", "values": [0.58, 0.50, 0.38, 0.40, 0.32], "color": "{brand.primary_current}"}
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": false, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "above"},
+        "value_axis": {"show": false, "format": "0%"},
+        "hide_category_labels": false
+      }
+    },
+    {
+      "type": "value_table",
+      "position": {"left": 10.80, "top": 1.85, "width": 2.20, "height": 4.50},
+      "headers": ["Q4'25", "Q1'26"],
+      "rows": [
+        ["52%", "58%"],
+        ["48%", "50%"],
+        ["35%", "38%"],
+        ["42%", "40%"],
+        ["30%", "32%"]
+      ],
+      "alternating_rows": true
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["ME-motivation-lift"],
+    "arc": "ACT NOW: Message Effectiveness"
+  }
+}

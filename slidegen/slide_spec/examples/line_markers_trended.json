@@ -1,0 +1,43 @@
+{
+  "_comment": "Pattern 3/10: line_markers_trended — 14% of real PET charts. Multi-wave trend with markers. Value axis visible; category axis shows wave labels directly (no companion label table).",
+  "_pattern": "line_markers_trended",
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_trend",
+  "slide_index": 0,
+  "brand": "RYBREVANT",
+  "section": "Awareness & Recall Trend",
+  "layout": "observed_full_width_table",
+
+  "headline": {"text": "Rybrevant unaided recall has grown 12pp over the past four waves"},
+  "subheadline": {"text": "Unaided brand recall, rolling three-month window — Q2 '25 through Q1 '26"},
+  "footer": {"text": "Source: Rybrevant PET, R3M rolling among NSCLC prescribers. Base: all respondents with ≥1 rep interaction."},
+
+  "components": [
+    {
+      "type": "chart",
+      "position": {"left": 1.00, "top": 1.85, "width": 11.00, "height": 4.80},
+      "chart_pattern": "line_markers_trended",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {"name": "Rybrevant", "values": [0.32, 0.38, 0.42, 0.44], "color": "{brand.primary_current}", "marker": "circle"},
+          {"name": "Tagrisso (competitor)", "values": [0.48, 0.50, 0.51, 0.50], "color": "#7030A0", "marker": "circle"}
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "above"},
+        "value_axis": {"show": true, "format": "0%", "min": 0.0, "max": 0.6}
+      }
+    }
+  ],
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "hypothesis_refs": ["trend-rybrevant-recall-growth"],
+    "arc": "CELEBRATE: Recall momentum"
+  }
+}

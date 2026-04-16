@@ -1,0 +1,106 @@
+{
+  "_comment": "Composition variant 8/10: dual_trend — cluster signature '2_chart' (44 real slides). Two trend line charts side-by-side without tables. Chart IS the trend, category axis shows wave labels. Both use line_markers_trended pattern.",
+  "_cluster_coverage": 44,
+
+  "spec_version": "1.0",
+  "slide_id": "zrx_dualtrend",
+  "slide_index": 8,
+  "brand": "RYBREVANT",
+  "section": "Brand Recall Trends",
+  "layout": "observed_dual_chart_no_table",
+
+  "headline": {
+    "text": "Rybrevant recall climbing steadily; Tagrisso plateau emerging after 4 waves",
+    "style": "default"
+  },
+  "subheadline": {
+    "text": "Unaided brand recall — rolling 3-month window, Q2 '25 through Q1 '26 (n=312)",
+    "style": "context"
+  },
+  "footer": {
+    "text": "Source: Rybrevant PET Q1 2026, n=312 NSCLC prescribers. Base: all respondents with ≥1 rep interaction.",
+    "style": "default"
+  },
+
+  "components": [
+    {
+      "_comment": "Left panel: Rybrevant recall trend",
+      "type": "chart",
+      "position": {"left": 0.50, "top": 1.85, "width": 5.90, "height": 4.50},
+      "chart_pattern": "line_markers_trended",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {
+            "name": "Rybrevant unaided recall",
+            "values": [0.32, 0.38, 0.42, 0.44],
+            "color": "{brand.primary_current}",
+            "marker": "circle"
+          },
+          {
+            "name": "Rybrevant aided recall",
+            "values": [0.55, 0.60, 0.65, 0.68],
+            "color": "{brand.primary_prior}",
+            "marker": "circle",
+            "line_style": "dashed"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "above"},
+        "value_axis": {"show": true, "format": "0%", "min": 0.0, "max": 0.80}
+      }
+    },
+    {
+      "_comment": "Right panel: Tagrisso recall trend",
+      "type": "chart",
+      "position": {"left": 6.80, "top": 1.85, "width": 5.90, "height": 4.50},
+      "chart_pattern": "line_markers_trended",
+      "data": {
+        "categories": ["Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+        "series": [
+          {
+            "name": "Tagrisso unaided recall",
+            "values": [0.48, 0.50, 0.51, 0.50],
+            "color": "#7030A0",
+            "marker": "circle"
+          },
+          {
+            "name": "Tagrisso aided recall",
+            "values": [0.70, 0.72, 0.73, 0.72],
+            "color": "#AD88C8",
+            "marker": "circle",
+            "line_style": "dashed"
+          }
+        ]
+      },
+      "chrome": {
+        "title": null,
+        "legend": {"show": true, "position": "bottom"},
+        "gridlines": false,
+        "data_labels": {"show": true, "format": "0%", "position": "above"},
+        "value_axis": {"show": true, "format": "0%", "min": 0.0, "max": 0.80}
+      }
+    }
+  ],
+
+  "data_lineage": {
+    "data_source": "Rybrevant/Q1_recall_trend",
+    "extraction_method": "question_code",
+    "question_codes": ["Q1_unaided", "Q1_aided"],
+    "segment_codes": [],
+    "source_file": "input/wave/Q1 2026/source_data.xlsx",
+    "last_data_pull": "2026-04-16T14:30:00"
+  },
+
+  "metadata": {
+    "created_by": "canonical_example",
+    "created_at": "2026-04-16T10:00:00",
+    "hypothesis_refs": ["trend-rybrevant-recall-growth", "trend-tagrisso-plateau"],
+    "arc": "CELEBRATE: Recall momentum",
+    "role_in_arc": "evidence"
+  }
+}
