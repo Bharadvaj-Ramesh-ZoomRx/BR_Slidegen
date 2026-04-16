@@ -46,7 +46,7 @@ nul
 
 # ── Experiments (reverse-engineering decks — not committed) ─────────────────
 experiments/deck_analysis/decks/*
-experiments/deck_analysis/outputs/*
+experiments/deck_analysis/outputs/generated/*
 !experiments/deck_analysis/decks/.gitkeep
 !experiments/deck_analysis/outputs/.gitkeep
 
