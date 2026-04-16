@@ -58,6 +58,7 @@ experiments/deck_analysis/outputs/generated/*
 experiments/deck_analysis/outputs/generated/*.pptx
 tests/track1/*.pptx
 tests/track3/*.pptx
+projects/*
 
 # OneDrive archives
 *.zip
