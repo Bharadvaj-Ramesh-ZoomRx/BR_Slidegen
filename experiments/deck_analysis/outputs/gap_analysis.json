@@ -1,0 +1,136 @@
+{
+  "covered_chart_types": {
+    "bar_clustered (57)": {
+      "frequency": 1511,
+      "candidate_renderers": [
+        "single_bar_with_delta",
+        "clustered_compare",
+        "dual_bar_with_delta"
+      ]
+    },
+    "xy_scatter (-4169)": {
+      "frequency": 674,
+      "candidate_renderers": [
+        "abacus",
+        "dual_abacus",
+        "quadrant_scatter",
+        "followup_rep",
+        "message_mbd"
+      ]
+    },
+    "line_markers (65)": {
+      "frequency": 563,
+      "candidate_renderers": [
+        "trended_scorecard",
+        "trended_activity"
+      ]
+    },
+    "column_stacked_100 (53)": {
+      "frequency": 486,
+      "candidate_renderers": [
+        "two_section_bar"
+      ]
+    },
+    "bar_stacked_100 (59)": {
+      "frequency": 324,
+      "candidate_renderers": [
+        "stacked_order",
+        "two_section_bar"
+      ]
+    },
+    "bar_stacked (58)": {
+      "frequency": 305,
+      "candidate_renderers": [
+        "stacked_order",
+        "two_section_bar"
+      ]
+    },
+    "doughnut (-4120)": {
+      "frequency": 138,
+      "candidate_renderers": [
+        "dual_doughnut"
+      ]
+    },
+    "column_clustered (51)": {
+      "frequency": 118,
+      "candidate_renderers": [
+        "qoq_bar_with_delta",
+        "dual_bar_qoq",
+        "hii_scorecard"
+      ]
+    },
+    "column_stacked (52)": {
+      "frequency": 98,
+      "candidate_renderers": [
+        "two_section_bar"
+      ]
+    },
+    "xy_scatter_lines (74)": {
+      "frequency": 60,
+      "candidate_renderers": [
+        "trended_scorecard",
+        "trended_activity"
+      ]
+    },
+    "line_markers_stacked (66)": {
+      "frequency": 31,
+      "candidate_renderers": [
+        "trended_scorecard",
+        "trended_activity"
+      ]
+    },
+    "line (4)": {
+      "frequency": 14,
+      "candidate_renderers": [
+        "trended_scorecard",
+        "trended_activity"
+      ]
+    },
+    "pie (5)": {
+      "frequency": 13,
+      "candidate_renderers": [
+        "dual_doughnut"
+      ]
+    },
+    "xy_scatter_smooth (72)": {
+      "frequency": 4,
+      "candidate_renderers": [
+        "abacus",
+        "dual_abacus",
+        "quadrant_scatter",
+        "followup_rep",
+        "message_mbd"
+      ]
+    }
+  },
+  "uncovered_chart_types": {
+    "area_stacked_100 (77)": 6,
+    "area_stacked (76)": 3,
+    "bubble (15)": 2
+  },
+  "existing_renderers": [
+    "abacus",
+    "clustered_compare",
+    "cover",
+    "dual_abacus",
+    "dual_bar_compare",
+    "dual_bar_qoq",
+    "dual_bar_with_delta",
+    "dual_brand_compare",
+    "dual_doughnut",
+    "executive_summary",
+    "followup_rep",
+    "heatmap_table",
+    "hii_scorecard",
+    "message_mbd",
+    "qoq_bar_with_delta",
+    "quadrant_scatter",
+    "qual_theme_analysis",
+    "single_bar_with_delta",
+    "stacked_order",
+    "trended_activity",
+    "trended_scorecard",
+    "two_section_bar"
+  ],
+  "note": "Mapping is heuristic. A chart of type X being 'covered' by renderer Y means Y uses charts of type X; does NOT mean Y produces the exact layout seen in the deck."
+}

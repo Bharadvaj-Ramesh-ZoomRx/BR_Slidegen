@@ -1,0 +1,2259 @@
+{
+  "signatures": {
+    "chart=0,table=0,text_box=0,picture=0,auto_shape=0": {
+      "occurrences": 94,
+      "example_slides": [
+        [
+          0,
+          "Title Slide1_blue"
+        ],
+        [
+          2,
+          "3_Slide Title - Colour"
+        ],
+        [
+          19,
+          "3_Slide Title - Colour"
+        ],
+        [
+          26,
+          "3_Slide Title - Colour"
+        ],
+        [
+          43,
+          "3_Slide Title - Colour"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 152,
+          "left_mean": 3.7,
+          "left_median": 1.04,
+          "top_mean": 3.18,
+          "top_median": 2.74,
+          "width_mean": 7.62,
+          "width_median": 8.49,
+          "height_mean": 1.44,
+          "height_median": 1.22,
+          "left_stdev": 4.8,
+          "top_stdev": 2.61
+        },
+        "embedded_ole_object": {
+          "count_observations": 1,
+          "left_mean": 0.0,
+          "left_median": 0.0,
+          "top_mean": 0.0,
+          "top_median": 0.0,
+          "width_mean": 0.0,
+          "width_median": 0.0,
+          "height_mean": 0.0,
+          "height_median": 0.0
+        },
+        "none": {
+          "count_observations": 16,
+          "left_mean": 0.92,
+          "left_median": 0.92,
+          "top_mean": 1.21,
+          "top_median": 1.21,
+          "width_mean": 10.59,
+          "width_median": 10.59,
+          "height_mean": 5.57,
+          "height_median": 5.57,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        }
+      }
+    },
+    "chart=0,table=0,text_box=1,picture=0,auto_shape=0": {
+      "occurrences": 33,
+      "example_slides": [
+        [
+          0,
+          "Title Slide_Advanced NSCLC"
+        ],
+        [
+          8,
+          "1_Divider Slide_Adjuvant_CSCC"
+        ],
+        [
+          10,
+          "Divider Slide_Advanced NSCLC"
+        ],
+        [
+          18,
+          "1_Divider Slide_Adjuvant_CSCC"
+        ],
+        [
+          27,
+          "1_Divider Slide_Adjuvant_CSCC"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 69,
+          "left_mean": 1.85,
+          "left_median": 0.54,
+          "top_mean": 4.3,
+          "top_median": 4.48,
+          "width_mean": 6.69,
+          "width_median": 7.29,
+          "height_mean": 1.02,
+          "height_median": 0.62,
+          "left_stdev": 3.46,
+          "top_stdev": 2.05
+        },
+        "text_box": {
+          "count_observations": 33,
+          "left_mean": 6.18,
+          "left_median": 6.45,
+          "top_mean": 4.4,
+          "top_median": 3.37,
+          "width_mean": 5.47,
+          "width_median": 5.47,
+          "height_mean": 1.34,
+          "height_median": 0.4,
+          "left_stdev": 4.38,
+          "top_stdev": 2.43
+        }
+      }
+    },
+    "chart=0,table=1,text_box=2,picture=0,auto_shape=0": {
+      "occurrences": 23,
+      "example_slides": [
+        [
+          48,
+          "Custom Layout"
+        ],
+        [
+          68,
+          "Custom Layout"
+        ],
+        [
+          69,
+          "Custom Layout"
+        ],
+        [
+          0,
+          "7_Title Slide"
+        ],
+        [
+          102,
+          "1_Title Only - White"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "table": {
+          "count_observations": 23,
+          "left_mean": 1.59,
+          "left_median": 1.02,
+          "top_mean": 1.39,
+          "top_median": 1.3,
+          "width_mean": 10.56,
+          "width_median": 10.75,
+          "height_mean": 4.93,
+          "height_median": 4.98,
+          "left_stdev": 1.74,
+          "top_stdev": 0.37
+        },
+        "text_box": {
+          "count_observations": 46,
+          "left_mean": 2.99,
+          "left_median": 0.61,
+          "top_mean": 2.05,
+          "top_median": 1.1,
+          "width_mean": 6.21,
+          "width_median": 4.82,
+          "height_mean": 0.92,
+          "height_median": 0.54,
+          "left_stdev": 4.24,
+          "top_stdev": 2.58
+        },
+        "placeholder": {
+          "count_observations": 25,
+          "left_mean": 5.88,
+          "left_median": 1.2,
+          "top_mean": 4.11,
+          "top_median": 6.79,
+          "width_mean": 6.2,
+          "width_median": 6.43,
+          "height_mean": 0.63,
+          "height_median": 0.61,
+          "left_stdev": 5.99,
+          "top_stdev": 3.26
+        },
+        "line": {
+          "count_observations": 4,
+          "left_mean": 0.92,
+          "left_median": 0.92,
+          "top_mean": 3.42,
+          "top_median": 3.06,
+          "width_mean": 0.09,
+          "width_median": 0.09,
+          "height_mean": 0.97,
+          "height_median": 0.29,
+          "left_stdev": 0.1,
+          "top_stdev": 1.07
+        },
+        "freeform": {
+          "count_observations": 6,
+          "left_mean": 1.15,
+          "left_median": 1.15,
+          "top_mean": 3.89,
+          "top_median": 3.75,
+          "width_mean": 0.28,
+          "width_median": 0.28,
+          "height_mean": 0.27,
+          "height_median": 0.27,
+          "left_stdev": 0.01,
+          "top_stdev": 1.6
+        }
+      }
+    },
+    "chart=0,table=0,text_box=0,picture=0,auto_shape=1": {
+      "occurrences": 14,
+      "example_slides": [
+        [
+          1,
+          "Agenda"
+        ],
+        [
+          5,
+          "Agenda"
+        ],
+        [
+          15,
+          "Agenda"
+        ],
+        [
+          47,
+          "Agenda"
+        ],
+        [
+          1,
+          "Agenda"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 25,
+          "left_mean": 1.03,
+          "left_median": 0.4,
+          "top_mean": 1.29,
+          "top_median": 1.37,
+          "width_mean": 10.0,
+          "width_median": 10.53,
+          "height_mean": 2.66,
+          "height_median": 1.56,
+          "left_stdev": 1.74,
+          "top_stdev": 0.9
+        },
+        "auto_shape": {
+          "count_observations": 14,
+          "left_mean": 0.51,
+          "left_median": 0.64,
+          "top_mean": 1.44,
+          "top_median": 1.83,
+          "width_mean": 1.03,
+          "width_median": 0.37,
+          "height_mean": 4.04,
+          "height_median": 5.02,
+          "left_stdev": 0.27,
+          "top_stdev": 0.77
+        }
+      }
+    },
+    "chart=0,table=0,text_box=1,picture=1,auto_shape=1": {
+      "occurrences": 14,
+      "example_slides": [
+        [
+          0,
+          "Cover - EMD Serono Pfizer"
+        ],
+        [
+          54,
+          "Title Only_With Subhead "
+        ],
+        [
+          55,
+          "Title Only_With Subhead "
+        ],
+        [
+          56,
+          "Title Only_With Subhead "
+        ],
+        [
+          57,
+          "Title Only_With Subhead "
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "embedded_ole_object": {
+          "count_observations": 1,
+          "left_mean": 0.0,
+          "left_median": 0.0,
+          "top_mean": 0.0,
+          "top_median": 0.0,
+          "width_mean": 0.0,
+          "width_median": 0.0,
+          "height_mean": 0.0,
+          "height_median": 0.0
+        },
+        "placeholder": {
+          "count_observations": 27,
+          "left_mean": 8.54,
+          "left_median": 5.1,
+          "top_mean": 3.99,
+          "top_median": 1.09,
+          "width_mean": 1.88,
+          "width_median": 3.13,
+          "height_mean": 0.36,
+          "height_median": 0.44,
+          "left_stdev": 4.07,
+          "top_stdev": 3.08
+        },
+        "auto_shape": {
+          "count_observations": 14,
+          "left_mean": 11.14,
+          "left_median": 11.32,
+          "top_mean": 1.64,
+          "top_median": 1.76,
+          "width_mean": 1.47,
+          "width_median": 1.34,
+          "height_mean": 0.46,
+          "height_median": 0.41,
+          "left_stdev": 0.66,
+          "top_stdev": 0.45
+        },
+        "picture": {
+          "count_observations": 14,
+          "left_mean": 2.92,
+          "left_median": 2.88,
+          "top_mean": 2.01,
+          "top_median": 1.76,
+          "width_mean": 6.75,
+          "width_median": 7.57,
+          "height_mean": 4.81,
+          "height_median": 5.21,
+          "left_stdev": 0.78,
+          "top_stdev": 1.05
+        },
+        "text_box": {
+          "count_observations": 14,
+          "left_mean": 9.42,
+          "left_median": 10.1,
+          "top_mean": 0.3,
+          "top_median": 0.0,
+          "width_mean": 3.55,
+          "width_median": 3.23,
+          "height_mean": 0.43,
+          "height_median": 0.36,
+          "left_stdev": 2.53,
+          "top_stdev": 1.11
+        }
+      }
+    },
+    "chart=0,table=0,text_box=10,picture=0,auto_shape=11": {
+      "occurrences": 12,
+      "example_slides": [
+        [
+          2,
+          "Title Only - White"
+        ],
+        [
+          5,
+          "Title Only - White"
+        ],
+        [
+          8,
+          "Title Only - White"
+        ],
+        [
+          20,
+          "Title Only - White"
+        ],
+        [
+          28,
+          "Title Only - White"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "auto_shape": {
+          "count_observations": 132,
+          "left_mean": 3.24,
+          "left_median": 1.8,
+          "top_mean": 2.46,
+          "top_median": 1.35,
+          "width_mean": 0.56,
+          "width_median": 0.16,
+          "height_mean": 0.83,
+          "height_median": 0.16,
+          "left_stdev": 2.31,
+          "top_stdev": 1.8
+        },
+        "text_box": {
+          "count_observations": 120,
+          "left_mean": 5.91,
+          "left_median": 5.55,
+          "top_mean": 3.61,
+          "top_median": 3.7,
+          "width_mean": 4.67,
+          "width_median": 4.64,
+          "height_mean": 0.38,
+          "height_median": 0.4,
+          "left_stdev": 0.44,
+          "top_stdev": 1.48
+        },
+        "group": {
+          "count_observations": 82,
+          "left_mean": 4.73,
+          "left_median": 4.65,
+          "top_mean": 3.1,
+          "top_median": 2.95,
+          "width_mean": 1.38,
+          "width_median": 0.83,
+          "height_mean": 0.19,
+          "height_median": 0.16,
+          "left_stdev": 0.34,
+          "top_stdev": 1.51
+        },
+        "line": {
+          "count_observations": 72,
+          "left_mean": 1.13,
+          "left_median": 1.13,
+          "top_mean": 1.43,
+          "top_median": 1.43,
+          "width_mean": 0.76,
+          "width_median": 0.76,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        }
+      }
+    },
+    "chart=0,table=0,text_box=1,picture=0,auto_shape=1": {
+      "occurrences": 11,
+      "example_slides": [
+        [
+          38,
+          "4_White Background"
+        ],
+        [
+          40,
+          "4_White Background"
+        ],
+        [
+          49,
+          "4_White Background"
+        ],
+        [
+          57,
+          "4_White Background"
+        ],
+        [
+          60,
+          "4_White Background"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "auto_shape": {
+          "count_observations": 11,
+          "left_mean": 0.56,
+          "left_median": 0.67,
+          "top_mean": 2.68,
+          "top_median": 2.29,
+          "width_mean": 8.81,
+          "width_median": 5.81,
+          "height_mean": 0.55,
+          "height_median": 0.57,
+          "left_stdev": 0.81,
+          "top_stdev": 1.52
+        },
+        "placeholder": {
+          "count_observations": 11,
+          "left_mean": 0.79,
+          "left_median": 0.77,
+          "top_mean": 0.36,
+          "top_median": 0.27,
+          "width_mean": 10.18,
+          "width_median": 8.6,
+          "height_mean": 1.02,
+          "height_median": 1.22,
+          "left_stdev": 0.54,
+          "top_stdev": 0.39
+        },
+        "text_box": {
+          "count_observations": 11,
+          "left_mean": 0.59,
+          "left_median": 0.46,
+          "top_mean": 1.01,
+          "top_median": 0.85,
+          "width_mean": 6.72,
+          "width_median": 8.37,
+          "height_mean": 3.55,
+          "height_median": 2.32,
+          "left_stdev": 0.16,
+          "top_stdev": 0.32
+        },
+        "embedded_ole_object": {
+          "count_observations": 1,
+          "left_mean": 4.22,
+          "left_median": 4.22,
+          "top_mean": 3.34,
+          "top_median": 3.34,
+          "width_mean": 1.0,
+          "width_median": 1.0,
+          "height_mean": 0.84,
+          "height_median": 0.84
+        }
+      }
+    },
+    "chart=0,table=1,text_box=3,picture=0,auto_shape=0": {
+      "occurrences": 10,
+      "example_slides": [
+        [
+          52,
+          "2_Title only"
+        ],
+        [
+          53,
+          "2_Title only"
+        ],
+        [
+          2,
+          "2_Title and Content"
+        ],
+        [
+          8,
+          "2_Title and Content"
+        ],
+        [
+          11,
+          "2_Title and Content"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 7,
+          "left_mean": 9.58,
+          "left_median": 12.34,
+          "top_mean": 6.22,
+          "top_median": 7.26,
+          "width_mean": 3.43,
+          "width_median": 0.59,
+          "height_mean": 0.36,
+          "height_median": 0.24,
+          "left_stdev": 4.51,
+          "top_stdev": 2.47
+        },
+        "text_box": {
+          "count_observations": 30,
+          "left_mean": 5.24,
+          "left_median": 2.41,
+          "top_mean": 2.75,
+          "top_median": 0.58,
+          "width_mean": 5.54,
+          "width_median": 2.57,
+          "height_mean": 0.52,
+          "height_median": 0.4,
+          "left_stdev": 5.06,
+          "top_stdev": 3.31
+        },
+        "table": {
+          "count_observations": 10,
+          "left_mean": 1.04,
+          "left_median": 1.22,
+          "top_mean": 1.67,
+          "top_median": 1.81,
+          "width_mean": 9.84,
+          "width_median": 10.46,
+          "height_mean": 4.66,
+          "height_median": 4.45,
+          "left_stdev": 0.45,
+          "top_stdev": 0.36
+        }
+      }
+    },
+    "chart=0,table=0,text_box=5,picture=0,auto_shape=11": {
+      "occurrences": 10,
+      "example_slides": [
+        [
+          7,
+          "Cover Slide Opt 5"
+        ],
+        [
+          28,
+          "Cover Slide Opt 5"
+        ],
+        [
+          33,
+          "Cover Slide Opt 5"
+        ],
+        [
+          40,
+          "Cover Slide Opt 5"
+        ],
+        [
+          53,
+          "Cover Slide Opt 5"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 50,
+          "left_mean": 2.67,
+          "left_median": 2.67,
+          "top_mean": 3.06,
+          "top_median": 3.11,
+          "width_mean": 4.32,
+          "width_median": 5.28,
+          "height_mean": 0.51,
+          "height_median": 0.4,
+          "left_stdev": 0.0,
+          "top_stdev": 1.51
+        },
+        "group": {
+          "count_observations": 50,
+          "left_mean": 1.58,
+          "left_median": 1.58,
+          "top_mean": 2.86,
+          "top_median": 2.86,
+          "width_mean": 0.93,
+          "width_median": 0.93,
+          "height_mean": 0.91,
+          "height_median": 0.91,
+          "left_stdev": 0.0,
+          "top_stdev": 1.52
+        },
+        "auto_shape": {
+          "count_observations": 110,
+          "left_mean": 1.29,
+          "left_median": 0.88,
+          "top_mean": 1.77,
+          "top_median": 1.37,
+          "width_mean": 0.92,
+          "width_median": 0.97,
+          "height_mean": 0.82,
+          "height_median": 0.75,
+          "left_stdev": 1.46,
+          "top_stdev": 1.44
+        }
+      }
+    },
+    "chart=0,table=1,text_box=0,picture=0,auto_shape=1": {
+      "occurrences": 8,
+      "example_slides": [
+        [
+          21,
+          "Agenda"
+        ],
+        [
+          23,
+          "Agenda"
+        ],
+        [
+          33,
+          "Agenda"
+        ],
+        [
+          40,
+          "Agenda"
+        ],
+        [
+          56,
+          "Title w/ Headline & Footnoe"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 15,
+          "left_mean": 1.33,
+          "left_median": 0.4,
+          "top_mean": 2.08,
+          "top_median": 0.53,
+          "width_mean": 9.48,
+          "width_median": 10.53,
+          "height_mean": 1.7,
+          "height_median": 0.47,
+          "left_stdev": 3.16,
+          "top_stdev": 2.66
+        },
+        "auto_shape": {
+          "count_observations": 8,
+          "left_mean": 3.16,
+          "left_median": 0.64,
+          "top_mean": 2.19,
+          "top_median": 1.83,
+          "width_mean": 1.43,
+          "width_median": 0.37,
+          "height_mean": 2.77,
+          "height_median": 3.24,
+          "left_stdev": 4.23,
+          "top_stdev": 2.1
+        },
+        "table": {
+          "count_observations": 8,
+          "left_mean": 1.57,
+          "left_median": 2.08,
+          "top_mean": 2.64,
+          "top_median": 2.84,
+          "width_mean": 7.34,
+          "width_median": 6.41,
+          "height_mean": 3.58,
+          "height_median": 3.38,
+          "left_stdev": 0.81,
+          "top_stdev": 1.6
+        }
+      }
+    },
+    "chart=0,table=0,text_box=15,picture=0,auto_shape=8": {
+      "occurrences": 8,
+      "example_slides": [
+        [
+          4,
+          "Blank"
+        ],
+        [
+          1,
+          "Title Only"
+        ],
+        [
+          5,
+          "Title Only"
+        ],
+        [
+          8,
+          "Title Only"
+        ],
+        [
+          14,
+          "Title Only"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 8,
+          "left_mean": 1.94,
+          "left_median": 0.49,
+          "top_mean": 1.34,
+          "top_median": 0.53,
+          "width_mean": 10.92,
+          "width_median": 12.35,
+          "height_mean": 0.84,
+          "height_median": 0.93,
+          "left_stdev": 4.1,
+          "top_stdev": 2.29
+        },
+        "auto_shape": {
+          "count_observations": 64,
+          "left_mean": 0.83,
+          "left_median": 0.4,
+          "top_mean": 2.1,
+          "top_median": 1.95,
+          "width_mean": 1.12,
+          "width_median": 0.55,
+          "height_mean": 0.56,
+          "height_median": 0.55,
+          "left_stdev": 1.78,
+          "top_stdev": 0.67
+        },
+        "text_box": {
+          "count_observations": 120,
+          "left_mean": 2.5,
+          "left_median": 1.37,
+          "top_mean": 3.11,
+          "top_median": 3.23,
+          "width_mean": 2.84,
+          "width_median": 3.19,
+          "height_mean": 0.33,
+          "height_median": 0.27,
+          "left_stdev": 2.88,
+          "top_stdev": 1.57
+        },
+        "line": {
+          "count_observations": 33,
+          "left_mean": 1.83,
+          "left_median": 1.12,
+          "top_mean": 2.42,
+          "top_median": 2.17,
+          "width_mean": 4.4,
+          "width_median": 5.03,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 2.09,
+          "top_stdev": 0.7
+        },
+        "group": {
+          "count_observations": 84,
+          "left_mean": 0.4,
+          "left_median": 0.38,
+          "top_mean": 2.36,
+          "top_median": 1.88,
+          "width_mean": 4.09,
+          "width_median": 5.81,
+          "height_mean": 0.65,
+          "height_median": 0.65,
+          "left_stdev": 0.06,
+          "top_stdev": 1.09
+        }
+      }
+    },
+    "chart=0,table=1,text_box=1,picture=0,auto_shape=0": {
+      "occurrences": 8,
+      "example_slides": [
+        [
+          3,
+          "Title Only"
+        ],
+        [
+          10,
+          "Title and Content"
+        ],
+        [
+          11,
+          "Title and Content"
+        ],
+        [
+          12,
+          "Title and Content"
+        ],
+        [
+          4,
+          "1_Title Only - White"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 8,
+          "left_mean": 0.39,
+          "left_median": 0.4,
+          "top_mean": 0.21,
+          "top_median": 0.22,
+          "width_mean": 12.47,
+          "width_median": 12.53,
+          "height_mean": 0.7,
+          "height_median": 0.64,
+          "left_stdev": 0.02,
+          "top_stdev": 0.06
+        },
+        "table": {
+          "count_observations": 8,
+          "left_mean": 1.29,
+          "left_median": 0.98,
+          "top_mean": 1.26,
+          "top_median": 1.18,
+          "width_mean": 10.93,
+          "width_median": 11.42,
+          "height_mean": 4.72,
+          "height_median": 4.84,
+          "left_stdev": 0.73,
+          "top_stdev": 0.18
+        },
+        "text_box": {
+          "count_observations": 8,
+          "left_mean": 5.74,
+          "left_median": 5.77,
+          "top_mean": 1.36,
+          "top_median": 0.38,
+          "width_mean": 4.16,
+          "width_median": 2.27,
+          "height_mean": 1.31,
+          "height_median": 0.18,
+          "left_stdev": 5.7,
+          "top_stdev": 2.35
+        }
+      }
+    },
+    "chart=0,table=0,text_box=2,picture=0,auto_shape=1": {
+      "occurrences": 8,
+      "example_slides": [
+        [
+          1,
+          "DS AZ_Title, Subtitle and Text"
+        ],
+        [
+          3,
+          "DS AZ_Title, Subtitle and Text"
+        ],
+        [
+          5,
+          "DS AZ_Title, Subtitle and Text"
+        ],
+        [
+          9,
+          "DS AZ_Title, Subtitle and Text"
+        ],
+        [
+          19,
+          "DS AZ_Title, Subtitle and Text"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 16,
+          "left_mean": 5.88,
+          "left_median": 5.88,
+          "top_mean": 0.41,
+          "top_median": 0.41,
+          "width_mean": 7.33,
+          "width_median": 7.33,
+          "height_mean": 2.39,
+          "height_median": 2.4,
+          "left_stdev": 5.82,
+          "top_stdev": 0.42
+        },
+        "placeholder": {
+          "count_observations": 8,
+          "left_mean": 0.01,
+          "left_median": 0.01,
+          "top_mean": 7.15,
+          "top_median": 7.15,
+          "width_mean": 0.58,
+          "width_median": 0.58,
+          "height_mean": 0.22,
+          "height_median": 0.22,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "auto_shape": {
+          "count_observations": 8,
+          "left_mean": 0.24,
+          "left_median": 0.24,
+          "top_mean": 2.81,
+          "top_median": 2.8,
+          "width_mean": 8.81,
+          "width_median": 8.81,
+          "height_mean": 0.6,
+          "height_median": 0.6,
+          "left_stdev": 0.0,
+          "top_stdev": 1.47
+        }
+      }
+    },
+    "chart=0,table=1,text_box=4,picture=0,auto_shape=0": {
+      "occurrences": 7,
+      "example_slides": [
+        [
+          31,
+          "1_Title and Content"
+        ],
+        [
+          4,
+          "2_Title Only"
+        ],
+        [
+          44,
+          "Blank"
+        ],
+        [
+          54,
+          "Blank"
+        ],
+        [
+          89,
+          "Title Only"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "table": {
+          "count_observations": 7,
+          "left_mean": 0.8,
+          "left_median": 0.88,
+          "top_mean": 1.27,
+          "top_median": 1.27,
+          "width_mean": 11.56,
+          "width_median": 11.19,
+          "height_mean": 4.82,
+          "height_median": 5.11,
+          "left_stdev": 0.32,
+          "top_stdev": 0.12
+        },
+        "text_box": {
+          "count_observations": 28,
+          "left_mean": 5.23,
+          "left_median": 4.05,
+          "top_mean": 2.12,
+          "top_median": 0.35,
+          "width_mean": 6.37,
+          "width_median": 4.54,
+          "height_mean": 0.52,
+          "height_median": 0.46,
+          "left_stdev": 5.09,
+          "top_stdev": 3.06
+        },
+        "placeholder": {
+          "count_observations": 4,
+          "left_mean": 11.38,
+          "left_median": 12.34,
+          "top_mean": 7.1,
+          "top_median": 7.1,
+          "width_mean": 1.66,
+          "width_median": 0.59,
+          "height_mean": 0.27,
+          "height_median": 0.27,
+          "left_stdev": 2.35,
+          "top_stdev": 0.18
+        }
+      }
+    },
+    "chart=0,table=0,text_box=2,picture=0,auto_shape=3": {
+      "occurrences": 7,
+      "example_slides": [
+        [
+          1,
+          "Title Slide"
+        ],
+        [
+          4,
+          "Title Slide"
+        ],
+        [
+          9,
+          "Title Slide"
+        ],
+        [
+          22,
+          "Title Slide"
+        ],
+        [
+          32,
+          "Title Slide"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 14,
+          "left_mean": 1.51,
+          "left_median": 1.51,
+          "top_mean": 0.58,
+          "top_median": 0.58,
+          "width_mean": 8.16,
+          "width_median": 8.18,
+          "height_mean": 1.45,
+          "height_median": 1.45,
+          "left_stdev": 1.08,
+          "top_stdev": 0.45
+        },
+        "auto_shape": {
+          "count_observations": 21,
+          "left_mean": 2.2,
+          "left_median": 2.2,
+          "top_mean": 2.4,
+          "top_median": 1.65,
+          "width_mean": 0.16,
+          "width_median": 0.16,
+          "height_mean": 0.15,
+          "height_median": 0.15,
+          "left_stdev": 0.0,
+          "top_stdev": 1.49
+        }
+      }
+    },
+    "chart=0,table=0,text_box=3,picture=2,auto_shape=0": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          50,
+          "3__Title_Bullets"
+        ],
+        [
+          51,
+          "3__Title_Bullets"
+        ],
+        [
+          52,
+          "3__Title_Bullets"
+        ],
+        [
+          53,
+          "3__Title_Bullets"
+        ],
+        [
+          54,
+          "3__Title_Bullets"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 18,
+          "left_mean": 3.64,
+          "left_median": 0.26,
+          "top_mean": 2.34,
+          "top_median": 0.22,
+          "width_mean": 9.19,
+          "width_median": 12.01,
+          "height_mean": 0.41,
+          "height_median": 0.5,
+          "left_stdev": 4.95,
+          "top_stdev": 3.24
+        },
+        "picture": {
+          "count_observations": 12,
+          "left_mean": 4.06,
+          "left_median": 5.09,
+          "top_mean": 1.76,
+          "top_median": 1.8,
+          "width_mean": 5.1,
+          "width_median": 5.54,
+          "height_mean": 4.35,
+          "height_median": 4.43,
+          "left_stdev": 2.94,
+          "top_stdev": 0.22
+        }
+      }
+    },
+    "chart=0,table=0,text_box=7,picture=6,auto_shape=12": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          1,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          9,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          38,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          41,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          64,
+          "Interior Main Head w/Photo"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "group": {
+          "count_observations": 120,
+          "left_mean": 1.22,
+          "left_median": 1.16,
+          "top_mean": 3.57,
+          "top_median": 4.1,
+          "width_mean": 3.28,
+          "width_median": 3.76,
+          "height_mean": 0.5,
+          "height_median": 0.59,
+          "left_stdev": 0.49,
+          "top_stdev": 1.38
+        },
+        "auto_shape": {
+          "count_observations": 72,
+          "left_mean": 0.38,
+          "left_median": 0.38,
+          "top_mean": 1.92,
+          "top_median": 1.92,
+          "width_mean": 0.6,
+          "width_median": 0.6,
+          "height_mean": 0.6,
+          "height_median": 0.6,
+          "left_stdev": 0.03,
+          "top_stdev": 0.03
+        },
+        "line": {
+          "count_observations": 36,
+          "left_mean": 1.14,
+          "left_median": 1.14,
+          "top_mean": 2.24,
+          "top_median": 2.24,
+          "width_mean": 4.05,
+          "width_median": 3.76,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "text_box": {
+          "count_observations": 42,
+          "left_mean": 1.1,
+          "left_median": 1.26,
+          "top_mean": 1.71,
+          "top_median": 1.95,
+          "width_mean": 3.58,
+          "width_median": 2.33,
+          "height_mean": 0.36,
+          "height_median": 0.3,
+          "left_stdev": 0.39,
+          "top_stdev": 0.59
+        },
+        "picture": {
+          "count_observations": 36,
+          "left_mean": 0.82,
+          "left_median": 0.88,
+          "top_mean": 4.19,
+          "top_median": 4.36,
+          "width_mean": 0.33,
+          "width_median": 0.33,
+          "height_mean": 0.3,
+          "height_median": 0.32,
+          "left_stdev": 0.15,
+          "top_stdev": 1.52
+        }
+      }
+    },
+    "chart=0,table=1,text_box=2,picture=0,auto_shape=1": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          6,
+          "1_Interior Main Head w/Photo"
+        ],
+        [
+          55,
+          "Title w/ Headline & Footnoe"
+        ],
+        [
+          7,
+          "Title Only - White"
+        ],
+        [
+          43,
+          "1_Servier 2"
+        ],
+        [
+          44,
+          "1_Servier 2"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 12,
+          "left_mean": 2.03,
+          "left_median": 0.61,
+          "top_mean": 3.14,
+          "top_median": 0.91,
+          "width_mean": 7.69,
+          "width_median": 10.68,
+          "height_mean": 0.46,
+          "height_median": 0.34,
+          "left_stdev": 3.15,
+          "top_stdev": 3.35
+        },
+        "table": {
+          "count_observations": 6,
+          "left_mean": 0.96,
+          "left_median": 0.67,
+          "top_mean": 1.93,
+          "top_median": 1.41,
+          "width_mean": 10.57,
+          "width_median": 11.86,
+          "height_mean": 4.01,
+          "height_median": 4.67,
+          "left_stdev": 0.89,
+          "top_stdev": 1.5
+        },
+        "auto_shape": {
+          "count_observations": 6,
+          "left_mean": 9.2,
+          "left_median": 10.91,
+          "top_mean": 1.23,
+          "top_median": 0.49,
+          "width_mean": 1.84,
+          "width_median": 1.56,
+          "height_mean": 0.47,
+          "height_median": 0.28,
+          "left_stdev": 4.42,
+          "top_stdev": 1.94
+        },
+        "placeholder": {
+          "count_observations": 9,
+          "left_mean": 5.56,
+          "left_median": 4.12,
+          "top_mean": 4.06,
+          "top_median": 3.67,
+          "width_mean": 5.38,
+          "width_median": 3.06,
+          "height_mean": 0.58,
+          "height_median": 0.61,
+          "left_stdev": 5.35,
+          "top_stdev": 2.69
+        },
+        "freeform": {
+          "count_observations": 4,
+          "left_mean": 5.73,
+          "left_median": 5.73,
+          "top_mean": 1.8,
+          "top_median": 1.77,
+          "width_mean": 1.5,
+          "width_median": 1.5,
+          "height_mean": 1.5,
+          "height_median": 1.5,
+          "left_stdev": 4.13,
+          "top_stdev": 0.05
+        }
+      }
+    },
+    "chart=0,table=1,text_box=2,picture=0,auto_shape=3": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          90,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          91,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          92,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          93,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          94,
+          "Interior Main Head w/Photo"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "text_box": {
+          "count_observations": 12,
+          "left_mean": 0.3,
+          "left_median": 0.17,
+          "top_mean": 0.75,
+          "top_median": 0.73,
+          "width_mean": 12.29,
+          "width_median": 12.21,
+          "height_mean": 0.71,
+          "height_median": 0.7,
+          "left_stdev": 0.67,
+          "top_stdev": 0.56
+        },
+        "table": {
+          "count_observations": 6,
+          "left_mean": 0.89,
+          "left_median": 0.91,
+          "top_mean": 1.77,
+          "top_median": 1.82,
+          "width_mean": 11.39,
+          "width_median": 11.52,
+          "height_mean": 4.84,
+          "height_median": 4.94,
+          "left_stdev": 0.05,
+          "top_stdev": 0.09
+        },
+        "auto_shape": {
+          "count_observations": 18,
+          "left_mean": 8.32,
+          "left_median": 11.12,
+          "top_mean": 3.14,
+          "top_median": 0.59,
+          "width_mean": 4.58,
+          "width_median": 2.22,
+          "height_mean": 0.31,
+          "height_median": 0.22,
+          "left_stdev": 5.38,
+          "top_stdev": 3.34
+        },
+        "placeholder": {
+          "count_observations": 1,
+          "left_mean": 12.34,
+          "left_median": 12.34,
+          "top_mean": 6.94,
+          "top_median": 6.94,
+          "width_mean": 0.59,
+          "width_median": 0.59,
+          "height_mean": 0.3,
+          "height_median": 0.3
+        }
+      }
+    },
+    "chart=0,table=0,text_box=3,picture=3,auto_shape=6": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          3,
+          "Slide Title - Colour"
+        ],
+        [
+          5,
+          "Slide Title - Colour"
+        ],
+        [
+          24,
+          "Slide Title - Colour"
+        ],
+        [
+          27,
+          "Slide Title - Colour"
+        ],
+        [
+          29,
+          "Slide Title - Colour"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 6,
+          "left_mean": 0.68,
+          "left_median": 0.68,
+          "top_mean": 0.4,
+          "top_median": 0.4,
+          "width_mean": 10.97,
+          "width_median": 10.97,
+          "height_mean": 0.73,
+          "height_median": 0.73,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "group": {
+          "count_observations": 66,
+          "left_mean": 1.2,
+          "left_median": 1.16,
+          "top_mean": 2.76,
+          "top_median": 2.35,
+          "width_mean": 3.24,
+          "width_median": 3.76,
+          "height_mean": 0.66,
+          "height_median": 0.59,
+          "left_stdev": 0.47,
+          "top_stdev": 0.83
+        },
+        "auto_shape": {
+          "count_observations": 36,
+          "left_mean": 0.38,
+          "left_median": 0.38,
+          "top_mean": 1.92,
+          "top_median": 1.92,
+          "width_mean": 0.6,
+          "width_median": 0.6,
+          "height_mean": 0.6,
+          "height_median": 0.6,
+          "left_stdev": 0.03,
+          "top_stdev": 0.03
+        },
+        "line": {
+          "count_observations": 18,
+          "left_mean": 1.14,
+          "left_median": 1.14,
+          "top_mean": 2.24,
+          "top_median": 2.24,
+          "width_mean": 3.76,
+          "width_median": 3.76,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "text_box": {
+          "count_observations": 18,
+          "left_mean": 1.26,
+          "left_median": 1.26,
+          "top_mean": 1.95,
+          "top_median": 1.95,
+          "width_mean": 2.66,
+          "width_median": 2.55,
+          "height_mean": 0.34,
+          "height_median": 0.34,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "picture": {
+          "count_observations": 18,
+          "left_mean": 0.9,
+          "left_median": 0.9,
+          "top_mean": 3.3,
+          "top_median": 3.26,
+          "width_mean": 0.32,
+          "width_median": 0.32,
+          "height_mean": 0.27,
+          "height_median": 0.25,
+          "left_stdev": 0.02,
+          "top_stdev": 0.6
+        }
+      }
+    },
+    "chart=0,table=1,text_box=1,picture=0,auto_shape=1": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          60,
+          "Title Only - White"
+        ],
+        [
+          61,
+          "Title Only - White"
+        ],
+        [
+          62,
+          "Title Only - White"
+        ],
+        [
+          63,
+          "Title Only - White"
+        ],
+        [
+          64,
+          "Title Only - White"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "table": {
+          "count_observations": 6,
+          "left_mean": 0.44,
+          "left_median": 0.34,
+          "top_mean": 0.97,
+          "top_median": 0.88,
+          "width_mean": 11.95,
+          "width_median": 12.0,
+          "height_mean": 4.78,
+          "height_median": 4.75,
+          "left_stdev": 0.25,
+          "top_stdev": 0.21
+        },
+        "auto_shape": {
+          "count_observations": 6,
+          "left_mean": 10.7,
+          "left_median": 10.76,
+          "top_mean": 1.17,
+          "top_median": 0.02,
+          "width_mean": 2.54,
+          "width_median": 2.58,
+          "height_mean": 0.18,
+          "height_median": 0.13,
+          "left_stdev": 0.16,
+          "top_stdev": 2.82
+        },
+        "text_box": {
+          "count_observations": 6,
+          "left_mean": 0.34,
+          "left_median": 0.34,
+          "top_mean": 0.16,
+          "top_median": 0.22,
+          "width_mean": 12.73,
+          "width_median": 12.81,
+          "height_mean": 0.58,
+          "height_median": 0.5,
+          "left_stdev": 0.01,
+          "top_stdev": 0.15
+        },
+        "placeholder": {
+          "count_observations": 1,
+          "left_mean": 12.34,
+          "left_median": 12.34,
+          "top_mean": 6.94,
+          "top_median": 6.94,
+          "width_mean": 0.59,
+          "width_median": 0.59,
+          "height_mean": 0.3,
+          "height_median": 0.3
+        }
+      }
+    },
+    "chart=0,table=0,text_box=7,picture=4,auto_shape=11": {
+      "occurrences": 6,
+      "example_slides": [
+        [
+          1,
+          "Title and copy"
+        ],
+        [
+          4,
+          "Title and copy"
+        ],
+        [
+          6,
+          "Title and copy"
+        ],
+        [
+          13,
+          "Title and copy"
+        ],
+        [
+          21,
+          "Title and copy"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 12,
+          "left_mean": 6.48,
+          "left_median": 6.48,
+          "top_mean": 3.7,
+          "top_median": 3.7,
+          "width_mean": 6.31,
+          "width_median": 6.31,
+          "height_mean": 0.85,
+          "height_median": 0.85,
+          "left_stdev": 6.25,
+          "top_stdev": 3.58
+        },
+        "group": {
+          "count_observations": 42,
+          "left_mean": 2.48,
+          "left_median": 1.12,
+          "top_mean": 3.75,
+          "top_median": 4.25,
+          "width_mean": 3.46,
+          "width_median": 4.5,
+          "height_mean": 0.68,
+          "height_median": 0.59,
+          "left_stdev": 1.95,
+          "top_stdev": 1.09
+        },
+        "auto_shape": {
+          "count_observations": 66,
+          "left_mean": 1.09,
+          "left_median": 0.84,
+          "top_mean": 3.97,
+          "top_median": 4.52,
+          "width_mean": 0.9,
+          "width_median": 0.59,
+          "height_mean": 0.62,
+          "height_median": 0.59,
+          "left_stdev": 0.46,
+          "top_stdev": 1.24
+        },
+        "line": {
+          "count_observations": 24,
+          "left_mean": 1.53,
+          "left_median": 1.53,
+          "top_mean": 4.07,
+          "top_median": 4.08,
+          "width_mean": 3.76,
+          "width_median": 3.76,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 0.0,
+          "top_stdev": 1.42
+        },
+        "text_box": {
+          "count_observations": 42,
+          "left_mean": 1.68,
+          "left_median": 1.65,
+          "top_mean": 4.14,
+          "top_median": 4.67,
+          "width_mean": 1.89,
+          "width_median": 2.09,
+          "height_mean": 0.47,
+          "height_median": 0.4,
+          "left_stdev": 0.07,
+          "top_stdev": 1.16
+        },
+        "picture": {
+          "count_observations": 24,
+          "left_mean": 0.93,
+          "left_median": 0.93,
+          "top_mean": 3.88,
+          "top_median": 3.88,
+          "width_mean": 0.31,
+          "width_median": 0.32,
+          "height_mean": 0.31,
+          "height_median": 0.31,
+          "left_stdev": 0.01,
+          "top_stdev": 1.43
+        }
+      }
+    },
+    "chart=1,table=1,text_box=5,picture=0,auto_shape=8": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          76,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          77,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          78,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          79,
+          "Interior Main Head w/Photo"
+        ],
+        [
+          80,
+          "Interior Main Head w/Photo"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "table": {
+          "count_observations": 5,
+          "left_mean": 0.39,
+          "left_median": 0.4,
+          "top_mean": 1.67,
+          "top_median": 1.64,
+          "width_mean": 9.27,
+          "width_median": 9.23,
+          "height_mean": 4.96,
+          "height_median": 5.01,
+          "left_stdev": 0.01,
+          "top_stdev": 0.08
+        },
+        "text_box": {
+          "count_observations": 25,
+          "left_mean": 4.81,
+          "left_median": 4.56,
+          "top_mean": 4.31,
+          "top_median": 6.51,
+          "width_mean": 4.26,
+          "width_median": 2.33,
+          "height_mean": 0.41,
+          "height_median": 0.43,
+          "left_stdev": 3.26,
+          "top_stdev": 2.82
+        },
+        "auto_shape": {
+          "count_observations": 40,
+          "left_mean": 8.82,
+          "left_median": 11.49,
+          "top_mean": 2.95,
+          "top_median": 1.31,
+          "width_mean": 2.23,
+          "width_median": 0.66,
+          "height_mean": 0.22,
+          "height_median": 0.21,
+          "left_stdev": 4.66,
+          "top_stdev": 3.05
+        },
+        "group": {
+          "count_observations": 20,
+          "left_mean": 6.02,
+          "left_median": 4.14,
+          "top_mean": 4.99,
+          "top_median": 6.31,
+          "width_mean": 1.38,
+          "width_median": 1.1,
+          "height_mean": 0.43,
+          "height_median": 0.43,
+          "left_stdev": 3.84,
+          "top_stdev": 2.61
+        },
+        "chart": {
+          "count_observations": 5,
+          "left_mean": 9.48,
+          "left_median": 9.5,
+          "top_mean": 1.9,
+          "top_median": 1.83,
+          "width_mean": 3.64,
+          "width_median": 3.64,
+          "height_mean": 4.59,
+          "height_median": 4.63,
+          "left_stdev": 0.03,
+          "top_stdev": 0.11
+        }
+      }
+    },
+    "chart=0,table=0,text_box=0,picture=1,auto_shape=0": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          0,
+          "Slide Title - Colour"
+        ],
+        [
+          0,
+          "Title Slide"
+        ],
+        [
+          0,
+          "4_Front Cover 1"
+        ],
+        [
+          0,
+          "Title Slide1_blue"
+        ],
+        [
+          0,
+          "Title Slide"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 13,
+          "left_mean": 2.16,
+          "left_median": 0.57,
+          "top_mean": 4.01,
+          "top_median": 4.92,
+          "width_mean": 9.35,
+          "width_median": 9.84,
+          "height_mean": 0.93,
+          "height_median": 0.73,
+          "left_stdev": 3.13,
+          "top_stdev": 2.07
+        },
+        "picture": {
+          "count_observations": 5,
+          "left_mean": 5.0,
+          "left_median": 4.59,
+          "top_mean": 4.09,
+          "top_median": 6.49,
+          "width_mean": 2.37,
+          "width_median": 1.91,
+          "height_mean": 0.56,
+          "height_median": 0.48,
+          "left_stdev": 4.87,
+          "top_stdev": 3.59
+        }
+      }
+    },
+    "chart=5,table=4,text_box=9,picture=0,auto_shape=22": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          83,
+          "9_White Background"
+        ],
+        [
+          84,
+          "9_White Background"
+        ],
+        [
+          92,
+          "9_White Background"
+        ],
+        [
+          93,
+          "9_White Background"
+        ],
+        [
+          94,
+          "9_White Background"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "auto_shape": {
+          "count_observations": 110,
+          "left_mean": -0.06,
+          "left_median": -0.82,
+          "top_mean": 3.78,
+          "top_median": 4.13,
+          "width_mean": 1.06,
+          "width_median": 0.1,
+          "height_mean": 0.19,
+          "height_median": 0.1,
+          "left_stdev": 2.89,
+          "top_stdev": 1.39
+        },
+        "chart": {
+          "count_observations": 25,
+          "left_mean": 3.52,
+          "left_median": 4.21,
+          "top_mean": 3.77,
+          "top_median": 3.51,
+          "width_mean": 6.88,
+          "width_median": 8.02,
+          "height_mean": 1.59,
+          "height_median": 1.26,
+          "left_stdev": 1.7,
+          "top_stdev": 1.42
+        },
+        "placeholder": {
+          "count_observations": 5,
+          "left_mean": 0.59,
+          "left_median": 0.59,
+          "top_mean": 0.13,
+          "top_median": 0.13,
+          "width_mean": 12.57,
+          "width_median": 12.57,
+          "height_mean": 1.21,
+          "height_median": 1.21,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "group": {
+          "count_observations": 50,
+          "left_mean": 6.24,
+          "left_median": 10.18,
+          "top_mean": 3.98,
+          "top_median": 4.04,
+          "width_mean": 1.53,
+          "width_median": 1.23,
+          "height_mean": 0.23,
+          "height_median": 0.2,
+          "left_stdev": 6.59,
+          "top_stdev": 2.13
+        },
+        "text_box": {
+          "count_observations": 45,
+          "left_mean": 1.6,
+          "left_median": 1.7,
+          "top_mean": 3.83,
+          "top_median": 4.52,
+          "width_mean": 2.59,
+          "width_median": 1.98,
+          "height_mean": 0.39,
+          "height_median": 0.37,
+          "left_stdev": 3.34,
+          "top_stdev": 1.26
+        },
+        "table": {
+          "count_observations": 20,
+          "left_mean": 5.78,
+          "left_median": 5.79,
+          "top_mean": 5.27,
+          "top_median": 6.06,
+          "width_mean": 4.62,
+          "width_median": 2.16,
+          "height_mean": 1.65,
+          "height_median": 0.53,
+          "left_stdev": 5.51,
+          "top_stdev": 2.13
+        }
+      }
+    },
+    "chart=1,table=1,text_box=12,picture=0,auto_shape=4": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          126,
+          "1_ContentSlide Opt 4"
+        ],
+        [
+          127,
+          "1_ContentSlide Opt 4"
+        ],
+        [
+          128,
+          "1_ContentSlide Opt 4"
+        ],
+        [
+          130,
+          "1_ContentSlide Opt 4"
+        ],
+        [
+          131,
+          "1_ContentSlide Opt 4"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 5,
+          "left_mean": 0.34,
+          "left_median": 0.34,
+          "top_mean": 0.49,
+          "top_median": 0.49,
+          "width_mean": 12.07,
+          "width_median": 12.07,
+          "height_mean": 0.72,
+          "height_median": 0.72,
+          "left_stdev": 0.0,
+          "top_stdev": 0.01
+        },
+        "text_box": {
+          "count_observations": 60,
+          "left_mean": 6.27,
+          "left_median": 5.96,
+          "top_mean": 4.57,
+          "top_median": 6.26,
+          "width_mean": 2.35,
+          "width_median": 1.66,
+          "height_mean": 0.27,
+          "height_median": 0.25,
+          "left_stdev": 4.01,
+          "top_stdev": 2.39
+        },
+        "group": {
+          "count_observations": 10,
+          "left_mean": 6.07,
+          "left_median": 6.08,
+          "top_mean": 3.88,
+          "top_median": 3.87,
+          "width_mean": 4.36,
+          "width_median": 4.33,
+          "height_mean": 0.24,
+          "height_median": 0.24,
+          "left_stdev": 6.15,
+          "top_stdev": 2.76
+        },
+        "table": {
+          "count_observations": 5,
+          "left_mean": 0.18,
+          "left_median": 0.1,
+          "top_mean": 1.66,
+          "top_median": 1.62,
+          "width_mean": 7.26,
+          "width_median": 7.32,
+          "height_mean": 4.84,
+          "height_median": 4.86,
+          "left_stdev": 0.11,
+          "top_stdev": 0.05
+        },
+        "chart": {
+          "count_observations": 5,
+          "left_mean": 7.54,
+          "left_median": 7.48,
+          "top_mean": 2.02,
+          "top_median": 1.99,
+          "width_mean": 5.41,
+          "width_median": 5.41,
+          "height_mean": 4.59,
+          "height_median": 4.59,
+          "left_stdev": 0.08,
+          "top_stdev": 0.04
+        },
+        "auto_shape": {
+          "count_observations": 20,
+          "left_mean": 4.27,
+          "left_median": 4.21,
+          "top_mean": 6.34,
+          "top_median": 6.34,
+          "width_mean": 0.1,
+          "width_median": 0.1,
+          "height_mean": 0.1,
+          "height_median": 0.1,
+          "left_stdev": 1.86,
+          "top_stdev": 0.0
+        }
+      }
+    },
+    "chart=0,table=1,text_box=2,picture=1,auto_shape=3": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          88,
+          "Title Only - White"
+        ],
+        [
+          89,
+          "1_Title Only - White"
+        ],
+        [
+          90,
+          "1_Title Only - White"
+        ],
+        [
+          91,
+          "1_Title Only - White"
+        ],
+        [
+          92,
+          "1_Title Only - White"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "group": {
+          "count_observations": 5,
+          "left_mean": 0.53,
+          "left_median": 0.53,
+          "top_mean": 0.91,
+          "top_median": 0.91,
+          "width_mean": 12.12,
+          "width_median": 12.12,
+          "height_mean": 0.47,
+          "height_median": 0.47,
+          "left_stdev": 0.01,
+          "top_stdev": 0.0
+        },
+        "auto_shape": {
+          "count_observations": 15,
+          "left_mean": 1.78,
+          "left_median": 2.45,
+          "top_mean": 1.94,
+          "top_median": 2.86,
+          "width_mean": 5.85,
+          "width_median": 6.98,
+          "height_mean": 0.36,
+          "height_median": 0.34,
+          "left_stdev": 1.31,
+          "top_stdev": 1.39
+        },
+        "table": {
+          "count_observations": 5,
+          "left_mean": 0.53,
+          "left_median": 0.53,
+          "top_mean": 1.4,
+          "top_median": 1.4,
+          "width_mean": 12.13,
+          "width_median": 12.13,
+          "height_mean": 5.3,
+          "height_median": 5.35,
+          "left_stdev": 0.01,
+          "top_stdev": 0.0
+        },
+        "text_box": {
+          "count_observations": 10,
+          "left_mean": 4.47,
+          "left_median": 4.47,
+          "top_mean": 3.62,
+          "top_median": 3.62,
+          "width_mean": 5.78,
+          "width_median": 5.78,
+          "height_mean": 0.24,
+          "height_median": 0.24,
+          "left_stdev": 4.22,
+          "top_stdev": 3.82
+        },
+        "picture": {
+          "count_observations": 5,
+          "left_mean": 0.61,
+          "left_median": 0.61,
+          "top_mean": 0.92,
+          "top_median": 0.92,
+          "width_mean": 0.43,
+          "width_median": 0.43,
+          "height_mean": 0.43,
+          "height_median": 0.43,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        }
+      }
+    },
+    "chart=0,table=0,text_box=0,picture=0,auto_shape=8": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          1,
+          "Section Header"
+        ],
+        [
+          2,
+          "Alt Section Header"
+        ],
+        [
+          8,
+          "Alt Section Header"
+        ],
+        [
+          19,
+          "Alt Section Header"
+        ],
+        [
+          26,
+          "Alt Section Header"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 6,
+          "left_mean": 4.16,
+          "left_median": 2.42,
+          "top_mean": 2.8,
+          "top_median": 1.96,
+          "width_mean": 3.37,
+          "width_median": 3.88,
+          "height_mean": 3.0,
+          "height_median": 3.56,
+          "left_stdev": 4.26,
+          "top_stdev": 2.05
+        },
+        "auto_shape": {
+          "count_observations": 40,
+          "left_mean": 2.16,
+          "left_median": 2.16,
+          "top_mean": 3.7,
+          "top_median": 3.67,
+          "width_mean": 0.09,
+          "width_median": 0.08,
+          "height_mean": 0.09,
+          "height_median": 0.08,
+          "left_stdev": 0.01,
+          "top_stdev": 1.12
+        }
+      }
+    },
+    "chart=0,table=0,text_box=5,picture=5,auto_shape=10": {
+      "occurrences": 5,
+      "example_slides": [
+        [
+          1,
+          "Subsection Header Ojjaara"
+        ],
+        [
+          6,
+          "Subsection Header Ojjaara"
+        ],
+        [
+          8,
+          "Subsection Header Ojjaara"
+        ],
+        [
+          25,
+          "Subsection Header Ojjaara"
+        ],
+        [
+          36,
+          "Subsection Header Ojjaara"
+        ]
+      ],
+      "coord_stats_by_shape_type": {
+        "placeholder": {
+          "count_observations": 5,
+          "left_mean": 0.73,
+          "left_median": 0.73,
+          "top_mean": 0.0,
+          "top_median": 0.0,
+          "width_mean": 8.64,
+          "width_median": 8.64,
+          "height_mean": 1.27,
+          "height_median": 1.27,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "group": {
+          "count_observations": 82,
+          "left_mean": 1.24,
+          "left_median": 1.16,
+          "top_mean": 2.97,
+          "top_median": 2.45,
+          "width_mean": 3.09,
+          "width_median": 3.76,
+          "height_mean": 0.51,
+          "height_median": 0.59,
+          "left_stdev": 0.48,
+          "top_stdev": 1.02
+        },
+        "auto_shape": {
+          "count_observations": 50,
+          "left_mean": 0.38,
+          "left_median": 0.38,
+          "top_mean": 1.92,
+          "top_median": 1.92,
+          "width_mean": 0.6,
+          "width_median": 0.6,
+          "height_mean": 0.6,
+          "height_median": 0.6,
+          "left_stdev": 0.03,
+          "top_stdev": 0.03
+        },
+        "picture": {
+          "count_observations": 25,
+          "left_mean": 0.83,
+          "left_median": 0.9,
+          "top_mean": 3.33,
+          "top_median": 3.26,
+          "width_mean": 0.32,
+          "width_median": 0.32,
+          "height_mean": 0.3,
+          "height_median": 0.34,
+          "left_stdev": 0.17,
+          "top_stdev": 0.97
+        },
+        "line": {
+          "count_observations": 25,
+          "left_mean": 1.14,
+          "left_median": 1.14,
+          "top_mean": 2.24,
+          "top_median": 2.24,
+          "width_mean": 3.76,
+          "width_median": 3.76,
+          "height_mean": 0.0,
+          "height_median": 0.0,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        },
+        "text_box": {
+          "count_observations": 25,
+          "left_mean": 1.26,
+          "left_median": 1.26,
+          "top_mean": 1.95,
+          "top_median": 1.95,
+          "width_mean": 2.26,
+          "width_median": 2.38,
+          "height_mean": 0.34,
+          "height_median": 0.34,
+          "left_stdev": 0.0,
+          "top_stdev": 0.0
+        }
+      }
+    }
+  }
+}

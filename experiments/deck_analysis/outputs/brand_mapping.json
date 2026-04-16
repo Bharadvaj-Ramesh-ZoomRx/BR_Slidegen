@@ -1,0 +1,226 @@
+[
+  {
+    "filename": "03.12.2026_Q1'26 Bone HCP PET Full Report_v1.0.pptx",
+    "brand": "BONE_HCP_TRACKER",
+    "client": "UNKNOWN",
+    "competitor": null,
+    "therapy_area": "Bone"
+  },
+  {
+    "filename": "05022026_Bavencio Promotional Effectiveness Tracking Wave 4 Q1'26 - Full Final Report V2.0.pptx",
+    "brand": "BAVENCIO",
+    "client": "EMD",
+    "competitor": null,
+    "therapy_area": "Oncology"
+  },
+  {
+    "filename": "[ZoomRx] Abilify LAI PET - Full Report.pptx",
+    "brand": "ABILIFY_MAINTENA",
+    "client": "OTSUKA",
+    "competitor": null,
+    "therapy_area": "Psychiatry"
+  },
+  {
+    "filename": "[ZoomRx] Alexion US PNH Q325 PET - v1.pptx",
+    "brand": "ULTOMIRIS",
+    "client": "ALEXION",
+    "competitor": null,
+    "therapy_area": "Hematology/PNH"
+  },
+  {
+    "filename": "[ZoomRx] AZN LOKELMA PET Quarterly Report Q4 2025_Synapse_connector.pptx",
+    "brand": "LOKELMA",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Nephrology"
+  },
+  {
+    "filename": "[ZoomRx] B+L DED PET Jul-Sep'25_Final Report v3.0.pptx",
+    "brand": "MIEBO",
+    "client": "BL",
+    "competitor": null,
+    "therapy_area": "Ophthalmology/DED"
+  },
+  {
+    "filename": "[ZoomRx] Libtayo (Nov \u201925 - Feb \u201926) NMSC Message Recall & Effectiveness Report v3.0 - Synapse Migration.pptx",
+    "brand": "LIBTAYO",
+    "client": "REGENERON",
+    "competitor": null,
+    "therapy_area": "Oncology/NMSC"
+  },
+  {
+    "filename": "[ZoomRx] NVS Rhapsido_PET_Wave 4 Full Report v1.0.pptx",
+    "brand": "RHAPSIDO",
+    "client": "NOVARTIS",
+    "competitor": null,
+    "therapy_area": "Immunology"
+  },
+  {
+    "filename": "[ZoomRx] Q1'26 Otezla Derm PET_Full Report v0.1.pptx",
+    "brand": "OTEZLA",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Dermatology/Psoriasis"
+  },
+  {
+    "filename": "[ZoomRx] Tezspire SUA+CRSwNP PET Report Q1 '26_v1.pptx",
+    "brand": "TEZSPIRE",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Respiratory"
+  },
+  {
+    "filename": "ALL PET Q1FY26 KPI Report 19DEC2025.pptx",
+    "brand": "ALL_PET_KPI",
+    "client": "UNKNOWN",
+    "competitor": null,
+    "therapy_area": "Cross-brand"
+  },
+  {
+    "filename": "AZ-DSI - DATROWAY mBC Promotional Effectiveness Tracking Q1 '26_TEST.pptx",
+    "brand": "DATROWAY",
+    "client": "DSI_AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/mBC"
+  },
+  {
+    "filename": "CCA PET Q2FY26 Personal Promotion Synapse check.pptx",
+    "brand": "CCA_PP_TRACKER",
+    "client": "CCA",
+    "competitor": null,
+    "therapy_area": "Cross-brand"
+  },
+  {
+    "filename": "DATROWAY EGFRm NSCLC Promotional Effectiveness Tracking (PET) Q1 '26 PP and NPP Final Report_v1.pptx",
+    "brand": "DATROWAY",
+    "client": "DSI",
+    "competitor": null,
+    "therapy_area": "Oncology/NSCLC"
+  },
+  {
+    "filename": "GSK BLENREP MM PET Monthly Report February 2026_Migration Copy.pptx",
+    "brand": "BLENREP",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Oncology/MM"
+  },
+  {
+    "filename": "GSK Jemperli Zejula PET Full Report February '26 Syn Check.pptx",
+    "brand": "JEMPERLI-ZEJULA",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Oncology/Endometrial"
+  },
+  {
+    "filename": "J&J MM SFEA Q1'26_Full_Report_V2_Migration.pptx",
+    "brand": "DARZALEX",
+    "client": "JJ",
+    "competitor": null,
+    "therapy_area": "Oncology/MM"
+  },
+  {
+    "filename": "JJ PET RYBREVANT+LAZCLUZE Q1'26 Report_Migration.pptx",
+    "brand": "RYBREVANT",
+    "client": "JJ",
+    "competitor": "TAGRISSO",
+    "therapy_area": "Oncology/NSCLC"
+  },
+  {
+    "filename": "Lynparza aOC_PET_Q1 2026TEST.pptx",
+    "brand": "LYNPARZA",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology"
+  },
+  {
+    "filename": "OG Adbry PET SC Deck.pptx",
+    "brand": "ADBRY",
+    "client": "LEO",
+    "competitor": null,
+    "therapy_area": "Dermatology/AD"
+  },
+  {
+    "filename": "Onivyde SFE W3 Report.pptx",
+    "brand": "ONIVYDE",
+    "client": "IPSEN",
+    "competitor": null,
+    "therapy_area": "Oncology/Pancreatic"
+  },
+  {
+    "filename": "Physicians SFE (PET)_Q3'25 Report_V1.pptx",
+    "brand": "PHYSICIANS_SFE_PET",
+    "client": "UNKNOWN",
+    "competitor": null,
+    "therapy_area": "Cross-brand"
+  },
+  {
+    "filename": "TEPEZZA_PET_Q4 2025_Report_JJ_NS_TP1latest_UseThis.pptx",
+    "brand": "TEPEZZA",
+    "client": "JJ",
+    "competitor": null,
+    "therapy_area": "Endocrinology/TED"
+  },
+  {
+    "filename": "TEST [COPY] ZoomRx AMG UPLIZNA NMOSD PET Q4 '25 Final Report_cleaned.pptx",
+    "brand": "UPLIZNA",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Neurology/NMOSD"
+  },
+  {
+    "filename": "TRUQAP PET Quarterly Report Q4 '25 v2 (Sandbox v2).pptx",
+    "brand": "TRUQAP",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/Breast"
+  },
+  {
+    "filename": "US Abrysvo Maternal HCP CFC Promotional Effectiveness Tracking (ZoomRx)_Q4 \u201825 - Full Report V3.0.pptx",
+    "brand": "ABRYSVO",
+    "client": "PFIZER",
+    "competitor": null,
+    "therapy_area": "Vaccines/Maternal"
+  },
+  {
+    "filename": "V1_Adbry PET_W1'26 (Wave 22)_migrated deck.pptx",
+    "brand": "ADBRY",
+    "client": "LEO",
+    "competitor": null,
+    "therapy_area": "Dermatology/AD"
+  },
+  {
+    "filename": "ZoomRx - AZ - DSI ENHERTU NSCLC HER2 ERBB2mu Post Launch Wave 6 Report 3.1.pptx",
+    "brand": "ENHERTU",
+    "client": "DSI_AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/HER2"
+  },
+  {
+    "filename": "ZoomRx - AZN Calquence PET Q4 '25 Report v1 - Sandbox Copy.pptx",
+    "brand": "CALQUENCE",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/CLL"
+  },
+  {
+    "filename": "ZoomRx - GSK OJJAARA MF PET Research - February '26 Full Monthly Report v1 Migration Test.pptx",
+    "brand": "OJJAARA",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Hematology/MF"
+  },
+  {
+    "filename": "ZoomRx Dupixent EoE PET Q4 '25_v3.pptx",
+    "brand": "DUPIXENT_EoE",
+    "client": "REGENERON_SANOFI",
+    "competitor": null,
+    "therapy_area": "Immunology/EoE"
+  },
+  {
+    "filename": "ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx",
+    "brand": "EMPAVELI",
+    "client": "APELLIS",
+    "competitor": null,
+    "therapy_area": "Hematology"
+  }
+]

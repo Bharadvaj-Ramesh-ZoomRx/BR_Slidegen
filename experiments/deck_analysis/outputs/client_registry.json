@@ -1,0 +1,97 @@
+{
+  "JJ": {
+    "font_heading": "Johnson Display",
+    "font_body": "Johnson Text",
+    "heading_color": "001E60"
+  },
+  "AZN": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "595959"
+  },
+  "DSI": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "1E22AA"
+  },
+  "DSI_AZN": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "1E22AA"
+  },
+  "GSK": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "F36633"
+  },
+  "PFIZER": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "0063C3"
+  },
+  "EMD": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "000000"
+  },
+  "REGENERON": {
+    "font_heading": "Trade Gothic LT Std",
+    "font_body": "Arial",
+    "heading_color": "00745A"
+  },
+  "REGENERON_SANOFI": {
+    "font_heading": "Trade Gothic LT Std",
+    "font_body": "Arial",
+    "heading_color": "00745A"
+  },
+  "NOVARTIS": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "018E86"
+  },
+  "AMGEN": {
+    "font_heading": "Century Gothic",
+    "font_body": "Century Gothic",
+    "heading_color": "003C71"
+  },
+  "LEO": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "C014A3"
+  },
+  "ALEXION": {
+    "font_heading": "Arial Black",
+    "font_body": "Arial",
+    "heading_color": "0E8779"
+  },
+  "BL": {
+    "font_heading": "Avenir Next LT Pro",
+    "font_body": "Century Gothic",
+    "heading_color": "400286"
+  },
+  "OTSUKA": {
+    "font_heading": "Calibri",
+    "font_body": "Arial",
+    "heading_color": "000000"
+  },
+  "APELLIS": {
+    "font_heading": "Calibri Light",
+    "font_body": "Calibri",
+    "heading_color": "FC3B6E"
+  },
+  "IPSEN": {
+    "font_heading": "Rethink Sans",
+    "font_body": "Calibri",
+    "heading_color": "54AC65"
+  },
+  "CCA": {
+    "font_heading": "Century Gothic",
+    "font_body": "Century Gothic",
+    "heading_color": "F28E2B"
+  },
+  "UNKNOWN": {
+    "font_heading": "Arial",
+    "font_body": "Arial",
+    "heading_color": "000000"
+  }
+}

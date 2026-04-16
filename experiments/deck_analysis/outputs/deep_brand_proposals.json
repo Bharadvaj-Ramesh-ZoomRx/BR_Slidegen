@@ -1,0 +1,1152 @@
+{
+  "Bone-HCP": {
+    "deck_count": 1,
+    "decks": [
+      "03.12.2026_Q1'26 Bone HCP PET Full Report_v1.0.pptx"
+    ],
+    "top_series_colors": {
+      "FF9933": 35,
+      "009201": 13,
+      "00B0F0": 13,
+      "58193D": 11,
+      "A6A6A6": 5,
+      "0063C3": 4,
+      "4BACC6": 4,
+      "E46C0A": 4,
+      "425563": 4,
+      "FFC285": 4,
+      "604A7B": 3,
+      "2C53A2": 3,
+      "F79646": 2,
+      "4F6228": 2,
+      "93CDDD": 2,
+      "57AC33": 2,
+      "FDC199": 2,
+      "8F77AD": 1,
+      "FFFFFF": 1,
+      "F48323": 1
+    },
+    "top_fonts": {
+      "Century Gothic": 1663,
+      "+mn-lt": 33,
+      "Times New Roman": 6,
+      "Calibri": 2,
+      "Arial": 1
+    },
+    "theme_fonts_major": {
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#1F497D",
+        "lt2": "#EEECE1",
+        "accent1": "#4F81BD",
+        "accent2": "#C0504D",
+        "accent3": "#9BBB59",
+        "accent4": "#8064A2",
+        "accent5": "#4BACC6",
+        "accent6": "#F79646",
+        "hlink": "#0000FF",
+        "folHlink": "#800080"
+      }
+    ]
+  },
+  "Pfizer": {
+    "deck_count": 2,
+    "decks": [
+      "05022026_Bavencio Promotional Effectiveness Tracking Wave 4 Q1'26 - Full Final Report V2.0.pptx",
+      "US Abrysvo Maternal HCP CFC Promotional Effectiveness Tracking (ZoomRx)_Q4 \u201825 - Full Report V3.0.pptx"
+    ],
+    "top_series_colors": {
+      "0000C9": 30,
+      "43964A": 14,
+      "E356DC": 12,
+      "F49C34": 10,
+      "BA2A4C": 9,
+      "C00000": 9,
+      "6D5A7A": 8,
+      "4060AF": 7,
+      "7F7F7F": 6,
+      "081E3D": 5,
+      "0095FF": 5,
+      "00B050": 4,
+      "008A00": 3,
+      "808080": 3,
+      "6FBF4A": 3,
+      "E4B77F": 3,
+      "D3770B": 3,
+      "0070BF": 3,
+      "A4D6A8": 3,
+      "67BB6E": 3
+    },
+    "top_fonts": {
+      "Arial": 1783,
+      "+mj-lt": 321,
+      "Europa-Regular": 32,
+      "Calibri (Body)": 22,
+      "Calibri": 13,
+      "Manrope": 8,
+      "Invention(Body)": 4,
+      "+mn-lt": 2,
+      "Trebuchet MS": 1
+    },
+    "theme_fonts_major": {
+      "Arial": 2
+    },
+    "theme_fonts_minor": {
+      "Arial": 2
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "sys:000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#44546A",
+        "lt2": "#E7E6E6",
+        "accent1": "#4060AF",
+        "accent2": "#00C7B2",
+        "accent3": "#5C7F92",
+        "accent4": "#FDCE07",
+        "accent5": "#983293",
+        "accent6": "#E60596",
+        "hlink": "#CDE100",
+        "folHlink": "#954F72"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#F49C34",
+        "lt2": "#F8DF5A",
+        "accent1": "#0000C9",
+        "accent2": "#0095FF",
+        "accent3": "#0DBDBA",
+        "accent4": "#67BB6E",
+        "accent5": "#9D73F7",
+        "accent6": "#D95776",
+        "hlink": "#0095FF",
+        "folHlink": "#A1AAB1"
+      }
+    ]
+  },
+  "Otsuka": {
+    "deck_count": 1,
+    "decks": [
+      "[ZoomRx] Abilify LAI PET - Full Report.pptx"
+    ],
+    "top_series_colors": {
+      "FFC000": 21,
+      "C00000": 15,
+      "2D5CA2": 15,
+      "7F47AA": 13,
+      "7D44A9": 11,
+      "3B5998": 11,
+      "7E97CD": 10,
+      "B3C9EA": 8,
+      "0000FF": 8,
+      "D8DDE5": 8,
+      "1C1755": 7,
+      "FFFFFF": 6,
+      "DA0072": 5,
+      "7AB2B2": 4,
+      "F1E9E9": 4,
+      "2D3250": 3,
+      "C1A5D6": 3,
+      "FEE598": 3,
+      "2A4C85": 3,
+      "8998B1": 3
+    },
+    "top_fonts": {
+      "Arial": 1093,
+      "Johnson Text": 13,
+      "Calibri (Body)": 13,
+      "Tahoma": 9,
+      "12": 4,
+      "Gotham Book": 1
+    },
+    "theme_fonts_major": {
+      "Calibri": 1
+    },
+    "theme_fonts_minor": {
+      "Calibri": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#343E4D",
+        "lt1": "#FFFFFF",
+        "dk2": "#49576F",
+        "lt2": "#FFFFFF",
+        "accent1": "#3B5998",
+        "accent2": "#49576F",
+        "accent3": "#DA471F",
+        "accent4": "#4E8F00",
+        "accent5": "#F1C300",
+        "accent6": "#B3C9EA",
+        "hlink": "#3B5998",
+        "folHlink": "#DA471F"
+      }
+    ]
+  },
+  "Alexion": {
+    "deck_count": 1,
+    "decks": [
+      "[ZoomRx] Alexion US PNH Q325 PET - v1.pptx"
+    ],
+    "top_series_colors": {
+      "0E8779": 29,
+      "7030A0": 28,
+      "E35105": 22,
+      "799A01": 21,
+      "FFA300": 21,
+      "FF8181": 10,
+      "CCCCCC": 10,
+      "84CA68": 8,
+      "009886": 6,
+      "D34D2F": 6,
+      "008DAB": 6,
+      "F8CF36": 6,
+      "003B75": 6,
+      "E47E19": 5,
+      "B2A4B6": 4,
+      "0072CE": 4,
+      "B52455": 4,
+      "BFBFBF": 4,
+      "FFC000": 4,
+      "FFC865": 3
+    },
+    "top_fonts": {
+      "Arial": 2880,
+      "Arial(Body)": 70,
+      "Montserrat": 14,
+      "Montserrat Regular": 4
+    },
+    "theme_fonts_major": {
+      "Arial Black": 1
+    },
+    "theme_fonts_minor": {
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#001E60",
+        "lt1": "#F3F4F3",
+        "dk2": "#6E6159",
+        "lt2": "#00A6CE",
+        "accent1": "#002F6C",
+        "accent2": "#E35105",
+        "accent3": "#B52455",
+        "accent4": "#FFA300",
+        "accent5": "#6B3077",
+        "accent6": "#799A01",
+        "hlink": "#0092CB",
+        "folHlink": "#10069F"
+      }
+    ]
+  },
+  "AZN": {
+    "deck_count": 7,
+    "decks": [
+      "[ZoomRx] AZN LOKELMA PET Quarterly Report Q4 2025_Synapse_connector.pptx",
+      "[ZoomRx] Tezspire SUA+CRSwNP PET Report Q1 '26_v1.pptx",
+      "AZ-DSI - DATROWAY mBC Promotional Effectiveness Tracking Q1 '26_TEST.pptx",
+      "Lynparza aOC_PET_Q1 2026TEST.pptx",
+      "TRUQAP PET Quarterly Report Q4 '25 v2 (Sandbox v2).pptx",
+      "ZoomRx - AZ - DSI ENHERTU NSCLC HER2 ERBB2mu Post Launch Wave 6 Report 3.1.pptx",
+      "ZoomRx - AZN Calquence PET Q4 '25 Report v1 - Sandbox Copy.pptx"
+    ],
+    "top_series_colors": {
+      "00B050": 77,
+      "FF8813": 73,
+      "94D448": 53,
+      "E15759": 50,
+      "250E62": 42,
+      "33A4FF": 42,
+      "59A14F": 40,
+      "9467BD": 40,
+      "1D7B87": 40,
+      "91C3D5": 37,
+      "00947F": 32,
+      "EE7623": 31,
+      "006937": 31,
+      "7F7F7F": 30,
+      "FFBA00": 30,
+      "8F2064": 29,
+      "003865": 27,
+      "656681": 27,
+      "F0FF4D": 26,
+      "CC0099": 25
+    },
+    "top_fonts": {
+      "Arial": 9645,
+      "Calibri": 3459,
+      "Manrope": 1350,
+      "Arial(Body)": 118,
+      "Century Gothic": 62,
+      "Playfair Display": 59,
+      "Arial (Headings)": 32,
+      "+mn-lt": 22,
+      "Times New Roman": 3,
+      "Playfair Display Black": 3
+    },
+    "theme_fonts_major": {
+      "Arial": 4,
+      "Calibri": 3
+    },
+    "theme_fonts_minor": {
+      "Arial": 4,
+      "Calibri": 3
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#00927C",
+        "lt2": "#003B45",
+        "accent1": "#B0BDC0",
+        "accent2": "#D19B07",
+        "accent3": "#DC582A",
+        "accent4": "#594371",
+        "accent5": "#3C83CD",
+        "accent6": "#871250",
+        "hlink": "#0000FF",
+        "folHlink": "#800080"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#716F73",
+        "lt2": "#00BCE4",
+        "accent1": "#0063C3",
+        "accent2": "#88C765",
+        "accent3": "#F3C108",
+        "accent4": "#D34D2F",
+        "accent5": "#597B7C",
+        "accent6": "#005480",
+        "hlink": "#2DBCB6",
+        "folHlink": "#B2A97E"
+      },
+      {
+        "dk1": "#75787B",
+        "lt1": "#FFFFFF",
+        "dk2": "#153352",
+        "lt2": "#000000",
+        "accent1": "#75787B",
+        "accent2": "#153352",
+        "accent3": "#DC582A",
+        "accent4": "#D19B07",
+        "accent5": "#5A982B",
+        "accent6": "#153352",
+        "hlink": "#0000FF",
+        "folHlink": "#800080"
+      }
+    ]
+  },
+  "BL": {
+    "deck_count": 1,
+    "decks": [
+      "[ZoomRx] B+L DED PET Jul-Sep'25_Final Report v3.0.pptx"
+    ],
+    "top_series_colors": {
+      "00A9EB": 38,
+      "400286": 37,
+      "A8109D": 29,
+      "00B050": 29,
+      "A6A6A6": 25,
+      "FF1119": 15,
+      "413A5F": 10,
+      "000F9F": 9,
+      "000000": 8,
+      "7F7F7F": 8,
+      "FFC000": 7,
+      "F78626": 7,
+      "8822FC": 7,
+      "BED32E": 6,
+      "04974F": 6,
+      "006EB9": 6,
+      "8497B0": 6,
+      "FFA7AA": 6,
+      "D9D9D9": 6,
+      "9A80B9": 5
+    },
+    "top_fonts": {
+      "+mn-lt": 235,
+      "Century Gothic": 212,
+      "Avenir Next LT Pro": 19,
+      "Source Sans Pro": 2,
+      "+mj-lt": 1,
+      " century gothic": 1
+    },
+    "theme_fonts_major": {
+      "Avenir Next LT Pro": 1
+    },
+    "theme_fonts_minor": {
+      "Century Gothic": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#44546A",
+        "lt2": "#E7E6E6",
+        "accent1": "#400286",
+        "accent2": "#00A9EB",
+        "accent3": "#636466",
+        "accent4": "#FF6C71",
+        "accent5": "#71CDA1",
+        "accent6": "#000000",
+        "hlink": "#0563C1",
+        "folHlink": "#954F72"
+      }
+    ]
+  },
+  "Regeneron": {
+    "deck_count": 2,
+    "decks": [
+      "[ZoomRx] Libtayo (Nov \u201925 - Feb \u201926) NMSC Message Recall & Effectiveness Report v3.0 - Synapse Migration.pptx",
+      "ZoomRx Dupixent EoE PET Q4 '25_v3.pptx"
+    ],
+    "top_series_colors": {
+      "219491": 62,
+      "F79646": 18,
+      "E46C0A": 16,
+      "DC0077": 11,
+      "8EB4E3": 11,
+      "00745A": 11,
+      "7030A0": 11,
+      "004F6F": 10,
+      "B370A4": 10,
+      "7ABFBD": 9,
+      "558ED5": 9,
+      "C83333": 8,
+      "BFBFBF": 8,
+      "96BBBB": 7,
+      "C19875": 7,
+      "338533": 7,
+      "D34D4D": 6,
+      "A6A6A6": 5,
+      "17375E": 5,
+      "668998": 4
+    },
+    "top_fonts": {
+      "Arial": 3071,
+      "DM Sans 14pt": 1585,
+      "+mj-lt": 189,
+      "+mn-lt": 99,
+      "Arial(Body)": 51,
+      "Wingdings": 27,
+      "Calibri": 22,
+      "Trebuschet MS Body": 1,
+      "Helvetica Neue": 1
+    },
+    "theme_fonts_major": {
+      "Trade Gothic LT Std": 1,
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Arial": 2
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "sys:000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#004F6F",
+        "lt2": "#E7E6E6",
+        "accent1": "#DC0077",
+        "accent2": "#004F6F",
+        "accent3": "#5C514E",
+        "accent4": "#969B1E",
+        "accent5": "#DC0077",
+        "accent6": "#004F6F",
+        "hlink": "#000000",
+        "folHlink": "#757070"
+      },
+      {
+        "dk1": "sys:000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#1F497D",
+        "lt2": "#EEECE1",
+        "accent1": "#4F81BD",
+        "accent2": "#C0504D",
+        "accent3": "#9BBB59",
+        "accent4": "#8064A2",
+        "accent5": "#4BACC6",
+        "accent6": "#F79646",
+        "hlink": "#0000FF",
+        "folHlink": "#0000FF"
+      }
+    ]
+  },
+  "Novartis": {
+    "deck_count": 1,
+    "decks": [
+      "[ZoomRx] NVS Rhapsido_PET_Wave 4 Full Report v1.0.pptx"
+    ],
+    "top_series_colors": {
+      "018E86": 14,
+      "0070FE": 11,
+      "002068": 11,
+      "8F2DDE": 8,
+      "852065": 7,
+      "B56FA3": 7,
+      "61A8FF": 6,
+      "50E2D0": 6,
+      "A7A8AA": 6,
+      "C89ABA": 5,
+      "E7D2E0": 5,
+      "E4EECA": 4,
+      "A6C850": 4,
+      "830F66": 4,
+      "DAAB8D": 4,
+      "B45518": 4,
+      "ADAFBC": 4,
+      "B3DDDB": 4,
+      "842064": 3,
+      "001750": 3
+    },
+    "top_fonts": {
+      "Arial": 3168,
+      "+mj-lt": 880,
+      "Calibri (Body)": 306,
+      "+mn-lt": 144,
+      "Times New Roman": 6,
+      "Tahoma": 2
+    },
+    "theme_fonts_major": {
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#595959",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#000000",
+        "lt2": "#0070FE",
+        "accent1": "#FF0085",
+        "accent2": "#1D003E",
+        "accent3": "#F2F3F3",
+        "accent4": "#79FFFF",
+        "accent5": "#9200D1",
+        "accent6": "#000000",
+        "hlink": "#0070FE",
+        "folHlink": "#9200D1"
+      }
+    ]
+  },
+  "Amgen": {
+    "deck_count": 2,
+    "decks": [
+      "[ZoomRx] Q1'26 Otezla Derm PET_Full Report v0.1.pptx",
+      "TEST [COPY] ZoomRx AMG UPLIZNA NMOSD PET Q4 '25 Final Report_cleaned.pptx"
+    ],
+    "top_series_colors": {
+      "1F497D": 48,
+      "813F97": 30,
+      "007D6D": 14,
+      "6F8DB4": 12,
+      "003C71": 11,
+      "DA205F": 8,
+      "00A3DF": 7,
+      "4C35DE": 7,
+      "0063C3": 7,
+      "00B0F0": 7,
+      "E46C0A": 5,
+      "D9D9D9": 5,
+      "A5A5A5": 4,
+      "425563": 4,
+      "A6A6A6": 4,
+      "335E95": 4,
+      "2E75B6": 3,
+      "FFB81C": 3,
+      "C303D4": 3,
+      "ED7D31": 3
+    },
+    "top_fonts": {
+      "Century Gothic": 4267,
+      "Calibri": 214,
+      "+mj-lt": 118,
+      "+mn-lt": 74,
+      "Arial": 3,
+      "Times New Roman": 1
+    },
+    "theme_fonts_major": {
+      "Century Gothic": 1,
+      "Calibri": 1
+    },
+    "theme_fonts_minor": {
+      "Century Gothic": 1,
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#605D75",
+        "lt2": "#ADADAD",
+        "accent1": "#0063C3",
+        "accent2": "#00BCE4",
+        "accent3": "#7EE0DD",
+        "accent4": "#2CC84D",
+        "accent5": "#FEDD00",
+        "accent6": "#FF6720",
+        "hlink": "#151F6D",
+        "folHlink": "#830B55"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#716F73",
+        "lt2": "#00BCE4",
+        "accent1": "#0063C3",
+        "accent2": "#88C765",
+        "accent3": "#F3C108",
+        "accent4": "#D34D2F",
+        "accent5": "#597B7C",
+        "accent6": "#005480",
+        "hlink": "#2DBCB6",
+        "folHlink": "#B2A97E"
+      }
+    ]
+  },
+  "Unknown": {
+    "deck_count": 2,
+    "decks": [
+      "ALL PET Q1FY26 KPI Report 19DEC2025.pptx",
+      "Physicians SFE (PET)_Q3'25 Report_V1.pptx"
+    ],
+    "top_series_colors": {
+      "E7004C": 37,
+      "C7A013": 30,
+      "6BC9EF": 25,
+      "006838": 24,
+      "FF6969": 21,
+      "00607C": 20,
+      "4E79A7": 18,
+      "00A44A": 14,
+      "ED98C1": 13,
+      "E464A2": 12,
+      "00CC00": 12,
+      "D9D9D9": 8,
+      "33B66E": 7,
+      "FFC000": 6,
+      "B2B2B2": 5,
+      "FF9694": 4,
+      "FF2653": 3,
+      "DEA6DD": 3,
+      "FF79A6": 3,
+      "294983": 2
+    },
+    "top_fonts": {
+      "Arial": 2261,
+      "Century Gothic": 185,
+      "+mj-lt": 160,
+      "Arial(Body)": 23,
+      "+mn-lt": 5,
+      "Times New Roman": 1
+    },
+    "theme_fonts_major": {
+      "Century Gothic": 1,
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Century Gothic": 1,
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#91C361",
+        "lt1": "#FFFFFF",
+        "dk2": "#47BFD9",
+        "lt2": "#E7E6E6",
+        "accent1": "#242269",
+        "accent2": "#F55B41",
+        "accent3": "#323C8E",
+        "accent4": "#9B7DCD",
+        "accent5": "#FDC300",
+        "accent6": "#D3DEF2",
+        "hlink": "#47BFD9",
+        "folHlink": "#91C361"
+      },
+      {
+        "dk1": "#0A3254",
+        "lt1": "#FFFFFF",
+        "dk2": "#404040",
+        "lt2": "#D8DAD9",
+        "accent1": "#0099DC",
+        "accent2": "#AF1F65",
+        "accent3": "#682666",
+        "accent4": "#00BED4",
+        "accent5": "#3DD5AE",
+        "accent6": "#EDAA00",
+        "hlink": "#002060",
+        "folHlink": "#0070C0"
+      }
+    ]
+  },
+  "CCA": {
+    "deck_count": 1,
+    "decks": [
+      "CCA PET Q2FY26 Personal Promotion Synapse check.pptx"
+    ],
+    "top_series_colors": {
+      "F28E2B": 5,
+      "FFFFFF": 4,
+      "A6A6A6": 4,
+      "8FAADC": 4,
+      "BDD7EE": 3,
+      "AFED5D": 3,
+      "FFABD5": 3,
+      "BFBFBF": 2,
+      "FF6700": 2,
+      "FF8F43": 2,
+      "FFBC8F": 2,
+      "002060": 2,
+      "2F5597": 2,
+      "B4C7E7": 2,
+      "F28E41": 1,
+      "F8696B": 1,
+      "FA9473": 1,
+      "FCBF7B": 1,
+      "FFEB84": 1,
+      "CCDD82": 1
+    },
+    "top_fonts": {
+      "Century Gothic": 366,
+      "Arial": 317,
+      "+mn-lt": 6,
+      "Wingdings": 4,
+      "+mj-lt": 1,
+      "-apple-system": 1
+    },
+    "theme_fonts_major": {
+      "Century Gothic": 1
+    },
+    "theme_fonts_minor": {
+      "Century Gothic": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#242269",
+        "lt1": "#FFFFFF",
+        "dk2": "#91C361",
+        "lt2": "#E7E6E6",
+        "accent1": "#242269",
+        "accent2": "#F55B41",
+        "accent3": "#323C8E",
+        "accent4": "#9B7DCD",
+        "accent5": "#FDC300",
+        "accent6": "#D3DEF2",
+        "hlink": "#47BFD9",
+        "folHlink": "#91C361"
+      }
+    ]
+  },
+  "DSI": {
+    "deck_count": 1,
+    "decks": [
+      "DATROWAY EGFRm NSCLC Promotional Effectiveness Tracking (PET) Q1 '26 PP and NPP Final Report_v1.pptx"
+    ],
+    "top_series_colors": {
+      "1E22AA": 22,
+      "643466": 11,
+      "FBCCB1": 10,
+      "A6A6A6": 5,
+      "B253DE": 5,
+      "353236": 5,
+      "CC0066": 5,
+      "75E6E9": 3,
+      "00AE9B": 3,
+      "7CD214": 3,
+      "A74109": 3,
+      "304B4C": 3,
+      "662D91": 3,
+      "353EFF": 3,
+      "3D94AA": 3,
+      "1E5680": 3,
+      "6165E3": 3,
+      "002060": 3,
+      "EE7623": 3,
+      "68D2DF": 3
+    },
+    "top_fonts": {
+      "+mj-lt": 814,
+      "Arial": 61,
+      "Arial (Body)": 6,
+      "Manrope": 2
+    },
+    "theme_fonts_major": {
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#464348",
+        "lt2": "#EBE3CE",
+        "accent1": "#1E22AA",
+        "accent2": "#00D1D6",
+        "accent3": "#0F7E95",
+        "accent4": "#FA9D00",
+        "accent5": "#BB5B02",
+        "accent6": "#F1F1FA",
+        "hlink": "#1E22AA",
+        "folHlink": "#BA5B02"
+      }
+    ]
+  },
+  "GSK": {
+    "deck_count": 2,
+    "decks": [
+      "GSK BLENREP MM PET Monthly Report February 2026_Migration Copy.pptx",
+      "GSK Jemperli Zejula PET Full Report February '26 Syn Check.pptx"
+    ],
+    "top_series_colors": {
+      "3AB51D": 36,
+      "668EDD": 28,
+      "6658A6": 26,
+      "5C103B": 22,
+      "7030A0": 21,
+      "D51900": 18,
+      "17B3AF": 17,
+      "1B3B7A": 16,
+      "E21860": 14,
+      "4F447D": 13,
+      "F36633": 12,
+      "F25E29": 11,
+      "706352": 11,
+      "A9A197": 11,
+      "00847C": 11,
+      "FFC000": 9,
+      "3F348E": 9,
+      "E7004E": 9,
+      "244EA2": 7,
+      "4D427D": 7
+    },
+    "top_fonts": {
+      "Arial": 763,
+      "+mn-lt": 11,
+      "DM Sans 14pt": 11,
+      "+mj-lt": 9,
+      "Century Gothic": 4,
+      "Times New Roman": 1
+    },
+    "theme_fonts_major": {
+      "Arial": 2
+    },
+    "theme_fonts_minor": {
+      "Arial": 2
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#F36633",
+        "lt2": "#959595",
+        "accent1": "#6658A6",
+        "accent2": "#E21860",
+        "accent3": "#69B445",
+        "accent4": "#244EA2",
+        "accent5": "#FFC709",
+        "accent6": "#DC4133",
+        "hlink": "#000000",
+        "folHlink": "#000000"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#F36633",
+        "lt2": "#959595",
+        "accent1": "#6658A6",
+        "accent2": "#E21860",
+        "accent3": "#69B445",
+        "accent4": "#244EA2",
+        "accent5": "#FFC709",
+        "accent6": "#DC4133",
+        "hlink": "#000000",
+        "folHlink": "#F0EFED"
+      }
+    ]
+  },
+  "JJ": {
+    "deck_count": 4,
+    "decks": [
+      "J&J MM SFEA Q1'26_Full_Report_V2_Migration.pptx",
+      "JJ PET RYBREVANT+LAZCLUZE Q1'26 Report_Migration.pptx",
+      "TEPEZZA_PET_Q4 2025_Report_JJ_NS_TP1latest_UseThis.pptx",
+      "ZoomRx - GSK OJJAARA MF PET Research - February '26 Full Monthly Report v1 Migration Test.pptx"
+    ],
+    "top_series_colors": {
+      "7FB1E1": 61,
+      "0063C3": 50,
+      "6FC6C1": 35,
+      "37CFCA": 34,
+      "BD05ED": 30,
+      "228D8A": 29,
+      "A0D0FF": 19,
+      "FF6A5A": 18,
+      "2A41C1": 18,
+      "CBF3F1": 18,
+      "F75824": 16,
+      "00A3C4": 16,
+      "FFC000": 14,
+      "0302C8": 13,
+      "ADADAD": 13,
+      "6BB23E": 13,
+      "6114FF": 13,
+      "2D5BEF": 12,
+      "00B050": 12,
+      "FF6720": 12
+    },
+    "top_fonts": {
+      "Johnson Text": 4918,
+      "Johnson Display": 702,
+      "+mn-lt": 475,
+      "Century Gothic": 457,
+      "+mj-lt": 451,
+      "Arial": 352
+    },
+    "theme_fonts_major": {
+      "Johnson Display": 2,
+      "Century Gothic": 1,
+      "Arial": 1
+    },
+    "theme_fonts_minor": {
+      "Johnson Text": 2,
+      "Century Gothic": 1,
+      "Arial": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#F9F7F6",
+        "lt2": "#564C47",
+        "accent1": "#EB1700",
+        "accent2": "#000000",
+        "accent3": "#C1BBB3",
+        "accent4": "#004685",
+        "accent5": "#69D0FF",
+        "accent6": "#541980",
+        "hlink": "#000000",
+        "folHlink": "#000000"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#EB1700",
+        "lt2": "#564C47",
+        "accent1": "#EB1700",
+        "accent2": "#000000",
+        "accent3": "#C4BDB6",
+        "accent4": "#004686",
+        "accent5": "#68D2FF",
+        "accent6": "#541981",
+        "hlink": "#000000",
+        "folHlink": "#000000"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#605D75",
+        "lt2": "#ADADAD",
+        "accent1": "#0063C3",
+        "accent2": "#00BCE4",
+        "accent3": "#7EE0DD",
+        "accent4": "#2CC84D",
+        "accent5": "#FEDD00",
+        "accent6": "#FF6720",
+        "hlink": "#151F6D",
+        "folHlink": "#830B55"
+      }
+    ]
+  },
+  "LEO": {
+    "deck_count": 2,
+    "decks": [
+      "OG Adbry PET SC Deck.pptx",
+      "V1_Adbry PET_W1'26 (Wave 22)_migrated deck.pptx"
+    ],
+    "top_series_colors": {
+      "C014A3": 36,
+      "D5685F": 30,
+      "6F439A": 28,
+      "FED006": 14,
+      "EAAFE0": 14,
+      "009B77": 12,
+      "D561C1": 8,
+      "90117A": 8,
+      "946A2C": 6,
+      "2E8082": 6,
+      "1E41EB": 6,
+      "0047BB": 5,
+      "00609C": 5,
+      "4E7BA9": 4,
+      "00B050": 4,
+      "929292": 4,
+      "EAB3AF": 4,
+      "9A7CB8": 4,
+      "C017A2": 4,
+      "FF8C19": 3
+    },
+    "top_fonts": {
+      "Arial": 1436,
+      "Franklin Gothic Book": 17
+    },
+    "theme_fonts_major": {
+      "Arial": 2
+    },
+    "theme_fonts_minor": {
+      "Arial": 2
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#68A17C",
+        "lt2": "#F5F3EF",
+        "accent1": "#204131",
+        "accent2": "#68A17C",
+        "accent3": "#006E96",
+        "accent4": "#EAAA00",
+        "accent5": "#682D64",
+        "accent6": "#798D83",
+        "hlink": "#338BAB",
+        "folHlink": "#865E83"
+      },
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#68A17C",
+        "lt2": "#F5F3EF",
+        "accent1": "#204131",
+        "accent2": "#68A17C",
+        "accent3": "#006E96",
+        "accent4": "#EAAA00",
+        "accent5": "#682D64",
+        "accent6": "#798D83",
+        "hlink": "#338BAB",
+        "folHlink": "#865E83"
+      }
+    ]
+  },
+  "Ipsen": {
+    "deck_count": 1,
+    "decks": [
+      "Onivyde SFE W3 Report.pptx"
+    ],
+    "top_series_colors": {
+      "54AC65": 41,
+      "C84874": 13,
+      "8EC899": 11,
+      "595959": 9,
+      "BBDEC2": 9,
+      "D3D3D3": 7,
+      "D2E9D6": 6,
+      "A6A6A6": 6,
+      "A9D5B2": 6,
+      "00B039": 4,
+      "387343": 4,
+      "FA9F1A": 4,
+      "BFBFBF": 4,
+      "C2EAFF": 3,
+      "DE505E": 1,
+      "FF8813": 1,
+      "F4DAE3": 1,
+      "691F39": 1,
+      "7BA07B": 1,
+      "FFDAB9": 1
+    },
+    "top_fonts": {
+      "+mn-lt": 59,
+      "+mj-lt": 34,
+      "Calibri": 2
+    },
+    "theme_fonts_major": {
+      "Rethink Sans": 1
+    },
+    "theme_fonts_minor": {
+      "Rethink Sans": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "#000000",
+        "lt1": "#FFFFFF",
+        "dk2": "#6EC4FF",
+        "lt2": "#000E56",
+        "accent1": "#EDEBE3",
+        "accent2": "#061F80",
+        "accent3": "#153F99",
+        "accent4": "#1E59B2",
+        "accent5": "#3286D6",
+        "accent6": "#50AAF8",
+        "hlink": "#BDDFFC",
+        "folHlink": "#000000"
+      }
+    ]
+  },
+  "Apellis": {
+    "deck_count": 1,
+    "decks": [
+      "ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx"
+    ],
+    "top_series_colors": {
+      "FC3B6E": 37,
+      "E7E6E6": 33,
+      "30CFD0": 32,
+      "81E3E3": 9,
+      "5A4986": 8,
+      "FD7FA0": 8,
+      "FEB0C4": 8,
+      "FFC000": 7,
+      "163A6B": 6,
+      "5E6C85": 5,
+      "C6F3F2": 4,
+      "00B0F0": 4,
+      "9A9A9A": 3,
+      "0070C0": 3,
+      "666666": 2,
+      "C02C57": 2,
+      "F16464": 2,
+      "D36B8A": 2,
+      "E6ABBC": 2,
+      "7F7F7F": 2
+    },
+    "top_fonts": {
+      "Calibri": 868,
+      "Calibri (Body)": 209,
+      "+mn-lt": 95,
+      "Wingdings": 16,
+      "+mj-lt": 14,
+      "Arial": 11
+    },
+    "theme_fonts_major": {
+      "Calibri Light": 1
+    },
+    "theme_fonts_minor": {
+      "Calibri": 1
+    },
+    "theme_colors_samples": [
+      {
+        "dk1": "sys:000000",
+        "lt1": "sys:FFFFFF",
+        "dk2": "#5E6C85",
+        "lt2": "#E7E6E6",
+        "accent1": "#5A4986",
+        "accent2": "#FC3B6E",
+        "accent3": "#A5CFD4",
+        "accent4": "#A4558F",
+        "accent5": "#FF8E70",
+        "accent6": "#3062A4",
+        "hlink": "#0090BA",
+        "folHlink": "#8E7ABC"
+      }
+    ]
+  }
+}
