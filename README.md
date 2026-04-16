@@ -83,15 +83,16 @@ Claude Code skills = SKILL.md files that tell Claude *what to do* and *when*. Or
 
 ```
 .claude/skills/
-├── analysis/         5 skills — hypothesis-generator, sfea-insight-writer,
-│                                segment-comparator, stat-sig-annotator, trend-analyzer
+├── analysis/         6 skills — hypothesis-generator, sfea-insight-writer (PET),
+│                                atu-insight-writer (ATU), segment-comparator,
+│                                stat-sig-annotator, trend-analyzer
 ├── context-data/     5 skills — deck-reader + 4 context builders
 ├── creation/         7 skills — slide-creator, slide-updater, slide-editor,
 │                                deck-assembler, headline-writer, callout-writer,
 │                                executive-summary-writer
 ├── planning/         7 skills — viz-selector, layout-selector, spec-validator,
 │                                4 slide-plan-generator-* variants
-├── projects/         1 skill  — pet-deck (ATU + HCP-Pt + DT + PCA in Q3)
+├── projects/         2 skills — pet-deck, atu-deck (HCP-Pt + DT + PCA via project teams)
 ├── workflows/        8 skills — top-level orchestrators (see §Workflows)
 ├── pptx/             legacy general-purpose PPTX skill
 └── slidegen/         legacy all-in-one skill (being decomposed)
@@ -196,7 +197,7 @@ galen-consulting-r3m-report/
 │   ├── pptx_utils/                  # composition primitives (see above)
 │   └── pipeline/                    # R3M Report YAML-driven orchestrator
 │
-├── .claude/skills/                  # 38 SKILL.md files across 7 folders
+├── .claude/skills/                  # 40 SKILL.md files across 7 folders
 ├── experiments/
 │   └── deck_analysis/               # Apr 15 analysis of 32 real PET decks
 │       ├── decks/                   # source PPTXs (gitignored)
@@ -288,6 +289,7 @@ python -m pytest tests/                                      # full suite
 
 **Done:**
 - Apr 15 deck analysis of 32 real PET decks across 17 clients → populated `BRAND{}`, `LAYOUTS{}`, `CHART_PATTERNS{}`
+- Apr 16 deck analysis of 8 ATU decks across 7 clients → ATU section structure, chart frequency comparison vs PET
 - Spec contract (`slidegen/slide_spec/`) + validator
 - `slide-creator` Python with 10 chart patterns rendering at real-deck fidelity
 - 20 canonical example specs (~55% real-slide coverage)

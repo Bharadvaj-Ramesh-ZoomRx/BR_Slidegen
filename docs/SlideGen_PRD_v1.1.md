@@ -3,7 +3,7 @@
 **Status:** Draft for iteration with Sriram/Siva/Manoj
 **Author:** Vijay Ganesan
 **Date:** April 16, 2026
-**Based on:** Q2 FY26 QBR (Apr 13) + follow-up calls with Sriram/Siva/Manoj (Apr 13-14) + Original PPT Agent Brief (Sep 2025) + Siva's existing SlideGen PRD (Mar 10, 2026) + code walkthrough with Rajesh + **Deck analysis of 32 PET decks across 17 clients (Apr 15, 2026)** + Galen-PowerPoint Synapse Connector tag model review + workflow-taxonomy MECE audit.
+**Based on:** Q2 FY26 QBR (Apr 13) + follow-up calls with Sriram/Siva/Manoj (Apr 13-14) + Original PPT Agent Brief (Sep 2025) + Siva's existing SlideGen PRD (Mar 10, 2026) + code walkthrough with Rajesh + **Deck analysis of 32 PET decks across 17 clients + 8 ATU decks across 7 clients** + Galen-PowerPoint Synapse Connector tag model review + workflow-taxonomy MECE audit.
 
 \---
 
@@ -25,7 +25,7 @@ SlideGen is a **library of composable skills + a robust `pptx\_utils` Python pac
 
 By end of Q3, this should work for all major project types (PET, ATU, PCA, HCP-Pt, Digital Trackers) and demonstrate enough versatility that consulting leadership can engage with FY27 staffing decisions.
 
-**Deck analysis grounding (Apr 15, 2026):** A reverse-engineering exercise across **32 real PET decks spanning 17 pharmaceutical clients** (4,354 charts, 4,950 tables, 3,569 headlines) concretely quantified what the skills and `pptx\_utils` must support. See §6.5 for key findings driving P0 work.
+**Deck analysis grounding:** Reverse-engineering of **32 real PET decks spanning 17 pharma clients** (4,354 charts, 4,950 tables, 3,569 headlines) plus **8 ATU decks across 7 clients** (1,347 charts, 1,539 tables) concretely quantified what the skills and `pptx_utils` must support. ATU analysis confirmed the same chart-type vocabulary with different frequency distribution (2.8x more stacked-100 composition charts, half the line/scatter usage). See §6.6 for PET findings; see `experiments/deck_analysis/outputs/atu_analysis.md` for ATU findings.
 
 \---
 
@@ -275,7 +275,8 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |Skill|Status|Purpose|
 |-|-|-|
 |`hypothesis-generator`|✅|Generate hypothesis bank from KBQs + context|
-|`sfea-insight-writer`|✅|Two internal phases: Phase 0 validates hypotheses against survey data → `validated\_analysis.md`; Phase 1 synthesizes story arcs (CONVERGENCE/TENSION/DIVERGENCE/CLOSURE) + arc-informed headlines + ES + recommendations → `narrative\_threads.md`. Kept as a single skill — phases share context heavily; will only be split if a concrete workflow needs one phase alone|
+|`sfea-insight-writer`|✅|PET/SFEA-specific. Two internal phases: Phase 0 validates hypotheses against survey data → `validated_analysis.md`; Phase 1 synthesizes story arcs (CONVERGENCE/TENSION/DIVERGENCE/CLOSURE) + arc-informed headlines + ES + recommendations → `narrative_threads.md`. Used by `pet-deck` project skill.|
+|`atu-insight-writer`|✅|ATU-specific parallel to sfea-insight-writer. Same two-phase structure but with ATU arc patterns (FUNNEL_LEAKAGE, SHARE_MOMENTUM, COMPETITIVE_CONVERGENCE, BARRIER_CLUSTER, LOYALTY_EROSION, SEGMENT_SPLIT, ADOPTION_CURVE), share-driven headline framing, and barrier-aware recommendations. Used by `atu-deck` project skill.|
 |`segment-comparator`|🆕|Compare segments with significance testing (T-test, chi-square as applicable)|
 |`trend-analyzer`|🆕|Trend analysis across waves|
 |`stat-sig-annotator`|🆕|Annotate slides with significance markers, low sample footnotes|
@@ -333,7 +334,7 @@ Each workflow skill maps user intent → composed skill sequence.
 * **9 context + data skills** (6 exist, 3 new)
 * **7 planning skills** (1 exists, 5 new, 1 refactor)
 * **7 creation skills** (2 refactor, 5 new)
-* **5 analysis skills** (2 exist, 3 new)
+* **6 analysis skills** (2 exist, 4 new — includes `atu-insight-writer` parallel to `sfea-insight-writer`)
 * **5 project-type skills** (1 refactor, 4 new)
 * **8 workflow skills** (1 exists-as-concept, 2 refactor, 5 new)
 * **4 collaboration skills** (2 exist, 2 new)
@@ -350,7 +351,7 @@ Verifies that every workflow is fully executable as a composition of skills. If 
 ### Workflow 1: Create deck
 
 **Composition:**
-`create-deck-workflow` → (`pet-deck` if PET project) → `project-context-builder` + `market-context-builder` + `survey-context-builder` + `prior-wave-context-builder` + `synapse-read` → `hypothesis-generator` (briefing mode) OR use provided `hypothesis\_bank.md` (hypothesis mode) → `sfea-insight-writer` → `slide-plan-generator-hypothesis` → `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` (×N) → `deck-assembler`
+`create-deck-workflow` → (`pet-deck` if PET project) → `project-context-builder` + `market-context-builder` + `survey-context-builder` + `prior-wave-context-builder` + `synapse-read` → `hypothesis-generator` (briefing mode) OR use provided `hypothesis\_bank.md` (hypothesis mode) → insight-writer (sfea or atu per project type) → `slide-plan-generator-hypothesis` → `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` (×N) → `deck-assembler`
 
 ### Workflow 2: Refresh deck
 
@@ -488,7 +489,7 @@ May evolve to custom harness over time if cost or control demands it. Skills + t
 
 Workflows are concrete and demonstrable. Skills emerge as artifacts of workflow work.
 
-### 6.6 Deck Analysis Findings (32 PET decks, 17 clients)
+### 6.6 Deck Analysis Findings (32 PET decks + 8 ATU decks)
 
 A reverse-engineering exercise analyzed every chart, table, headline, and coordinate in 32 real client PET decks. Full methodology + raw data in `experiments/deck\_analysis/outputs/ACTIONABLE\_FINDINGS.md`. Key findings that drive this PRD:
 
@@ -877,7 +878,7 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * **Original PPT Agent Brief (Sep 2025)** — source of several workflows (edit, add, segment analysis, executive summary) and architectural concepts (viz hierarchy, multi-element assembly, analysis traces). Superseded in modality (embedded-in-PPT → Claude Code terminal) but many ideas survive.
 * **Siva's SlideGen PRD (Mar 10, 2026)** — at `docs/SlideGen_PRD.md`. The implementation blueprint (four-track data layer, win32com live editing, shape registry reconciliation, audit chain). This PRD (v1.1) is strategic direction; Siva's is the technical blueprint. Complementary, not contradictory.
 * **Existing SlideGen Workflow** — at `galen-consulting-r3m-report/docs/slidegen\_workflow.md`. Current 8-stage pipeline documentation.
-* **Deck Analysis (Apr 15, 2026)** — at `galen-consulting-r3m-report/experiments/deck\_analysis/` on branch `vijay-slidegen`. Reverse-engineering of 32 PET decks across 17 clients. Produced `ACTIONABLE\_FINDINGS.md` (synthesis), `deep\_report.md` (detailed OOXML analysis), `deep\_brand\_proposals.md` (BRAND{} proposals), `layout\_clusters.md` (coordinate clusters), plus JSON outputs for every dimension. Source of the populated `pptx\_utils`.
+* **Deck Analysis** — at `experiments/deck_analysis/` on branch `vijay-slidegen`. Two rounds: (1) 32 PET decks across 17 clients (Apr 15) — produced ACTIONABLE_FINDINGS.md, deep_report.md, layout_clusters.md, plus JSON outputs. Source of the populated pptx_utils. (2) 8 ATU decks across 7 clients (Apr 16) — produced atu_analysis.md with ATU-vs-PET structural comparison. Source of the atu-deck project skill and atu-insight-writer.
 * **Agentic MR PRD** — broader client-facing platform vision. SlideGen is an internal capability toward that vision; this PRD scopes it to internal use for Q3.
 
 ### 11.2 Glossary
@@ -911,12 +912,12 @@ All 8 workflows are in Q3 scope. Ship order reflects §9.2 — smallest-risk fir
 |-|-|-|-|
 |3|Edit slide|edit-slide-workflow, deck-reader, spec-validator, slide-updater, slide-editor, headline-writer, slide-creator, deck-assembler|1 (shake-down — rebuild mode first, then data\_refresh and edit modes)|
 |2|Refresh deck|refresh-deck-workflow, pet-deck, deck-reader (Tier 1+2), prior-wave-context-builder, synapse-read, slide-plan-generator-refresh, slide-updater, slide-creator, trend-analyzer, headline-writer, deck-assembler|2 (primary demo)|
-|1|Create deck|create-deck-workflow, pet-deck, context-builders, hypothesis-generator, sfea-insight-writer, slide-plan-generator-hypothesis, viz-selector, layout-selector, headline-writer, slide-creator, deck-assembler|3|
+|1|Create deck|create-deck-workflow, pet-deck, context-builders, hypothesis-generator, insight-writer (sfea or atu per project type), slide-plan-generator-hypothesis, viz-selector, layout-selector, headline-writer, slide-creator, deck-assembler|3|
 |4|Add slide|add-slide-workflow, deck-reader, synapse-read, slide-plan-generator-single, viz-selector, layout-selector, headline-writer, slide-creator, (segment-comparator + stat-sig-annotator for segment mode), deck-assembler|4|
 |5|Annotate slide|annotate-slide-workflow, deck-reader, callout-writer, slide-editor, (segment-comparator + stat-sig-annotator for insight mode), slide-creator, deck-assembler|5|
 |6|Restructure deck|structural-edit-workflow, deck-reader, spec-validator, layout-selector, deck-assembler|6|
 |7|Audit deck|deck-audit-workflow, deck-reader, spec-validator (read-only)|7|
-|8|Executive summary|executive-summary-workflow, deck-reader (full deck), sfea-insight-writer, slide-plan-generator-exec-summary, executive-summary-writer, slide-creator, deck-assembler|8|
+|8|Executive summary|executive-summary-workflow, deck-reader (full deck), insight-writer (sfea or atu per project type), slide-plan-generator-exec-summary, executive-summary-writer, slide-creator, deck-assembler|8|
 
 
 

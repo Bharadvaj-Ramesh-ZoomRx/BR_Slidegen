@@ -89,6 +89,6 @@ The 120-char limit is enforced as a hard cap with ellipsis truncation.
 
 - `slidegen/headline_writer.py` — implementation (template-based baseline; LLM augmentation is a wrapper layer)
 - `experiments/deck_analysis/outputs/deep_headlines.json` — 3,569 real headlines as style corpus
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` — existing skill that writes narrative arcs + headlines inline (Phase 1 of the 2-phase flow)
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET) / `atu-insight-writer/SKILL.md` (ATU) — existing skill that writes narrative arcs + headlines inline (Phase 1 of the 2-phase flow)
 - `.claude/skills/creation/slide-updater/SKILL.md` — primary caller; invokes on every data refresh
 - PRD §6.7 (spec contract), §6.9 (headline-refresh policy)

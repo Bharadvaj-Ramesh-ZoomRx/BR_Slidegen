@@ -198,10 +198,11 @@ When `atu-deck` is invoked by a workflow, it applies these methodology defaults 
 - Require PRIOR WAVE VALIDATION hypotheses for funnel metrics and competitive position carried forward
 - KBQ mapping must span funnel health, competitive positioning, adoption barriers, usage drivers, and patient selection
 
-### To `sfea-insight-writer`
-- Narrative arcs should follow the brand funnel: awareness -> trial -> usage -> loyalty
+### To `atu-insight-writer` (NOT sfea-insight-writer — ATU has its own insight skill)
+- Uses ATU arc patterns: FUNNEL_LEAKAGE, SHARE_MOMENTUM, COMPETITIVE_CONVERGENCE, BARRIER_CLUSTER, LOYALTY_EROSION, SEGMENT_SPLIT, ADOPTION_CURVE
+- Narrative arcs follow the brand funnel: awareness -> consideration -> trial -> usage -> loyalty
 - Executive Summary must cover: Awareness position, Usage/prescribing dynamics, Competitive positioning, Key perception gaps, Patient profile insights
-- Recommendations use ATU action verbs: EXPAND, REINFORCE, ADDRESS, DIFFERENTIATE, TARGET, EDUCATE, LEVERAGE, CONVERT, RETAIN, STRENGTHEN, SIMPLIFY, ACCELERATE
+- Recommendations use ATU action verbs: ACCELERATE, UNBLOCK, DEFEND, EXPAND, INVESTIGATE
 
 ### To `slide-plan-generator-hypothesis`
 - Section ordering: Cover, Methodology, Executive Summary, Recommendations, Awareness, Trial/Adoption, Usage/Prescribing, Perceptions/Attitudes, Competitive, Loyalty/Retention, Patient Profile, Treatment Journey, Appendix
@@ -261,7 +262,7 @@ When invoked by `create-deck-workflow`:
 3. Apply ATU methodology defaults to all downstream skill invocations
 4. Delegate to the standard workflow stages:
      hypothesis-generator (with ATU module coverage requirement)
-     sfea-insight-writer (with ATU narrative conventions)
+     atu-insight-writer (ATU-specific hypothesis validation + narrative arcs)
      slide-plan-generator-hypothesis (with ATU section ordering)
      viz-selector + layout-selector (with ATU chart pattern defaults)
      slide-creator + deck-assembler (with brand visual identity)
@@ -340,7 +341,7 @@ When setting up an ATU project for a new brand, the project team must provide:
 - `.claude/skills/workflows/create-deck-workflow/SKILL.md` -- full create orchestration
 - `.claude/skills/workflows/refresh-deck-workflow/SKILL.md` -- full refresh orchestration
 - `.claude/skills/analysis/hypothesis-generator/SKILL.md` -- hypothesis generation
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` -- narrative threads + ES + recs
+- `.claude/skills/analysis/atu-insight-writer/SKILL.md` -- ATU-specific narrative threads + ES + recs (NOT sfea-insight-writer)
 - `.claude/skills/planning/slide-plan-generator-hypothesis/SKILL.md` -- slide plan from narrative
 - `.claude/skills/planning/viz-selector/SKILL.md`, `layout-selector/SKILL.md` -- chart/layout selection
 - `.claude/skills/creation/slide-creator/SKILL.md`, `deck-assembler/SKILL.md` -- rendering + assembly

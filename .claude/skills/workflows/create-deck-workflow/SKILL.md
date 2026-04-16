@@ -78,7 +78,7 @@ Stage 2 — mode-dependent
 GATE: user confirms hypothesis count + domain coverage
 
 Stage 3
-8. sfea-insight-writer (both phases)
+8. insight-writer (sfea-insight-writer for PET, atu-insight-writer for ATU — selected by project-type skill)
      Phase 0: validated_analysis.md
      Phase 1: narrative_threads.md
 
@@ -117,7 +117,7 @@ Stage 5 — internal, no gate
 - PRD §3 Workflow 1, §5 composition map, §7 stage model
 - `.claude/skills/context-data/*` — context builders
 - `.claude/skills/analysis/hypothesis-generator/SKILL.md`
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md`
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET), `.claude/skills/analysis/atu-insight-writer/SKILL.md` (ATU)
 - `.claude/skills/planning/slide-plan-generator-hypothesis/SKILL.md`
 - `.claude/skills/planning/viz-selector/SKILL.md`, `layout-selector/SKILL.md`
 - `.claude/skills/creation/slide-creator/SKILL.md`, `deck-assembler/SKILL.md`

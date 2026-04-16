@@ -27,7 +27,7 @@ Full deck + KBQs → 1-3 ES slides with citations. Every claim is traceable to a
 
 - `deck_path`: the full deck being summarized
 - `kbqs`: list of key business questions (from `kbqs.md` or user input)
-- Optional `narrative_threads_path`: pre-built arcs from `sfea-insight-writer`
+- Optional `narrative_threads_path`: pre-built arcs from the project insight-writer (sfea or atu)
 - `insert_position`: where ES slides go (typically slide 2, after cover)
 
 ## Outputs
@@ -43,7 +43,7 @@ Full deck + KBQs → 1-3 ES slides with citations. Every claim is traceable to a
      → list[SlideSpec] for every slide (used as citation targets)
 
 2. if narrative_threads_path not provided:
-     (Optional) sfea-insight-writer on existing hypothesis_bank
+     (Optional) insight-writer (sfea or atu per project type) on existing hypothesis_bank
      → narrative_threads.md (or use summarization over deck_specs)
 
 3. slide-plan-generator-exec-summary(
@@ -87,5 +87,5 @@ Full deck + KBQs → 1-3 ES slides with citations. Every claim is traceable to a
 - `.claude/skills/context-data/deck-reader/SKILL.md`
 - `.claude/skills/planning/slide-plan-generator-exec-summary/SKILL.md`
 - `.claude/skills/creation/executive-summary-writer/SKILL.md` (planned; not yet implemented)
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` — source of narrative threads
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET) / `atu-insight-writer/SKILL.md` (ATU) — source of narrative threads
 - `.claude/skills/creation/slide-creator/SKILL.md`

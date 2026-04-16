@@ -65,5 +65,5 @@ Landed. Citation lookup: narrative_threads arc mapping first, keyword-match fall
 - `slidegen/slide_plan_exec_summary.py` — implementation
 - PRD §3 Workflow 8
 - `.claude/skills/creation/executive-summary-writer/SKILL.md` — the renderer-facing skill that documents the same contract
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` — source of narrative threads
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET) / `atu-insight-writer/SKILL.md` (ATU) — source of narrative threads
 - `.claude/skills/creation/headline-writer/SKILL.md` — used by generate_exec_summary internally

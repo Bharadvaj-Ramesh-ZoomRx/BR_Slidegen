@@ -63,7 +63,7 @@ es_slides = generate_exec_summary(
 
 - `slidegen/slide_plan_exec_summary.py` — implementation
 - `.claude/skills/planning/slide-plan-generator-exec-summary/SKILL.md` — the planner layer (calls this)
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` — source of narrative threads
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET) / `atu-insight-writer/SKILL.md` (ATU) — source of narrative threads
 - `.claude/skills/context-data/deck-reader/SKILL.md` — source of deck_specs
 - `.claude/skills/creation/slide-creator/SKILL.md` — renders the ES slides
 - PRD §3 Workflow 8, §5 composition map

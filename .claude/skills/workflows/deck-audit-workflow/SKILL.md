@@ -125,5 +125,5 @@ Pre-delivery QA audit. Read-only. Produces a report of issues to fix; does not m
 - PRD §3 Workflow 7, §5 composition map
 - `.claude/skills/context-data/deck-reader/SKILL.md`
 - `.claude/skills/planning/spec-validator/SKILL.md`
-- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (narrative backbone reference)
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` (PET) / `atu-insight-writer/SKILL.md` (ATU) (narrative backbone reference)
 - `slidegen/pptx_utils/registry.py` (shape registry for audit trail)
