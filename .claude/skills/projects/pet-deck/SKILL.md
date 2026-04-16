@@ -1,7 +1,8 @@
 ---
-name: pet-es-builder
+name: pet-deck
 effort: high
-description: "Use when writing PET Executive Summaries or Recommendations slides. Trigger when: user says 'write executive summary', 'build ES', 'pet-es-builder', or needs to create publication-ready executive summary content for a PET study wave. Supports 8 format templates (A-H) for different audience and data complexity scenarios."
+paths: []
+description: "Project-type skill for Promotional Effectiveness Tracking (PET) decks. Invoked by create-deck-workflow and refresh-deck-workflow when the project type is PET. Encodes PET-specific methodology defaults, universal slide structure, KBQ framing, and wave-over-wave comparison logic for any pharma client and brand."
 ---
 
 ## Auto-Detected Context
@@ -21,7 +22,11 @@ if configs:
     if not isinstance(cfg, dict): cfg = {}
     proj = os.path.dirname(configs[0])
     wave = cfg.get('project',{}).get('wave','')
+    brand = cfg.get('project',{}).get('brand','')
+    client = cfg.get('project',{}).get('client','')
+    ta = cfg.get('project',{}).get('therapy_area','')
     print(f'**Active project:** \`{proj}\`')
+    print(f'**Brand:** \`{brand}\` | **Client:** \`{client}\` | **TA:** \`{ta}\`')
     print(f'**Active wave:** \`{wave}\`')
     ctx = f'{proj}/context/{wave}' if wave else f'{proj}/context'
     for md in sorted(glob.glob(f'{ctx}/*.md')):
@@ -31,254 +36,258 @@ else:
 "
 `
 
-# PET Executive Summary Builder
+# PET Deck — Project-Type Skill
 
-You are an expert market research analyst specializing in Promotional Effectiveness Tracking (PET) studies for pharmaceutical brands. Your task is to write a complete, publication-ready Executive Summary (and Recommendations) for a PET study.
+You are a project-type skill for **Promotional Effectiveness Tracking (PET)** studies. Workflow skills (`create-deck-workflow`, `refresh-deck-workflow`) invoke you to apply PET-specific methodology defaults before delegating to lower-level planning, analysis, and creation skills.
 
-## HOW TO USE THIS SKILL
-
-When the user invokes `/pet-es-builder`, ask them the following questions if the information is not already provided:
-
-1. **Brand name** (e.g., RYBREVANT, OJJAARA, ERLEADA, SPRAVATO)
-2. **Wave/period** (e.g., Q4 '25, Wave 2 FY2026, Feb '26)
-3. **HCP audience** (e.g., Oncologists, Urologists, Psych MDs — and any sub-segments like RWE Targets, All-Stars, Utility Players, Academic/Community)
-4. **Competitors tracked** (list all)
-5. **Key data available** — which of these modules does the study cover:
-   - Share of Voice / Activity (reach, frequency, in-person %, visual aid use)
-   - Messaging (message recall, effectiveness, optimal combos, under-recalled messages)
-   - Rep Performance (call quality ratings, attribute ratings)
-   - Impact/Outcomes (LTIP, product perception, High Impact calls, closing rates, follow-up actions)
-   - Non-Personal Promotion (NPP/digital channels)
-   - KAM / MSL / FRM (if applicable — non-rep roles)
-6. **Data inputs** — ask the user to paste or provide the key metric numbers, wave-over-wave comparisons, and any significant findings
-7. **Preferred ES format** — offer the menu below and let them choose, OR choose the best fit automatically based on the data
+This skill is **client-agnostic and brand-agnostic**. It works for any pharmaceutical brand that has a PET study — the brand, client, therapy area, competitor set, and visual identity are all resolved at runtime from `config.yaml` and `BRAND{}`.
 
 ---
 
-## ES FORMAT MENU
+## Cardinal Rules
 
-Based on patterns from real PET studies, choose the format that best fits the data complexity and audience:
-
-### FORMAT A — Narrative Sections + Separate Recommendations Slide
-**Best for:** Single brand, 3-4 data modules, clear story arc
-**Structure:**
-- Slide 1: Executive Summary
-  - Section: ACTIVITY & FORMAT
-  - Section: MESSAGING
-  - Section: PERFORMANCE & IMPACT
-  - Each section ends with an **Implication** bullet in italics
-- Slide 2: Recommendations (numbered action list, 4-6 items)
-
-**Example brands:** ILAI, SPRAVATO, Pepaxto
+1. **Never hardcode a brand, client, or therapy area.** All identity comes from `config.yaml` via `project.brand`, `project.client`, `project.therapy_area`. Visual identity (colors, fonts, heading color, template) comes from `BRAND{}` / `CLIENT{}` in `slidegen/pptx_utils/brand.py`.
+2. **Wave-over-wave comparison is the core PET value proposition.** Every data slide must show current vs. prior wave with deltas. Trends across multiple waves (trended scorecards) are expected for studies with 3+ waves.
+3. **Competitive positioning is always present.** PET studies track the focal brand against named competitors. All message, rep performance, and intent slides must include competitive context.
+4. **The slide plan drives the slide list — not this skill.** This skill provides PET methodology defaults and section structure expectations. The actual slide sequence is determined by `slide-plan-generator-hypothesis` (create flow) or `slide-plan-generator-refresh` (refresh flow).
+5. **Respect the brand's visual identity.** Use `get_brand(config.project.brand)` for colors, `CLIENT[brand.client]` for fonts and heading color. Never apply one client's typography or palette to another.
 
 ---
 
-### FORMAT B — Combined Key Findings + Recommendations (Single Slide)
-**Best for:** Competitive head-to-head (brand vs. named competitor), time-pressed audience
-**Structure:**
-- Key Findings (3-5 bullets, data-specific)
-- Recommendations (3-5 bullets, each tied directly to a finding)
-- Optional: Sub-segment callouts (e.g., RWE Targets vs. Non-RWE Targets)
+## Inputs
 
-**Example brands:** ERLEADA ONCs, ERLEADA UROs
-
----
-
-### FORMAT C — Competitive Advantage Scorecard
-**Best for:** Two-brand head-to-head, clear win/loss/parity story
-**Structure — 3 columns:**
-- [BRAND] ADVANTAGE (where brand leads)
-- EQUAL STANDING (parity areas)
-- [COMPETITOR] ADVANTAGE (where competitor leads)
-- Each column ends with an **Implications** sub-bullet
-
-**Example brands:** XARELTO vs. Eliquis
+| Input | Source | Required |
+|---|---|---|
+| `config.yaml` | `projects/{name}/config.yaml` | Yes |
+| `project.brand` | config — `project.brand` (key into `BRAND{}`) | Yes |
+| `project.client` | config — `project.client` (key into `CLIENT{}`) | Yes |
+| `project.wave` | config — `project.wave` (e.g., "Q1 2026") | Yes |
+| `project.therapy_area` | config — `project.therapy_area` | Yes |
+| Slide plan | `context/{wave}/slide_plan.md` | Yes (generated upstream) |
+| Narrative threads | `context/{wave}/narrative_threads.md` | Yes (generated upstream) |
+| `BRAND{}` / `CLIENT{}` | `slidegen/pptx_utils/brand.py` | Yes (runtime lookup) |
 
 ---
 
-### FORMAT D — Table Format: Findings | Considerations
-**Best for:** Multi-topic brand, structured wave deliverable, easy scan for leadership
-**Structure:** 2-column table
-- Row 1: Header (Topic Area)
-- Column 1: Key Finding (what the data shows)
-- Column 2: Consideration/Implication (what to do about it)
+## What a PET Deck Universally Contains
 
-**Example brands:** MAVYRET
+Based on analysis of 32 PET decks across 17 pharmaceutical clients (30 distinct brands), every PET deck follows a consistent section structure. The specific slides within each section vary by study scope, but the sections themselves are universal.
 
----
+### Universal Sections (present in all PET decks)
 
-### FORMAT E — Strategic Questions Framework
-**Best for:** KAM, MSL, or account-level studies with 3 strategic lenses
-**Structure — 3 framed questions:**
-- Q1: How does J&J engage vs. competitors? -> Engagement findings + Recommendation
-- Q2: How does J&J execute vs. competitors? -> Execution findings + Recommendation
-- Q3: What are account actions / perceptions post-interaction? -> Impact findings + Recommendation
+| Section | Content | Typical Chart Pattern |
+|---|---|---|
+| **Cover** | Title slide — brand, wave, audience, date | `cover` |
+| **Executive Summary** | Key findings synthesized across all modules | `executive_summary` |
+| **Recommendations** | Action-oriented bullets tied to findings | `executive_summary` |
+| **Message Recall** | Aided/unaided recall rates by message, current vs. prior wave | `bar_clustered_horizontal` / `single_bar_with_delta` |
+| **Message Effectiveness (M-B-D)** | Motivation, Believability, Differentiation breakdown per message | `xy_scatter_abacus` / `message_mbd` |
+| **Rep Performance / Call Quality** | Overall call quality, attribute ratings vs. competitors | `abacus` / `clustered_compare` |
+| **Prescribing Intent (LTIP)** | Likelihood to increase prescribing, by segment/brand | `column_stacked_100_vertical` / `stacked_order` |
 
-**Example brands:** J&J KAM (Dupixent/IL-33)
+### Common Sections (present in most PET decks)
 
----
+| Section | Content | Typical Chart Pattern |
+|---|---|---|
+| **Trended Scorecards** | Multi-wave trend panels for key KPIs (3+ wave studies) | `line_markers_trended` / `trended_scorecard` |
+| **Activity / Share of Voice** | Reach, frequency, in-person %, visual aid usage | `trended_activity` / `dual_bar_qoq` |
+| **Call-to-Action / Branded Close** | Closing behavior, follow-up actions | `bar_stacked_100_horizontal` / `stacked_order` |
+| **HII Scorecard** | High Impact Interaction breakdown by segment | `column_clustered_vertical` / `hii_scorecard` |
+| **Segment Comparisons** | Academic vs. Community, High Impact vs. Others | `dual_abacus` / `dual_bar_compare` |
 
-### FORMAT F — Strengths & Opportunities Grid
-**Best for:** Non-rep roles (KAM-HS, ABS, KAM-MD, FRM), or when SWOT framing is desired
-**Structure:**
-- STRENGTHS (what's working — Activity, Interaction Quality, Topic Delivery, Outcomes)
-- OPPORTUNITIES (gaps to close — same 4 dimensions)
-- Optional SWOT: add WEAKNESSES + THREATS
+### Optional Sections (study-dependent)
 
-**Example brands:** KAM-HS, ABS, KAM-MD, TREMFYA FRM
-
----
-
-### FORMAT G — What's Working / Opportunities / Recommendations
-**Best for:** Portfolio or multi-product OCE studies
-**Structure:**
-- What's Working Well (3-5 bullets)
-- Opportunities (3-5 bullets, framed as gaps not failures)
-- Recommendations (3-5 bullets, action-oriented)
-
-**Example brands:** MM OCE (DARZALEX / TECVAYLI / TALVEY)
+| Section | When Present |
+|---|---|
+| **Non-Personal Promotion (NPP)** | When digital/NPP channels are tracked |
+| **KAM / MSL / FRM Performance** | When non-rep roles are in scope |
+| **Qualitative Themes** | When open-ended responses are captured |
+| **Quadrant Analysis** | When stated vs. derived importance is measured |
+| **Heatmap Tables** | When multi-attribute cross-brand comparisons are needed |
 
 ---
 
-### FORMAT H — Key Takeaways Table by Audience Segment
-**Best for:** Studies with multiple HCP audience types (clinical vs. admin/PHDM)
-**Structure:** Table with topic rows x audience columns
-- Topics: Challenges to Adoption | Educational Gaps | Messaging/Topics Covered | Rep Activity & Impact
-- Audience columns: PHDMs | Clinical, or Academic | Community
+## PET Methodology Knowledge
 
-**Example brands:** TECVAYLI/TALVEY PHDMs vs. Clinical
+### What is PET?
+
+**Promotional Effectiveness Tracking** is a recurring (wave-based) market research study that measures how effectively a pharmaceutical brand's field force communicates key messages to healthcare professionals (HCPs). PET studies are conducted quarterly or semi-annually for brands with active promotional campaigns.
+
+### Standard PET Modules
+
+1. **Activity & Share of Voice** — reach, frequency, in-person vs. virtual, visual aid usage, proactive vs. reactive engagement
+2. **Messaging** — message recall (aided/unaided), message effectiveness (M-B-D), optimal message combinations, under-recalled opportunities
+3. **Rep Performance** — overall call quality (1-7 scale), attribute-level ratings, closing rates, follow-up actions
+4. **Impact & Outcomes** — Likelihood to Increase Prescribing (LTIP), product perception shift, High Impact Interactions (HII), drivers of high-impact calls
+5. **Trends** — wave-over-wave scorecards showing trajectory of key metrics
+
+### PET KBQ Framing
+
+PET Key Business Questions are about:
+- **Message cut-through:** Which messages are being recalled? Which are effective but under-delivered?
+- **Rep quality:** How do reps compare to competitors on call quality and key attributes?
+- **Competitive positioning:** Where does the brand lead, trail, or match competitors?
+- **Prescription intent shift:** Is promotional effort translating to prescribing behavior change?
+- **Wave-over-wave trajectory:** Are key metrics improving, stable, or declining?
+
+### Wave-Over-Wave Comparison
+
+This is the defining feature of PET reporting:
+- Every metric is shown as current wave vs. prior wave with delta (percentage point change)
+- Deltas use universal color coding: green for positive change, red for negative
+- Period labels are dynamic: `{{period_current}}` vs. `{{period_prior}}` from config
+- Multi-wave studies add trended scorecards showing 3+ waves as line charts
+- Narrative threads frame changes as CONVERGENCE, TENSION, DIVERGENCE, or CLOSURE arcs
+
+### Competitive Context
+
+PET decks always position the focal brand against its competitive set:
+- The primary brand's colors come from `BRAND[config.project.brand]`
+- Competitor colors come from `BRAND[competitor_brand]` (if defined) or `BRAND[config.project.brand].secondary`
+- Dual-brand slides (e.g., `dual_bar_compare`, `dual_abacus`) show the brand and its key competitor side by side
+- Competitive language: "led competitors," "trailed [Competitor]," "on par with," "closed the gap," "extended its lead"
 
 ---
 
-## CONTENT WRITING RULES
+## PET Defaults Applied to Downstream Skills
+
+When `pet-deck` is invoked by a workflow, it applies these methodology defaults before delegating:
+
+### To `hypothesis-generator`
+- Ensure hypotheses cover all 5 PET modules (Activity, Messaging, Rep Performance, Impact, Trends)
+- Require PRIOR WAVE VALIDATION hypotheses for every domain finding and recommendation carried forward
+- KBQ mapping must span message cut-through, rep quality, competitive positioning, and intent shift
+
+### To `sfea-insight-writer`
+- Narrative arcs should reflect wave-over-wave trajectory (improving, declining, stable, mixed)
+- Executive Summary must cover: Activity, Messaging, Rep Performance, Impact — each with wave comparison
+- Recommendations use PET action verbs: CONTINUE, LEVERAGE, REINFORCE, ANCHOR, ELEVATE, PRIORITIZE, ADDRESS, ENSURE, DRIVE, INCREASE, STRENGTHEN
+
+### To `slide-plan-generator-hypothesis`
+- Section ordering: Cover, Executive Summary, Recommendations, Activity/SOV, Messaging, Rep Performance, Impact/LTIP, Trends, Appendix
+- Every data slide must specify prior/current wave columns and delta computation
+- Trended slides are included for studies with 3+ waves of data
+- Arc sequencing: ACT NOW arcs first, then MONITOR, then CELEBRATE
+
+### To `viz-selector` and `layout-selector`
+- Message Recall: `single_bar_with_delta` or `bar_clustered_horizontal`
+- M-B-D: `message_mbd` (multi-column abacus)
+- Rep Attributes: `abacus` or `clustered_compare`
+- LTIP: `stacked_order` or `column_stacked_100_vertical`
+- Trends: `trended_scorecard` (multi-panel line grid)
+- Activity: `trended_activity` (line + stacked column)
+- HII: `hii_scorecard` (clustered column with section headers)
+- Segment comparison: `dual_abacus` or `dual_bar_compare`
+
+### To `slide-creator` and `deck-assembler`
+- Brand colors from `get_brand(config.project.brand)`
+- Client fonts and heading color from `CLIENT[brand.client]`
+- Template path from brand config or `config.yaml` `template_path`
+- Shape naming: `zrx_{slide:03d}_{shape:03d}` convention
+- Speaker notes: include question codes and full question text on every data slide
+
+---
+
+## Executive Summary & Recommendations
+
+PET Executive Summaries follow a consistent structure regardless of client. See `pet-es-builder` skill for the full 8-format menu (Formats A through H). Key conventions:
 
 ### Language & Tone
-- Always **data-anchored**: every claim needs a metric, a comparison, or a directional ("increased," "declined," "led," "trailed")
-- Use **wave-over-wave language**: "improved vs. Q3 '25," "declined QoQ," "stable wave over wave," "at an all-time high"
-- Use **competitive language**: "led competitors," "trailed [Brand]," "on par with," "closed the gap," "extended its lead"
-- Keep sentences tight — one finding per sentence; group related findings in the same bullet
+- **Data-anchored:** every claim needs a metric, comparison, or directional ("increased," "declined," "led," "trailed")
+- **Wave-over-wave language:** "improved vs. {{period_prior}}," "declined QoQ," "stable wave over wave," "at an all-time high"
+- **Competitive language:** "led competitors," "trailed {{competitor}}," "on par with," "closed the gap"
 
-### Section: ACTIVITY / SHARE OF VOICE
-Standard elements to cover (use what data is available):
-- Share of voice % and rank vs. competitors
-- Reach % among target HCPs (and segments if applicable)
-- Average frequency of interactions
-- In-person vs. virtual/video split
-- Visual aid usage rate
-- Proactive vs. reactive engagement
-
-Example phrasing:
-> "[Brand] captured X% share of voice within the [market] market, [leading/trailing] [Competitor] by Xpp, driven by [higher reach / higher frequency / in-person execution]."
-> "X% of interactions were conducted in-person, [on par with / above / below] competitor norms."
-
-### Section: MESSAGING
-Standard elements to cover:
-- Top recalled message(s) — name them (e.g., NCCN message O10, Efficacy message ME1)
-- Effectiveness ratings vs. prior wave and vs. competitors
-- Under-recalled but high-impact messages (frame as opportunity)
-- Optimal message combination and its impact on LTIP
-- Topics HCPs want to hear more about
-- Message misattribution issues if present
-
-Example phrasing:
-> "[Message code/name] was the most recalled message (X% recall), while [Message] showed high effectiveness ratings but remained under-recalled — a key opportunity."
-> "The optimal message combination of [X + Y] was associated with the strongest LTIP lift, yet recall of [Y] lagged at X%."
-
-### Section: REP PERFORMANCE / INTERACTION QUALITY
-Standard elements to cover:
-- Overall Call Quality rating (scale 1-7; report % rating 6-7, or mean)
-- Attribute-level strengths vs. gaps vs. competitors and vs. industry benchmarks
-- Closing rates (% of interactions formally closed)
-- Follow-up actions taken by HCPs post-interaction
-- High Impact Interaction (HII) rate
-- Sub-segment differences (e.g., Academic vs. Community, RWE vs. Non-RWE)
-
-Example phrasing:
-> "X% of HCPs rated [Brand] reps highly on Overall Call Quality (6-7 rating), [on par with / ahead of / trailing] [Competitor] by Xpp."
-> "[Brand] reps closed X% of interactions — [leading / on par with / trailing] competitors — and closing was correlated with [higher LTIP / stronger message recall]."
-
-### Section: IMPACT / OUTCOMES
-Standard elements to cover:
-- Likelihood to Increase Prescribing (LTIP) — current %, WoW change, vs. competitors
-- Change in product perception (% positive shift)
-- HCP-reported next actions (formulary review, PSP enrollment, peer discussion, etc.)
-- Drivers of high-impact calls
-
-Example phrasing:
-> "LTIP for [Brand] [held steady at / increased by X pts to / declined by X pts to] X%, [leading / now on par with] [Competitor]."
-> "High Impact Interactions account for X% of [Brand] calls, driven primarily by [HCP segment] — [higher / lower] than the prior wave."
-
-### Implications / Recommendations
-- Always start with a strong **action verb in CAPS**: CONTINUE, LEVERAGE, REINFORCE, ANCHOR, ELEVATE, PRIORITIZE, ADDRESS, ENSURE, DRIVE, INCREASE, STRENGTHEN, REMIND, ENCOURAGE, UTILIZE
-- Tie each recommendation directly back to a specific finding
-- Frame as an opportunity, not a failure: "Opportunity exists to..." not "Reps are failing to..."
-- Order by impact: highest-leverage actions first
-- 4-6 recommendations is the sweet spot; 3 minimum for simple studies
-
-Example phrasing:
-> "LEVERAGE [message X] during [HCP segment] interactions to enhance recall of its strong effectiveness ratings."
-> "ENCOURAGE reps to close high-quality calls, which are associated with [higher LTIP / stronger message recall]."
-> "REINFORCE delivery of [under-recalled topic] — particularly among [segment] — to close the gap with [Competitor]."
-> "PRIORITIZE [message combination X + Y] to maximize LTIP lift, given its X% appeal and association with [outcome]."
+### Recommendation Formatting
+- Start with a strong **action verb in CAPS**: CONTINUE, LEVERAGE, REINFORCE, ANCHOR, ELEVATE, PRIORITIZE, ADDRESS, ENSURE, DRIVE, INCREASE, STRENGTHEN, REMIND, ENCOURAGE, UTILIZE
+- Tie each recommendation to a specific finding
+- Frame as opportunity, not failure: "Opportunity exists to..." not "Reps are failing to..."
+- 4-6 recommendations is the sweet spot
 
 ---
 
-## STEP-BY-STEP PROCESS
+## Orchestration
 
-1. **Gather inputs** — ask for all data listed above; accept pasted tables, summary stats, or bullet notes
-2. **Select format** — match to the data complexity and audience (or ask user to choose)
-3. **Draft ES** — write the full executive summary in the selected format; include all sections supported by data
-4. **Draft Recommendations** — 4-6 action-oriented bullets tied to findings; use CAPS action verbs
-5. **Review pass** — check: every finding has a number; every recommendation has a specific action and rationale; wave-over-wave language is present; competitive comparisons are included where applicable
-6. **Output** — deliver the ES text ready to paste into a PowerPoint slide, formatted with bullet hierarchy clearly marked
-
----
-
-## FORMATTING FOR PPTX OUTPUT
-
-When outputting for copy-paste into PowerPoint, use this notation:
-- `[SECTION HEADER]` for bold section titles
-- `*` for main bullets
-- `  -` for sub-bullets (indent with 2 spaces)
-- `[IMPLICATION]` or `[RECOMMENDATION]` prefix for action bullets
-- Wrap each slide's content in `--- SLIDE [N]: [Title] ---`
-
----
-
-## EXAMPLE INVOCATION
-
-User: `/pet-es-builder`
-
-Claude asks for: brand, wave, audience, competitors, modules covered, and key data points.
-
-User provides the data.
-
-Claude selects Format A (or user picks), then outputs:
+When invoked by `create-deck-workflow`:
 
 ```
---- SLIDE 1: Executive Summary -- Q4 '25 ---
-
-[ACTIVITY & FORMAT]
-* [Brand] maintained a leading X% share of voice in the [market] space...
-  - Reach improved to X% among Tier A/B HCPs...
-  - X% of interactions were conducted in-person, [above/on par with] competitor norms...
-[IMPLICATION] Consistent rep presence and in-person execution continue to differentiate [Brand]...
-
-[MESSAGING]
-* [Message X] remained the most recalled message (X% recall)...
-  - [Message Y] shows high effectiveness but under-recall — opportunity to prioritize...
-[IMPLICATION] Pairing [Message X + Y] presents the highest LTIP lift opportunity...
-
-[PERFORMANCE & IMPACT]
-* X% of HCPs rated [Brand] reps highly on Overall Call Quality...
-  - LTIP [held steady / improved / declined] at X% vs. X% in Q3 '25...
-[IMPLICATION] Reps who close interactions show X% higher LTIP — closing behavior should be reinforced...
-
---- SLIDE 2: Recommendations -- Q4 '25 ---
-
-1. PRIORITIZE delivery of [Message X + Y] combination to maximize LTIP lift among [segment].
-2. LEVERAGE visual aids during [HCP segment] interactions to enhance recall of high-effectiveness messages.
-3. ENCOURAGE reps to formally close high-quality interactions — closing is correlated with X% higher LTIP.
-4. REINFORCE reach among [under-indexed segment] to close the competitive gap with [Competitor].
-5. ADDRESS [topic gap] by equipping reps with [resource] to meet HCP educational needs.
+1. Read config.yaml — resolve brand, client, therapy_area, wave, competitor set
+2. Validate brand exists in BRAND{} (or project provides brand_palette override)
+3. Apply PET methodology defaults to all downstream skill invocations
+4. Delegate to the standard workflow stages:
+     hypothesis-generator (with PET module coverage requirement)
+     sfea-insight-writer (with PET narrative conventions)
+     slide-plan-generator-hypothesis (with PET section ordering)
+     viz-selector + layout-selector (with PET chart pattern defaults)
+     slide-creator + deck-assembler (with brand visual identity)
 ```
+
+When invoked by `refresh-deck-workflow`:
+
+```
+1. Read config.yaml — resolve brand, client, wave, new period labels
+2. Apply PET defaults to refresh-specific skills:
+     deck-reader (PET slide type recognition)
+     slide-plan-generator-refresh (PET section structure preservation)
+     slide-updater (wave label rewrite, headline regeneration, delta recomputation)
+     deck-assembler (brand visual identity)
+```
+
+---
+
+## Decision Rules
+
+| Situation | Response |
+|---|---|
+| Brand not in `BRAND{}` | Halt — user must add brand entry or provide `brand_palette` in config |
+| No competitor defined | Proceed — single-brand slides only; skip dual-brand comparisons |
+| Study has only 1-2 waves | Skip trended scorecards; use QoQ bars and deltas only |
+| Study has 3+ waves | Include trended scorecards for key KPIs |
+| Non-rep roles in scope (KAM/MSL/FRM) | Add separate section; use Format F (Strengths & Opportunities) for ES |
+| NPP/digital channels tracked | Add NPP section after Rep Performance |
+| Qualitative data available | Add `qual_theme_analysis` slides; enable `qual_callout` flags on relevant data slides |
+| Multi-audience study (e.g., Onc + Uro) | Use segment comparisons; consider Format H (audience columns) for ES |
+| Prior wave deck available (refresh) | `deck-reader` extracts specs; preserve slide structure, regenerate headlines and data |
+
+---
+
+## New PET Project Onboarding
+
+When setting up a PET project for a new brand, the project team must provide:
+
+### Required
+
+1. **Brand entry in `BRAND{}`** — or a `brand_palette` override in `config.yaml`. Each brand needs: `client` key, `therapy_area`, `primary_current`, `primary_prior`, `secondary` colors, and optionally `competitor_brand`. If the brand was included in the 32-deck analysis, it already exists. Otherwise, extract colors from the client's slide master or brand guidelines.
+
+2. **Client slide master deck** — a clean `.pptx` template with the client's layout masters, logos, and footer elements. Stored at `projects/{name}/templates/template.pptx`. If unavailable, the pipeline generates from a blank template using `BRAND{}` / `CLIENT{}` definitions.
+
+3. **Synapse project configuration** — `project_id`, `reporting_plan_id`, and `analysis_ids` for the study. Enables Track A (JSON-first) and Track D (raw-data-first) data fetching. Alternatively, provide `source_data.xlsx` for Track B (Excel) extraction.
+
+4. **KBQs.md** — hand-written Key Business Questions for the study. Organized by domain (Activity, Messaging, Rep Performance, Impact). This file has no auto-generation path; the research team authors it.
+
+### Strongly Recommended
+
+5. **Prior wave deck** — a `.pptx` from the most recent delivered wave. Enables `deck-reader` to bootstrap slide structure and `prior-wave-context-builder` to extract findings. Place in `input/wave/{wave}/`.
+
+6. **Survey context** — survey instrument or questionnaire with question codes, message lists, and response scales. Enables `survey-context-builder` to map codes to extractions.
+
+7. **Call notes / methodology doc** — client call notes, study design `.odt`, or methodology brief. Feeds `project-context-builder` for field intel and wave expectations.
+
+### Optional
+
+8. **Competitor brand entry in `BRAND{}`** — if the competitor is tracked in PET and has its own color definition. Set `competitor_brand` in the primary brand's `BRAND{}` entry for automatic color resolution.
+
+9. **Label shortcuts** — `label_shortcuts` mapping in `config.yaml` for long message labels (e.g., mapping 80-character message texts to clean 40-character display labels). Set `use_label_shortcuts: true` in extraction params.
+
+---
+
+## References
+
+- `slidegen/pptx_utils/brand.py` — `BRAND{}` (33 entries, 17 clients), `CLIENT{}`, `get_brand()`, `get_competitor()`
+- `.claude/skills/workflows/create-deck-workflow/SKILL.md` — full create orchestration
+- `.claude/skills/workflows/refresh-deck-workflow/SKILL.md` — full refresh orchestration
+- `.claude/skills/analysis/hypothesis-generator/SKILL.md` — hypothesis generation
+- `.claude/skills/analysis/sfea-insight-writer/SKILL.md` — narrative threads + ES + recs
+- `.claude/skills/planning/slide-plan-generator-hypothesis/SKILL.md` — slide plan from narrative
+- `.claude/skills/planning/viz-selector/SKILL.md`, `layout-selector/SKILL.md` — chart/layout selection
+- `.claude/skills/creation/slide-creator/SKILL.md`, `deck-assembler/SKILL.md` — rendering + assembly
+- PRD §4.5 — project-type skills definition

@@ -433,14 +433,17 @@ _LINE_SCATTER_PATTERNS = {"line_markers_trended", "xy_scatter_abacus"}
 _PIE_DOUGHNUT_PATTERNS = {"doughnut_default"}
 
 
-def _clamp_label_position(position: str, chart_pattern: str) -> str:
-    """Return a valid dLblPos value for the given chart pattern.
+def _clamp_label_position(position: str, chart_pattern: str) -> str | None:
+    """Return a valid dLblPos value for the given chart pattern, or None to skip.
 
     Input `position` uses our spec vocabulary ("above", "inEnd", etc.) which
     maps 1:1 onto OOXML values in most cases. Positions that don't exist for
     a given chart type are remapped to a sensible equivalent:
       - inEnd / outEnd on line/scatter → "above"
       - above / below on bar/column    → "outEnd"
+      - ANY position on pie/doughnut   → None (skip — PowerPoint rejects
+        <c:dLblPos> at the series-level dLbls for doughnut; its default
+        "bestFit" positioning works correctly without it)
     """
     if chart_pattern in _LINE_SCATTER_PATTERNS:
         if position in ("inEnd", "outEnd"):
@@ -449,11 +452,10 @@ def _clamp_label_position(position: str, chart_pattern: str) -> str:
             return position
         return "above"       # safe default for line/scatter
     if chart_pattern in _PIE_DOUGHNUT_PATTERNS:
-        if position in ("inEnd", "outEnd", "ctr"):
-            return position   # all valid for pie/doughnut
-        if position in ("above", "below"):
-            return "ctr"     # pie/doughnut doesn't have above/below
-        return "ctr"
+        # PowerPoint rejects <c:dLblPos> inside <c:ser>/<c:dLbls> for
+        # doughnut/pie charts — triggers Repair prompt. Return None to
+        # skip setting any position; PowerPoint defaults to bestFit.
+        return None
     # Bar / column / other: spec vocabulary's inEnd/outEnd/ctr are all valid
     if position in ("above", "below"):
         return "outEnd"      # bar charts use outEnd instead of above
@@ -485,7 +487,8 @@ def _apply_data_labels(
     if not dl.show:
         return
 
-    # Clamp position to schema-valid value for this chart type
+    # Clamp position to schema-valid value for this chart type.
+    # Returns None for pie/doughnut (PowerPoint rejects dLblPos on series dLbls).
     effective_position = _clamp_label_position(dl.position, component.chart_pattern)
 
     # Color override: only apply spec's font_color when labels sit on a
@@ -506,14 +509,16 @@ def _apply_data_labels(
         "ctr":    set_datalabel_pos_center,
         "above":  set_datalabel_pos_top,
     }
-    pos_fn = pos_fn_map.get(effective_position, set_datalabel_pos_outside_end)
+    # None → skip position setting (pie/doughnut uses PowerPoint default bestFit)
+    pos_fn = pos_fn_map.get(effective_position) if effective_position else None
 
     for series in chart.series:
-        # Enable + format + position
+        # Enable + format + (optionally) position
         try:
             series.data_labels.show_value = True
             set_datalabel_format(series, dl.format or "0%")
-            pos_fn(series)
+            if pos_fn is not None:
+                pos_fn(series)
             if label_color is not None:
                 set_data_label_color(series, label_color)
         except Exception:
@@ -895,10 +900,18 @@ def _child_local_name(el) -> str:
 
 # ── Element order per CT_*Ser (children of <c:ser>) ────────────────────────
 # Union order across CT_LineSer, CT_BarSer, CT_PieSer, CT_ScatterSer.
+#
+# NOTE: dPt is intentionally OMITTED from this order. Per ECMA-376,
+# dPt should appear before dLbls — but PowerPoint's doughnut/pie loader
+# rejects dPt in that position. python-pptx + set_pie_slice_colors append
+# dPt at the end of <c:ser> (after val), and PowerPoint accepts that.
+# By omitting dPt from the order tuple, _reorder_children leaves it
+# wherever python-pptx put it (default index = len(order) = end).
 _SER_CHILD_ORDER: tuple[str, ...] = (
     "idx", "order", "tx", "spPr",
     "invertIfNegative", "pictureOptions", "marker", "explosion",
-    "dPt", "dLbls",
+    # dPt intentionally omitted — stays where python-pptx put it
+    "dLbls",
     "trendline", "errBars",
     "xVal", "yVal",       # scatter series
     "cat", "val",
@@ -941,6 +954,29 @@ _PLOTAREA_CHILD_ORDER: tuple[str, ...] = (
     # Axis elements
     "valAx", "catAx", "dateAx", "serAx",
     "dTable", "spPr",
+    "extLst",
+)
+
+# ── Element order per CT_DLbls (children of <c:dLbls>) ─────────────────────
+# Per ECMA-376 Part 1 §21.2.2.49 — applies to BOTH series-level and
+# chart-type-level dLbls. python-pptx creates showVal/showCatName first,
+# then our lxml helpers append numFmt/dLblPos at the end — wrong order.
+_DLBLS_CHILD_ORDER: tuple[str, ...] = (
+    "dLbl",
+    "delete",
+    "numFmt",
+    "spPr",
+    "txPr",
+    "dLblPos",
+    "showLegendKey",
+    "showVal",
+    "showCatName",
+    "showSerName",
+    "showPercent",
+    "showBubbleSize",
+    "separator",
+    "showLeaderLines",
+    "leaderLines",
     "extLst",
 )
 
@@ -1007,6 +1043,12 @@ def _enforce_ser_child_order(chart) -> None:
     # Level 3: reorder every <c:ser> element's children
     for ser_el in plot_area_el.iter("{%s}ser" % _C_NS):
         _reorder_children(ser_el, _SER_CHILD_ORDER)
+
+    # Level 4: reorder every <c:dLbls> element's children
+    # python-pptx creates showVal/showCatName first, then our lxml helpers
+    # append numFmt/dLblPos at the end — wrong per CT_DLbls schema.
+    for dlbls_el in plot_area_el.iter("{%s}dLbls" % _C_NS):
+        _reorder_children(dlbls_el, _DLBLS_CHILD_ORDER)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
