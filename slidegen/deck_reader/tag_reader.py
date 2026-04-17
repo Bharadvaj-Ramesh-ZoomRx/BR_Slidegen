@@ -451,15 +451,18 @@ def _report_config_to_lineage(report_config: dict, tags: dict) -> DataLineage:
 
     # Deliverables: static vs dynamic
     time_period_type = report_config.get('TimePeriodType', '')
-    if str(time_period_type).lower() == 'static' or str(time_period_type) == '0':
-        static_ids = report_config.get('StaticTimePeriodIds', [])
-        if isinstance(static_ids, list):
-            lineage.static_time_period_ids = [int(x) for x in static_ids if x is not None]
-    else:
-        dtp = report_config.get('DynamicTimePeriod', {})
-        if isinstance(dtp, dict):
-            lineage.dynamic_latest_n = dtp.get('LatestNDeliverables')
-            lineage.include_live_wave = dtp.get('IncludeLiveWave')
+    static_ids = report_config.get('StaticTimePeriodIds', [])
+    if isinstance(static_ids, list) and static_ids:
+        lineage.static_time_period_ids = [int(x) for x in static_ids if x is not None]
+    # StaticTimePeriodNames — human-readable (always extract if available)
+    static_names = report_config.get('StaticTimePeriodNames', [])
+    if isinstance(static_names, list) and static_names:
+        lineage.static_time_period_names = static_names
+
+    dtp = report_config.get('DynamicTimePeriod', {})
+    if isinstance(dtp, dict) and dtp:
+        lineage.dynamic_latest_n = dtp.get('LatestNDeliverables')
+        lineage.include_live_wave = dtp.get('IncludeLiveWave')
 
     # Analysis type from shape tag
     lineage.analysis_type = tags.get(TAG_ANALYSIS_TYPE)

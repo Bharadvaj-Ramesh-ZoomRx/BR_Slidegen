@@ -373,15 +373,21 @@ class DataLineage:
     """
     # Synapse-canonical identifiers (preferred when available)
     project_id: Optional[int] = None
+    project_name: Optional[str] = None               # e.g. "AMG [ATU]: Repatha"
     reporting_plan_id: Optional[int] = None
+    reporting_plan_name: Optional[str] = None         # e.g. "Quarterly"
     analysis_ids: list[int] = field(default_factory=list)
+    analysis_names: list[str] = field(default_factory=list)  # human-readable per analysis
     survey_id: Optional[int] = None
     segment_ids: list[int] = field(default_factory=list)
+    segment_names: list[str] = field(default_factory=list)   # human-readable per segment
     # Deliverables — either static list or dynamic "latest N + live"
     static_time_period_ids: list[int] = field(default_factory=list)
+    static_time_period_names: list[str] = field(default_factory=list)  # e.g. ["Q2 2026", "Q1 2026"]
     dynamic_latest_n: Optional[int] = None
     include_live_wave: Optional[bool] = None
-    analysis_type: Optional[str] = None              # e.g. "Question Analysis"
+    analysis_type: Optional[str] = None              # e.g. "SINGLE_QUESTION"
+    question_text: Optional[str] = None              # full question text from survey
     column_key_label_map: Optional[dict[str, str]] = None  # from ColumnKeyLabelMap shape tag
 
     # Legacy / Excel-path identifiers (used when no Synapse connection)
