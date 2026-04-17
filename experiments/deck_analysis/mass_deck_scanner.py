@@ -48,9 +48,24 @@ from pptx.util import Emu
 HERE = Path(__file__).parent
 REPO = HERE.parents[1]
 
-# Import deep OOXML extraction from the existing deep_analyzer (same directory)
+# Import algorithms from the existing analysis scripts (same directory)
 sys.path.insert(0, str(HERE))
 from deep_analyzer import analyze_chart_xml, extract_chart_xmls
+from brand_mapper import (
+    STRUCTURAL_COLORS, is_structural, extract_series_colors,
+    top_brand_palette, DECK_TO_BRAND, map_deck,
+    derive_tint, write_generated_brand_py,
+)
+from layout_clusterer import (
+    relaxed_signature as lc_relaxed_signature,
+    walk_shapes, cluster_positions, per_type_stats, coord_stats,
+)
+from competitor_detector import (
+    build_primary_registry, score_candidate, rgb_distance,
+    therapy_area_overlap, EXACT_MATCH_THRESHOLD, LOOSE_MATCH_THRESHOLD,
+    write_review_md as write_competitor_md,
+)
+from generate_pptx_utils import generate_lxml_helpers_py
 OUTPUTS_DIR = HERE / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
@@ -184,11 +199,31 @@ def _client_key(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
-    """Analyze one PPTX file. Returns metadata dict."""
+    """Analyze one PPTX file. Returns metadata dict.
+
+    Integrates all analysis from the original scripts:
+    - parser.py: chart types, fonts, colors
+    - deep_analyzer.py: OOXML properties (gapWidth, overlap, dLblPos, etc.)
+    - brand_mapper.py: structural color filtering, per-brand series colors
+    - layout_clusterer.py: relaxed signatures, shape positions with metadata
+    - Table structure extraction (row/col counts, header fills)
+    """
     prs = Presentation(str(pptx_path))
     client = _extract_client_name(pptx_path, base_dir)
     project = _extract_project_name(pptx_path, base_dir)
     project_type = _classify_project_type(pptx_path)
+
+    # Per-brand mapping (from brand_mapper.py DECK_TO_BRAND regex rules)
+    brand, mapped_client, competitor, therapy_area = map_deck(pptx_path.name)
+    # If brand_mapper didn't match, use client-level fallback
+    if brand == "UNKNOWN":
+        brand = _client_key(client)
+    if mapped_client == "UNKNOWN" and client != "Unknown":
+        mapped_client = _client_key(client)
+
+    # Extract series colors via brand_mapper (zipfile-based, structural-filtered)
+    raw_series_colors = extract_series_colors(pptx_path)
+    brand_palette = top_brand_palette(raw_series_colors, max_colors=10)
 
     deck = {
         "file": str(pptx_path.relative_to(base_dir)),
@@ -196,23 +231,30 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
         "client_key": _client_key(client),
         "project": project,
         "project_type": project_type,
+        "brand": brand,
+        "mapped_client": mapped_client,
+        "competitor": competitor,
+        "therapy_area": therapy_area,
         "total_slides": len(prs.slides),
         "total_charts": 0,
         "total_tables": 0,
         "chart_types": Counter(),
         "chart_patterns": Counter(),
-        "series_colors": Counter(),       # per-deck for brand extraction
+        "series_colors_raw": dict(raw_series_colors.most_common(20)),  # all series colors
+        "series_colors_filtered": brand_palette,  # structural colors removed
         "heading_colors": Counter(),
         "fonts": Counter(),
         "font_sizes": Counter(),
         "headline_lengths": [],
         "headline_font_sizes": [],
-        "sections": Counter(),               # section/topic classification from headlines
-        "headlines": [],                      # sample headlines (first 50)
+        "sections": Counter(),
+        "headlines": [],
         "composition_signatures": Counter(),
-        "chart_positions": [],            # (left, top, width, height)
+        "relaxed_signatures": Counter(),      # from layout_clusterer (content-only)
+        "chart_positions": [],
         "table_positions": [],
         "table_dimensions": Counter(),
+        "table_header_fills": Counter(),      # header cell fill colors
         # Per-slide positions grouped by composition signature (for LAYOUTS{})
         "positions_by_sig": defaultdict(lambda: {"chart": [], "table": []}),
         # OOXML properties (from deep_analyzer.analyze_chart_xml)
@@ -236,6 +278,14 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
         table_count = 0
         slide_chart_positions = []
         slide_table_positions = []
+
+        # Use layout_clusterer's walk_shapes for relaxed signature
+        try:
+            lc_shapes = walk_shapes(slide)
+            relaxed_sig = lc_relaxed_signature(lc_shapes)
+            deck["relaxed_signatures"][relaxed_sig] += 1
+        except Exception:
+            relaxed_sig = "unknown"
 
         for shape in slide.shapes:
             if shape.has_chart:
@@ -263,18 +313,6 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
                 deck["chart_positions"].append(pos)
                 slide_chart_positions.append(pos)
 
-                try:
-                    for s in chart.plots[0].series:
-                        try:
-                            fill = s.format.fill
-                            if fill.type is not None:
-                                rgb = f"#{fill.fore_color.rgb}"
-                                deck["series_colors"][rgb] += 1
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
             elif shape.has_table:
                 table_count += 1
                 deck["total_tables"] += 1
@@ -288,6 +326,16 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
                 )
                 deck["table_positions"].append(pos)
                 slide_table_positions.append(pos)
+
+                # Table header fill color extraction
+                try:
+                    if len(tbl.rows) > 0 and len(tbl.columns) > 0:
+                        cell = tbl.cell(0, 0)
+                        if cell.fill and cell.fill.type is not None:
+                            rgb = f"#{cell.fill.fore_color.rgb}"
+                            deck["table_header_fills"][rgb] += 1
+                except Exception:
+                    pass
 
             elif shape.has_text_frame:
                 text = shape.text_frame.text.strip()
@@ -322,9 +370,10 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
 
         sig = f"{chart_count}_chart_{table_count}_table"
         deck["composition_signatures"][sig] += 1
-        # Track positions per composition signature (for LAYOUTS{})
-        deck["positions_by_sig"][sig]["chart"].extend(slide_chart_positions)
-        deck["positions_by_sig"][sig]["table"].extend(slide_table_positions)
+        # Track positions per relaxed signature (for LAYOUTS{} — uses content-only sig)
+        pos_sig = relaxed_sig if relaxed_sig != "unknown" else sig
+        deck["positions_by_sig"][pos_sig]["chart"].extend(slide_chart_positions)
+        deck["positions_by_sig"][pos_sig]["table"].extend(slide_table_positions)
 
     # Deep OOXML extraction (gapWidth, overlap, dLblPos, axis orientation, etc.)
     try:
@@ -365,9 +414,9 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
         pass  # OOXML extraction is best-effort; don't fail the deck scan
 
     # Serialize Counters and defaultdicts for JSON
-    for key in ["chart_types", "chart_patterns", "series_colors", "heading_colors",
-                "fonts", "font_sizes", "composition_signatures", "table_dimensions",
-                "sections"]:
+    for key in ["chart_types", "chart_patterns", "heading_colors",
+                "fonts", "font_sizes", "composition_signatures", "relaxed_signatures",
+                "table_dimensions", "table_header_fills", "sections"]:
         deck[key] = dict(Counter(deck[key]).most_common(50))
     deck["positions_by_sig"] = {k: dict(v) for k, v in deck["positions_by_sig"].items()}
     # Serialize OOXML counters
@@ -386,13 +435,22 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
     """Aggregate all deck data into structures ready for codegen."""
 
     # ── Per-client brand data ──
-    # client_key → {series_colors: Counter, fonts: Counter, heading_colors: Counter, deck_count}
     by_client: dict[str, dict] = defaultdict(lambda: {
         "series_colors": Counter(),
         "fonts": Counter(),
         "heading_colors": Counter(),
         "deck_count": 0,
         "raw_name": "",
+    })
+
+    # ── Per-brand (product-level) data — from brand_mapper.py ──
+    by_brand: dict[str, dict] = defaultdict(lambda: {
+        "client": "",
+        "competitor": None,
+        "therapy_area": "",
+        "deck_count": 0,
+        "series_colors_filtered": [],  # accumulated palettes
+        "deck_files": [],
     })
 
     # ── Global aggregates ──
@@ -413,16 +471,32 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
         "chart_positions": [], "table_positions": [],
     })
 
+    all_table_header_fills = Counter()
+
     for d in inventories:
         ck = d.get("client_key", _client_key(d["client"]))
         by_client[ck]["deck_count"] += 1
         by_client[ck]["raw_name"] = d["client"]
-        for color, count in d["series_colors"].items():
+        for color, count in d.get("series_colors_raw", {}).items():
             by_client[ck]["series_colors"][color] += count
         for font, count in d["fonts"].items():
             by_client[ck]["fonts"][font] += count
         for hc, count in d.get("heading_colors", {}).items():
             by_client[ck]["heading_colors"][hc] += count
+
+        # Per-brand (product-level) aggregation
+        brand = d.get("brand", ck)
+        bb = by_brand[brand]
+        bb["deck_count"] += 1
+        bb["client"] = d.get("mapped_client", ck)
+        bb["competitor"] = d.get("competitor")
+        bb["therapy_area"] = d.get("therapy_area", "")
+        bb["series_colors_filtered"].extend(d.get("series_colors_filtered", []))
+        if len(bb["deck_files"]) < 5:
+            bb["deck_files"].append(d["file"])
+
+        for hf, count in d.get("table_header_fills", {}).items():
+            all_table_header_fills[hf] += count
 
         for k, v in d["chart_patterns"].items():
             all_chart_patterns[k] += v
@@ -473,6 +547,81 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
                 "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
         ooxml_agg[key] = dict(ooxml_agg[key].most_common(30))
 
+    # ── Position clustering via layout_clusterer.cluster_positions ──
+    # Convert flat position tuples to dicts for the clustering algorithm
+    chart_pos_dicts = [
+        {"left": p[0], "top": p[1], "width": p[2], "height": p[3], "deck": ""}
+        for p in all_chart_positions
+    ]
+    table_pos_dicts = [
+        {"left": p[0], "top": p[1], "width": p[2], "height": p[3], "deck": ""}
+        for p in all_table_positions
+    ]
+    chart_clusters = cluster_positions(chart_pos_dicts, tolerance=0.5)
+    table_clusters = cluster_positions(table_pos_dicts, tolerance=0.5)
+
+    # ── Per-brand palette finalization ──
+    # Aggregate per-brand filtered colors into a final palette
+    brand_by_brand = {}
+    for brand, bb in by_brand.items():
+        # Count color frequencies across all decks for this brand
+        color_counter = Counter(bb["series_colors_filtered"])
+        palette = [c for c, _ in color_counter.most_common(10)]
+        brand_by_brand[brand] = {
+            "brand": brand,
+            "client": bb["client"],
+            "competitor": bb["competitor"],
+            "therapy_area": bb["therapy_area"],
+            "deck_count": bb["deck_count"],
+            "palette_filtered": palette,
+            "deck_files": bb["deck_files"],
+        }
+
+    # ── Competitor detection via competitor_detector ──
+    primary_registry = build_primary_registry(brand_by_brand)
+    competitor_map = {}
+    for brand, binfo in brand_by_brand.items():
+        palette = binfo.get("palette_filtered", [])
+        if len(palette) < 2:
+            continue
+        # Minor colors = palette positions 1+ (not the primary)
+        candidates = {}
+        total_colors = len(palette)
+        for idx, color in enumerate(palette[1:], 1):
+            color_up = color.upper()
+            for reg_color, reg_entries in primary_registry.items():
+                dist = rgb_distance(color_up, reg_color)
+                if dist > LOOSE_MATCH_THRESHOLD:
+                    continue
+                for entry in reg_entries:
+                    if entry["brand"] == brand:
+                        continue  # skip self
+                    score, reason = score_candidate(
+                        color_up, total_colors - idx, total_colors,
+                        entry, reg_color, binfo.get("therapy_area", ""),
+                    )
+                    if score > 0:
+                        cand_brand = entry["brand"]
+                        if cand_brand not in candidates or candidates[cand_brand]["score"] < score:
+                            candidates[cand_brand] = {
+                                "candidate_brand": cand_brand,
+                                "candidate_client": entry["client"],
+                                "score": round(score, 3),
+                                "reason": reason,
+                            }
+        if candidates:
+            competitor_map[brand] = {
+                "therapy_area": binfo.get("therapy_area"),
+                "client": binfo["client"],
+                "candidates": sorted(candidates.values(), key=lambda x: -x["score"])[:5],
+            }
+
+    # ── Table structure stats ──
+    table_stats = {
+        "table_dimensions": dict(all_table_dims.most_common(30)),
+        "header_fills": dict(all_table_header_fills.most_common(20)),
+    }
+
     # ── Per-project-type profiles (for project-type skills) ──
     by_project_type: dict[str, dict] = defaultdict(lambda: {
         "deck_count": 0,
@@ -512,14 +661,19 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
 
     return {
         "by_client": dict(by_client),
+        "by_brand": brand_by_brand,
         "by_project_type": dict(by_project_type),
         "chart_patterns": dict(all_chart_patterns.most_common(30)),
         "chart_types": dict(all_chart_types.most_common(30)),
         "composition_signatures": dict(all_composition_sigs.most_common(30)),
         "table_dimensions": dict(all_table_dims.most_common(30)),
+        "table_stats": table_stats,
         "chart_positions": all_chart_positions,
         "table_positions": all_table_positions,
+        "chart_clusters": chart_clusters,
+        "table_clusters": table_clusters,
         "positions_by_sig": {k: dict(v) for k, v in positions_by_sig.items()},
+        "competitor_map": competitor_map,
         "headline_lengths": all_headline_lengths,
         "headline_font_sizes": all_headline_font_sizes,
         "project_types": dict(project_types.most_common(20)),
@@ -660,7 +814,75 @@ def generate_brand_py(agg: dict) -> str:
         "        )",
         "    return CLIENT[key]",
         "",
+        "",
     ]
+
+    # ── BRAND{} — per-product entries ──
+    by_brand = agg.get("by_brand", {})
+    if by_brand:
+        lines += [
+            "# ============================================================================",
+            "# BRAND{} — Per-product brand entries (auto-extracted from deck filenames)",
+            "# ============================================================================",
+            "",
+            "BRAND = {",
+        ]
+
+        sorted_brands = sorted(by_brand.items(), key=lambda kv: -kv[1].get("deck_count", 0))
+        for brand_key, binfo in sorted_brands:
+            dc = binfo.get("deck_count", 0)
+            palette = binfo.get("palette_filtered", [])
+            client_key = binfo.get("client", "UNKNOWN")
+            competitor = binfo.get("competitor")
+            ta = binfo.get("therapy_area", "")
+
+            primary = palette[0] if palette else "808080"
+            secondary = palette[1] if len(palette) > 1 else "A6A6A6"
+            prior = palette[2] if len(palette) > 2 else derive_tint(primary)
+
+            lines.append(f'    # --- {brand_key} ({dc} decks, {ta}) ---')
+            lines.append(f'    "{brand_key}": {{')
+            lines.append(f'        "client": "{client_key}",')
+
+            for role, hex_val in [("primary_current", primary), ("primary_prior", prior),
+                                  ("competitor_current", secondary)]:
+                r, g, b = _hex_to_rgb_tuple(hex_val)
+                lines.append(f'        "{role}": RGBColor(0x{r:02X}, 0x{g:02X}, 0x{b:02X}),')
+
+            lines.append('        "positive": POSITIVE_GREEN,')
+            lines.append('        "negative": NEGATIVE_RED,')
+            if competitor:
+                lines.append(f'        "competitor_name": "{competitor}",')
+            if ta:
+                lines.append(f'        "therapy_area": "{ta}",')
+
+            pal_str = ", ".join(f'"{c}"' for c in palette[:8])
+            lines.append(f'        "_observed_palette": [{pal_str}],')
+            lines.append("    },")
+            lines.append("")
+
+        lines += [
+            "}",
+            "",
+            "",
+            "def get_brand(brand_key: str) -> dict:",
+            '    """Look up brand by key. Falls back to CLIENT{} for client-level lookup."""',
+            "    key = brand_key.upper().replace(' ', '_').replace('-', '_')",
+            "    if key in BRAND:",
+            "        return BRAND[key]",
+            "    if key in CLIENT:",
+            "        return CLIENT[key]",
+            "    raise KeyError(",
+            '        f"Unknown brand {brand_key!r}. Available brands: {sorted(BRAND.keys())}"',
+            "    )",
+            "",
+            "",
+            "def get_competitor(brand_key: str) -> str | None:",
+            '    """Return the competitor brand name for a given brand, or None."""',
+            "    b = get_brand(brand_key)",
+            '    return b.get("competitor_name")',
+            "",
+        ]
 
     return "\n".join(lines)
 
@@ -1155,6 +1377,40 @@ Examples:
     layouts_path.write_text(layouts_py, encoding="utf-8")
     print(f"  {layouts_path}")
 
+    # lxml_helpers codegen (from generate_pptx_utils.py — uses OOXML stats)
+    lxml_py = generate_lxml_helpers_py()
+    lxml_path = OUTPUTS_DIR / "generated_lxml_helpers.py"
+    lxml_path.write_text(lxml_py, encoding="utf-8")
+    print(f"  {lxml_path}")
+
+    # Competitor map
+    competitor_map = agg.get("competitor_map", {})
+    if competitor_map:
+        comp_path = OUTPUTS_DIR / "competitor_map.json"
+        comp_path.write_text(json.dumps(competitor_map, indent=2, default=str), encoding="utf-8")
+        comp_md_path = OUTPUTS_DIR / "competitor_map.md"
+        write_competitor_md(competitor_map, comp_md_path)
+        print(f"  {comp_path} ({len(competitor_map)} brands with competitors)")
+
+    # Brand-by-brand JSON (for downstream tools)
+    by_brand = agg.get("by_brand", {})
+    if by_brand:
+        bbb_path = OUTPUTS_DIR / "brand_by_brand.json"
+        bbb_path.write_text(json.dumps(by_brand, indent=2, default=str), encoding="utf-8")
+        print(f"  {bbb_path} ({len(by_brand)} brands)")
+
+    # Chart + table position clusters (for layout refinement)
+    chart_clusters = agg.get("chart_clusters", [])
+    table_clusters = agg.get("table_clusters", [])
+    if chart_clusters:
+        (OUTPUTS_DIR / "chart_positions.json").write_text(
+            json.dumps(chart_clusters, indent=2, default=str), encoding="utf-8")
+    if table_clusters:
+        (OUTPUTS_DIR / "table_positions.json").write_text(
+            json.dumps(table_clusters, indent=2, default=str), encoding="utf-8")
+    print(f"  chart_positions.json ({len(chart_clusters)} clusters), "
+          f"table_positions.json ({len(table_clusters)} clusters)")
+
     # Summary
     summary_path = OUTPUTS_DIR / "mass_scan_summary.md"
     write_summary(agg, summary_path)
@@ -1170,17 +1426,21 @@ Examples:
         profile_path.write_text(md_content, encoding="utf-8")
     print(f"  {profiles_dir}/ ({len(profiles)} project types)")
 
+    n_brands = len(agg.get("by_brand", {}))
     print(f"\n{'='*60}")
     print(f"DONE — {agg['total_decks']} decks, {agg['total_charts']:,} charts, "
-          f"{len(agg['by_client'])} clients, {len(profiles)} project types")
+          f"{len(agg['by_client'])} clients, {n_brands} brands, {len(profiles)} project types")
     print(f"{'='*60}")
     print(f"Generated files:")
-    print(f"  {brand_path}  — CLIENT{{}}")
+    print(f"  {brand_path}  — CLIENT{{}} + BRAND{{}}")
     print(f"  {patterns_path}  — CHART_PATTERNS{{}}")
     print(f"  {layouts_path}  — LAYOUTS{{}}")
+    print(f"  {lxml_path}  — lxml_helpers")
+    if competitor_map:
+        print(f"  competitor_map.json/md  — {len(competitor_map)} brands")
     for pt in sorted(profiles.keys()):
         safe_name = pt.lower().replace(" ", "_").replace("-", "_")
-        print(f"  {profiles_dir}/{safe_name}_profile.md")
+        print(f"  project_type_profiles/{safe_name}_profile.md")
     print(f"{'='*60}")
 
 
