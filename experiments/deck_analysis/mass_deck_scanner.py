@@ -90,6 +90,51 @@ _PROJECT_TYPE_KEYWORDS = {
     "Qualitative": ["Qual", "Qualitative", "Focus Group", "IDI"],
 }
 
+# Section/topic classification from headline text (feeds project-type skills)
+_SECTION_KEYWORDS = {
+    # PET sections
+    "Message Recall": ["message recall", "msg recall", "unaided recall", "aided recall",
+                       "recall of messages"],
+    "Message Effectiveness": ["message effectiveness", "effectiveness of messages",
+                              "message impact"],
+    "Rep Performance": ["rep performance", "rep quality", "sales rep", "representative",
+                        "rep rating", "SFE", "sales force"],
+    "Prescription Intent": ["prescription intent", "intent to prescribe", "prescribing",
+                            "likelihood to prescribe", "Rx intent"],
+    "Call to Action": ["call to action", "CTA", "action taken"],
+    "HII": ["high impact interaction", "HII", "high-impact"],
+    # ATU sections
+    "Awareness": ["awareness", "unaided awareness", "aided awareness", "brand awareness"],
+    "Trial": ["trial", "ever tried", "ever prescribed"],
+    "Usage": ["usage", "current use", "currently using", "share of", "SOV"],
+    "Loyalty": ["loyalty", "switching", "switch intent", "brand switch"],
+    "Satisfaction": ["satisfaction", "patient satisfaction", "HCP satisfaction"],
+    # HCP-Pt sections
+    "Patient Conversations": ["patient conversation", "patient dialogue",
+                              "HCP-patient", "treatment discussion"],
+    "Treatment Journey": ["treatment journey", "treatment path", "patient journey"],
+    # Digital Tracker sections
+    "Digital Engagement": ["digital engagement", "digital channel", "email",
+                           "website", "banner ad", "online"],
+    "Non-Personal Promotion": ["non-personal", "NPP", "omnichannel"],
+    # Cross-cutting
+    "Drivers and Barriers": ["driver", "barrier", "reason for", "reason not"],
+    "Competitive Landscape": ["competitive", "competitor", "vs.", "versus", "comparison"],
+    "Executive Summary": ["executive summary", "key findings", "summary"],
+    "Methodology": ["methodology", "sample", "respondent profile", "study design"],
+    "Recommendations": ["recommendation", "implication", "next steps"],
+}
+
+
+def _classify_section(headline: str) -> str:
+    """Classify a headline into a section/topic."""
+    hl = headline.lower()
+    for section, keywords in _SECTION_KEYWORDS.items():
+        for kw in keywords:
+            if kw.lower() in hl:
+                return section
+    return "Other"
+
 
 def _emu_to_inches(emu: int) -> float:
     return round(emu / 914400, 2) if emu else 0.0
@@ -162,6 +207,8 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
         "font_sizes": Counter(),
         "headline_lengths": [],
         "headline_font_sizes": [],
+        "sections": Counter(),               # section/topic classification from headlines
+        "headlines": [],                      # sample headlines (first 50)
         "composition_signatures": Counter(),
         "chart_positions": [],            # (left, top, width, height)
         "table_positions": [],
@@ -248,6 +295,11 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
 
                 if top < 1.5 and len(text) > 10:
                     deck["headline_lengths"].append(len(text))
+                    # Section classification
+                    section = _classify_section(text)
+                    deck["sections"][section] += 1
+                    if len(deck["headlines"]) < 50:
+                        deck["headlines"].append(text[:150])
                     try:
                         for para in shape.text_frame.paragraphs:
                             for run in para.runs:
@@ -314,7 +366,8 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
 
     # Serialize Counters and defaultdicts for JSON
     for key in ["chart_types", "chart_patterns", "series_colors", "heading_colors",
-                "fonts", "font_sizes", "composition_signatures", "table_dimensions"]:
+                "fonts", "font_sizes", "composition_signatures", "table_dimensions",
+                "sections"]:
         deck[key] = dict(Counter(deck[key]).most_common(50))
     deck["positions_by_sig"] = {k: dict(v) for k, v in deck["positions_by_sig"].items()}
     # Serialize OOXML counters
@@ -420,8 +473,46 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
                 "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
         ooxml_agg[key] = dict(ooxml_agg[key].most_common(30))
 
+    # ── Per-project-type profiles (for project-type skills) ──
+    by_project_type: dict[str, dict] = defaultdict(lambda: {
+        "deck_count": 0,
+        "total_slides": 0,
+        "total_charts": 0,
+        "total_tables": 0,
+        "chart_patterns": Counter(),
+        "composition_signatures": Counter(),
+        "sections": Counter(),
+        "avg_slides_per_deck": 0,
+        "sample_headlines": [],
+    })
+
+    for d in inventories:
+        pt = d["project_type"]
+        bpt = by_project_type[pt]
+        bpt["deck_count"] += 1
+        bpt["total_slides"] += d["total_slides"]
+        bpt["total_charts"] += d["total_charts"]
+        bpt["total_tables"] += d["total_tables"]
+        for k, v in d["chart_patterns"].items():
+            bpt["chart_patterns"][k] += v
+        for k, v in d["composition_signatures"].items():
+            bpt["composition_signatures"][k] += v
+        for k, v in d.get("sections", {}).items():
+            bpt["sections"][k] += v
+        if len(bpt["sample_headlines"]) < 20:
+            bpt["sample_headlines"].extend(d.get("headlines", [])[:5])
+
+    # Finalize per-type profiles
+    for pt, bpt in by_project_type.items():
+        bpt["avg_slides_per_deck"] = round(bpt["total_slides"] / max(bpt["deck_count"], 1), 1)
+        bpt["chart_patterns"] = dict(Counter(bpt["chart_patterns"]).most_common(15))
+        bpt["composition_signatures"] = dict(Counter(bpt["composition_signatures"]).most_common(15))
+        bpt["sections"] = dict(Counter(bpt["sections"]).most_common(20))
+        bpt["sample_headlines"] = bpt["sample_headlines"][:20]
+
     return {
         "by_client": dict(by_client),
+        "by_project_type": dict(by_project_type),
         "chart_patterns": dict(all_chart_patterns.most_common(30)),
         "chart_types": dict(all_chart_types.most_common(30)),
         "composition_signatures": dict(all_composition_sigs.most_common(30)),
@@ -766,6 +857,79 @@ def generate_layouts_py(agg: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Codegen: Per-project-type profiles
+# ---------------------------------------------------------------------------
+
+def generate_project_type_profiles(agg: dict) -> dict[str, str]:
+    """Generate a markdown profile per project type for project-type skills.
+
+    Returns {project_type: markdown_string}.
+    """
+    by_pt = agg.get("by_project_type", {})
+    profiles = {}
+
+    for pt, data in sorted(by_pt.items(), key=lambda x: -x[1]["deck_count"]):
+        dc = data["deck_count"]
+        if dc < 2:
+            continue  # skip singleton types
+
+        total_charts = data["total_charts"] or 1
+        lines = [
+            f"# {pt} Project Type Profile",
+            "",
+            f"**Decks analyzed:** {dc}",
+            f"**Total slides:** {data['total_slides']:,}",
+            f"**Avg slides/deck:** {data['avg_slides_per_deck']}",
+            f"**Total charts:** {data['total_charts']:,}",
+            f"**Total tables:** {data['total_tables']:,}",
+            "",
+            "---",
+            "",
+            "## Chart Pattern Distribution",
+            "",
+            "| Pattern | Count | % |",
+            "|---|---|---|",
+        ]
+        for p, count in sorted(data["chart_patterns"].items(), key=lambda x: -x[1]):
+            pct = round(count * 100 / total_charts, 1)
+            lines.append(f"| `{p}` | {count:,} | {pct}% |")
+
+        lines += [
+            "",
+            "## Slide Composition Signatures",
+            "",
+            "| Signature | Slides |",
+            "|---|---|",
+        ]
+        for sig, count in sorted(data["composition_signatures"].items(), key=lambda x: -x[1]):
+            lines.append(f"| `{sig}` | {count:,} |")
+
+        lines += [
+            "",
+            "## Section/Topic Distribution",
+            "",
+            "| Section | Slides |",
+            "|---|---|",
+        ]
+        for sec, count in sorted(data["sections"].items(), key=lambda x: -x[1]):
+            lines.append(f"| {sec} | {count:,} |")
+
+        if data.get("sample_headlines"):
+            lines += [
+                "",
+                "## Sample Headlines",
+                "",
+            ]
+            for hl in data["sample_headlines"][:15]:
+                lines.append(f"- {hl}")
+
+        lines.append("")
+        profiles[pt] = "\n".join(lines)
+
+    return profiles
+
+
+# ---------------------------------------------------------------------------
 # Summary report
 # ---------------------------------------------------------------------------
 
@@ -996,14 +1160,27 @@ Examples:
     write_summary(agg, summary_path)
     print(f"  {summary_path}")
 
+    # Per-project-type profiles (for project-type skills)
+    profiles = generate_project_type_profiles(agg)
+    profiles_dir = OUTPUTS_DIR / "project_type_profiles"
+    profiles_dir.mkdir(exist_ok=True)
+    for pt, md_content in profiles.items():
+        safe_name = pt.lower().replace(" ", "_").replace("-", "_")
+        profile_path = profiles_dir / f"{safe_name}_profile.md"
+        profile_path.write_text(md_content, encoding="utf-8")
+    print(f"  {profiles_dir}/ ({len(profiles)} project types)")
+
     print(f"\n{'='*60}")
     print(f"DONE — {agg['total_decks']} decks, {agg['total_charts']:,} charts, "
-          f"{len(agg['by_client'])} clients")
+          f"{len(agg['by_client'])} clients, {len(profiles)} project types")
     print(f"{'='*60}")
-    print(f"Generated files (review, then copy to slidegen/pptx_utils/):")
-    print(f"  {brand_path}")
-    print(f"  {patterns_path}")
-    print(f"  {layouts_path}")
+    print(f"Generated files:")
+    print(f"  {brand_path}  — CLIENT{{}}")
+    print(f"  {patterns_path}  — CHART_PATTERNS{{}}")
+    print(f"  {layouts_path}  — LAYOUTS{{}}")
+    for pt in sorted(profiles.keys()):
+        safe_name = pt.lower().replace(" ", "_").replace("-", "_")
+        print(f"  {profiles_dir}/{safe_name}_profile.md")
     print(f"{'='*60}")
 
 
