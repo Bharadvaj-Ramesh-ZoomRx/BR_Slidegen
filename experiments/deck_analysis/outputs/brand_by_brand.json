@@ -4,25 +4,25 @@
     "client": "VIR_BIOTECH",
     "competitor": null,
     "therapy_area": "Unknown",
-    "deck_count": 463,
+    "deck_count": 785,
     "palette_filtered": [
       "FFC000",
       "92D050",
       "D9D9D9",
       "7030A0",
-      "0070C0",
       "00B0F0",
+      "0070C0",
       "002060",
       "0063C3",
       "002B48",
-      "071D49"
+      "435363"
     ],
     "deck_files": [
+      "01 Nirogacestat PET and HCP-Pt\\(Unclassified)\\GEMTESA 06-23.pptx",
       "AbbVie (ABV)\\(Unclassified)\\ZoomRx Requested Slides.pptx",
+      "AbbVie (ABV)\\01 - Q1'25 PET Dec'24 - Mar'25\\2025-01-30 Elahere PET Mid-fielding Intermediate KPI Report.pptx",
       "AbbVie (ABV)\\02 AbbVie - HCV\\HCV PET Q1'26 Full Report.pptx",
-      "AbbVie (ABV)\\03 ABV_Creon\\CREON Share of Voice Study - W33.pptx",
-      "AbbVie (ABV)\\14 Rinvoq_Skyrizi PET\\Consolidated PET.pptx",
-      "AbbVie (ABV)\\22 ABV_MVD_UC UD Qual Quant study\\MVD Refinement Study UC Final Report.pptx"
+      "AbbVie (ABV)\\03 ABV_Creon\\CREON Share of Voice Study - W33.pptx"
     ]
   },
   "CCA_PP_TRACKER": {
@@ -52,7 +52,7 @@
     "client": "ALEXION",
     "competitor": null,
     "therapy_area": "Hematology/PNH",
-    "deck_count": 1,
+    "deck_count": 2,
     "palette_filtered": [
       "0E8779",
       "7030A0",
@@ -66,6 +66,7 @@
       "008DAB"
     ],
     "deck_files": [
+      "Alexion Pharmaceuticals\\PET+ATU Integration\\ZoomRx ALEXION ULTOMIRIS US PNH PET-ATU Integration Q4'23.pptx",
       "Alexion Pharmaceuticals\\ULTOMIRIS PNH\\[Migration] ZoomRx Alexion US PNH Q325 PET - v1.pptx"
     ]
   },
@@ -74,20 +75,21 @@
     "client": "ALNYLAM",
     "competitor": null,
     "therapy_area": "Cross-brand",
-    "deck_count": 2,
+    "deck_count": 3,
     "palette_filtered": [
-      "E7004C",
       "FF6969",
+      "33B66E",
+      "00CC00",
+      "B2B2B2",
+      "E7004C",
       "6BC9EF",
       "006838",
       "00607C",
       "00A44A",
-      "00CC00",
-      "D9D9D9",
-      "33B66E",
-      "B2B2B2"
+      "D9D9D9"
     ],
     "deck_files": [
+      "Alnylam (ALN)\\19 ALN Vutrisiran PET 2024\\Physicians SFE (PET)_Q4'24 Report_v5.pptx",
       "Alnylam (ALN)\\24 ALN AMVUTTRA PET 2025\\Physicians SFE (PET)_Q4'25 Report_V1.pptx",
       "Alnylam (ALN)\\31 ALN AMVUTTRA PET 2026\\Physicians SFE (PET)_Q2'26 Report_V1.pptx"
     ]
@@ -97,25 +99,25 @@
     "client": "AMGEN",
     "competitor": null,
     "therapy_area": "Dermatology/Psoriasis",
-    "deck_count": 9,
+    "deck_count": 11,
     "palette_filtered": [
       "1F497D",
       "00A3DF",
       "C40E12",
       "448D96",
       "009900",
-      "F3C108",
-      "4C35DE",
-      "11A1A2",
       "BF9761",
-      "AAA8AB"
+      "F3C108",
+      "AAA8AB",
+      "993366",
+      "4C35DE"
     ],
     "deck_files": [
       "Amgen (AMG)\\00 Amgen Otezla - all workstreams\\Q4'25 Otezla Rheum-PsA Dialogue - Sales Rep Training 2026.04.13.pptx",
       "Amgen (AMG)\\076 AMG Otezla PET\\[ZoomRx] Q1'26 Otezla Derm PET_Full Report v1_Client version_15.04.2026.pptx",
       "Amgen (AMG)\\CG Tracker - Wave 2\\[ZoomRx] Rheum Otezla CG Tracker - Wave 2 - v2.pptx",
       "Amgen (AMG)\\CG Tracker Wave 1\\[ZoomRx] Rheum Otezla CG Tracker - Wave1 Report v1_Final.pptx",
-      "Amgen (AMG)\\Derm PET\\[ZoomRx] AMG Otezla Derm PET_Apr'25 KPIs_v1.pptx"
+      "Amgen (AMG)\\CG Tracker Wave 3\\03. Wave 3 '25 - Rheum Otezla Chase Goals Tracker.pptx"
     ]
   },
   "BONE_HCP_TRACKER": {
@@ -123,7 +125,7 @@
     "client": "AMGEN",
     "competitor": null,
     "therapy_area": "Bone",
-    "deck_count": 3,
+    "deck_count": 4,
     "palette_filtered": [
       "FF9933",
       "009201",
@@ -139,56 +141,8 @@
     "deck_files": [
       "Amgen (AMG)\\01 AMG_Prolia_PET_2023\\10-04-26 AMG Bone HCP PET and ATU_Mar R3M.pptx",
       "Amgen (AMG)\\084 Bone Health ATU\\3.12.2026_Q1'26 Bone HCP ATU Full Report_v1.0_AMG_SP_Version.pptx",
-      "Amgen (AMG)\\090 - Bone HCP-PT\\[ZoomRx] AMG Bone HCP-PT Dialogue Final Report Draft v0.3.pptx"
-    ]
-  },
-  "UPLIZNA": {
-    "brand": "UPLIZNA",
-    "client": "AMGEN",
-    "competitor": null,
-    "therapy_area": "Neurology/NMOSD",
-    "deck_count": 7,
-    "palette_filtered": [
-      "D6D2D0",
-      "76C269",
-      "0063C3",
-      "F2BFBF",
-      "2F6D5B",
-      "E57F7F",
-      "5B729B",
-      "813F97",
-      "007D6D",
-      "003C71"
-    ],
-    "deck_files": [
-      "Amgen (AMG)\\040 Amgen - UPLIZNA PET\\ZoomRx AMG Uplizna PET Q4'24 Final Report_01.10.25.pptx",
-      "Amgen (AMG)\\093 - UPLIZNA gMG Patient AAU\\ZoomRx UPLIZNA gMG Patient Experience and Switch Dynamics Full Report Q3 '25 v4.pptx",
-      "Amgen (AMG)\\Amgen - Uplizna IgG4 AAU\\Zoomrx Uplizna IgG4 AAU_Skeleton Deck.v0.1.pptx",
-      "Amgen (AMG)\\Amgen - UPLIZNA IgG4-RD PET\\ZoomRx AMG UPLIZNA IgG4 RD PET Q1 '26 Report v1.pptx",
-      "Amgen (AMG)\\Amgen - UPLIZNA NMOSD AAU\\ZoomRx UPLIZNA AAU Wave 6 Q4 2025 Final report Follow-up.pptx"
-    ]
-  },
-  "TEZSPIRE": {
-    "brand": "TEZSPIRE",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Respiratory",
-    "deck_count": 2,
-    "palette_filtered": [
-      "F89C0D",
-      "FFC600",
-      "6C5199",
-      "EF426F",
-      "9B37FF",
-      "0063C3",
-      "C688E8",
-      "5D9D39",
-      "0062C2",
-      "830051"
-    ],
-    "deck_files": [
-      "Amgen (AMG)\\056_AMG_AZ_Tezspire_PET\\ZoomRx Tezspire PET - 2026 Check-in Deck - 7th Apr 2026.pptx",
-      "Amgen (AMG)\\059 AMG_AZ_Tezspire_HCP_Pt\\2024-11-18_Tezspire HCP-Patient Dialogue Full Report_v3.pptx"
+      "Amgen (AMG)\\090 - Bone HCP-PT\\[ZoomRx] AMG Bone HCP-PT Dialogue Final Report Draft v0.3.pptx",
+      "Amgen (AMG)\\Bone HCP-PT Dialogue Study\\Bone HCP-Patient Dialogue Observational Research Kickoff v0.1.pptx"
     ]
   },
   "TEPEZZA": {
@@ -196,7 +150,7 @@
     "client": "JJ",
     "competitor": null,
     "therapy_area": "Endocrinology/TED",
-    "deck_count": 2,
+    "deck_count": 3,
     "palette_filtered": [
       "7FB1E1",
       "0063C3",
@@ -210,8 +164,59 @@
       "31CDC9"
     ],
     "deck_files": [
+      "Amgen (AMG)\\01 Survey Draft\\ZOOMRx AMG TEPEZZA Visual Aids Q4'25 wave 3.pptx",
       "Amgen (AMG)\\079 AMG Tepezza\\AMG Tepezza HCP-PT KO.pptx",
       "Amgen (AMG)\\TEPEZZA PET\\TEPEZZA_PET_Q4 2025_Report_Migration test.pptx"
+    ]
+  },
+  "UPLIZNA": {
+    "brand": "UPLIZNA",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Neurology/NMOSD",
+    "deck_count": 13,
+    "palette_filtered": [
+      "D6D2D0",
+      "76C269",
+      "5B729B",
+      "E57F7F",
+      "0063C3",
+      "F2BFBF",
+      "2F6D5B",
+      "00BCE4",
+      "92D050",
+      "FF6720"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\040 Amgen - UPLIZNA PET\\ZoomRx AMG Uplizna PET Q4'24 Final Report_01.10.25.pptx",
+      "Amgen (AMG)\\086 Amgen - UPLIZNA gMG Patient Experience & Switch Dynamics\\ZoomRx UPLIZNA gMG Patient Experience and Switch Dynamics Full Report Q3 '25 V3 (6 August).pptx",
+      "Amgen (AMG)\\093 - UPLIZNA gMG Patient AAU\\ZoomRx UPLIZNA gMG Patient Experience and Switch Dynamics Full Report Q3 '25 v4.pptx",
+      "Amgen (AMG)\\Amgen - Uplizna IgG4 AAU\\Zoomrx Uplizna IgG4 AAU_Skeleton Deck.v0.1.pptx",
+      "Amgen (AMG)\\Amgen - UPLIZNA IgG4-RD PET\\ZoomRx AMG UPLIZNA IgG4 RD PET Q1 '26 Report v1.pptx"
+    ]
+  },
+  "TEZSPIRE": {
+    "brand": "TEZSPIRE",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Respiratory",
+    "deck_count": 3,
+    "palette_filtered": [
+      "0063C3",
+      "F89C0D",
+      "FFC600",
+      "6C5199",
+      "EF426F",
+      "9B37FF",
+      "C688E8",
+      "5D9D39",
+      "0062C2",
+      "830051"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\056_AMG_AZ_Tezspire_PET\\ZoomRx Tezspire PET - 2026 Check-in Deck - 7th Apr 2026.pptx",
+      "Amgen (AMG)\\059 AMG_AZ_Tezspire_HCP_Pt\\2024-11-18_Tezspire HCP-Patient Dialogue Full Report_v3.pptx",
+      "Amgen (AMG)\\0591 AMG Tezspire KAM\\AMG TEZSPIRE KAM ATU v1.pptx"
     ]
   },
   "EMPAVELI": {
@@ -219,21 +224,23 @@
     "client": "APELLIS",
     "competitor": null,
     "therapy_area": "Hematology",
-    "deck_count": 1,
+    "deck_count": 3,
     "palette_filtered": [
       "FC3B6E",
-      "30CFD0",
-      "81E3E3",
-      "5A4986",
-      "FD7FA0",
-      "FEB0C4",
-      "FFC000",
-      "163A6B",
-      "5E6C85",
-      "C6F3F2"
+      "3E797E",
+      "5B9BD5",
+      "584D75",
+      "433764",
+      "8A8A8A",
+      "66ADB4",
+      "C9E2E5",
+      "594986",
+      "92D050"
     ],
     "deck_files": [
-      "Apellis (APL)\\01_APL_Empaveli_Nephrology_PET_2025\\ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx"
+      "Apellis (APL)\\00 APL_Empaveli_PET_2022\\ZoomRx - Apellis Empaveli Fieldforce Effectiveness Full Report_V3.0.pptx",
+      "Apellis (APL)\\01_APL_Empaveli_Nephrology_PET_2025\\ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx",
+      "Apellis (APL)\\04 Recruitment and Survey Draft\\ZoomRx_2025 Empaveli (C3G and IC-MPGN) PET - Key Promotional Messages and Visual Aid.pptx"
     ]
   },
   "ENHERTU": {
@@ -241,25 +248,25 @@
     "client": "DSI_AZN",
     "competitor": null,
     "therapy_area": "Oncology/HER2",
-    "deck_count": 23,
+    "deck_count": 32,
     "palette_filtered": [
       "FF8813",
-      "34A355",
       "EE7623",
-      "F5AD7B",
-      "8F66A9",
+      "34A355",
       "33A4FF",
       "0070C0",
-      "F6BC94",
+      "8F66A9",
+      "F5AD7B",
       "D9D9D9",
-      "FFBFFF"
+      "E15759",
+      "4EBB57"
     ],
     "deck_files": [
       "AstraZeneca (AZN)\\01 AZN_DS-8201_IntegratedTracking_2020\\ZoomRx AZ-DSI ENHERTU mBC QBR Report - Q1 '26 v1.0.pptx",
+      "AstraZeneca (AZN)\\Integrated Tracking - Combined Report\\ZoomRx - AZ -DSI -ENHERTU Q4 '21 - Combined Report - V1.pptx",
       "AstraZeneca (AZN)\\PET - Monthly\\ZoomRx - ENHERTU mBC PET - Feb '26 Monthly WIP Report v1.0.pptx",
       "AstraZeneca (AZN)\\PET - Quarterly\\ZoomRx AZ-DSI ENHERTU mBC Full PP PET Report - Q1 '26_WIP_skeleton.pptx",
-      "daiichi sankyo\\(Unclassified)\\ZoomRx - ENHERTU Brand Planning - 03-27.pptx",
-      "daiichi sankyo\\00 Client Access SharePoint Files\\ZoomRx - AZ-DSI ENHERTU NPP Report - NSCLC - Tumor-Agnostic - Nov \u201925 - Feb \u201926 - Final Report v1.pptx"
+      "daiichi sankyo\\(Unclassified)\\ZoomRx - ENHERTU Brand Planning - 03-27.pptx"
     ]
   },
   "CALQUENCE": {
@@ -314,24 +321,25 @@
     "client": "AZN",
     "competitor": null,
     "therapy_area": "Oncology",
-    "deck_count": 4,
+    "deck_count": 6,
     "palette_filtered": [
+      "92D050",
+      "004D74",
+      "D9D9D9",
+      "94D448",
+      "00B3FF",
       "006680",
       "B2D234",
       "33CCCC",
-      "D9D9D9",
       "675F53",
-      "92D050",
-      "94D448",
-      "FFBA00",
-      "00B3FF",
-      "D2CEC8"
+      "801851"
     ],
     "deck_files": [
       "AstraZeneca (AZN)\\04 AZN_Lynparza_Ovarian_PET\\Lynparza aOC_PET_Q1 2026_v1.0.pptx",
+      "AstraZeneca (AZN)\\04 PERxCEPT 2024\\Lynparza aOC_PETxCEPT_ 2024_v1.0_WIP_deck.pptx",
       "AstraZeneca (AZN)\\21 AZN_Lynparza_mBC_PET_2022\\ZoomRx_Lynparza eBC PET Q1 '26 Report_v1.pptx",
       "AstraZeneca (AZN)\\47 AZN Lynparza eBC Digital Tracker 2025\\ZoomRx_Lynparza eBC Digital Tracker - Q4 '24 to Q4 '25.pptx",
-      "Merck (MER)\\32 MER_Lynparza_mCRPC_PET_2025\\Lynparza mCRPC PET_Q4 25 Full Report_Readout V4.1.pptx"
+      "Merck (MER)\\25 MER_Lynparza_mCRPC_PET_2024\\Lynparza mCRPC PET_Q4 24.pptx"
     ]
   },
   "TRUQAP": {
@@ -339,12 +347,12 @@
     "client": "AZN",
     "competitor": null,
     "therapy_area": "Oncology/Breast",
-    "deck_count": 1,
+    "deck_count": 2,
     "palette_filtered": [
       "250E62",
-      "656681",
       "006937",
       "FFCB05",
+      "656681",
       "F5A899",
       "05CDCD",
       "006680",
@@ -353,7 +361,8 @@
       "FCE7E3"
     ],
     "deck_files": [
-      "AstraZeneca (AZN)\\38 AZN Capivasertib PET\\TRUQAP PET Quarterly Report Q1 '26 v2.pptx"
+      "AstraZeneca (AZN)\\38 AZN Capivasertib PET\\TRUQAP PET Quarterly Report Q1 '26 v2.pptx",
+      "AstraZeneca (AZN)\\AZN_One_Breast\\ZoomRx - ENHERTU, DATROWAY & TRUQAP PET Q2 '25 Readout Deck v1.0.pptx"
     ]
   },
   "LOKELMA": {
@@ -383,20 +392,21 @@
     "client": "BL",
     "competitor": null,
     "therapy_area": "Ophthalmology/DED",
-    "deck_count": 1,
+    "deck_count": 2,
     "palette_filtered": [
-      "00A9EB",
       "4B34A2",
-      "222A35",
-      "400286",
       "D9D9D9",
       "FFC000",
-      "003865",
-      "993366",
-      "660066",
-      "000F9F"
+      "00A9EB",
+      "300264",
+      "A57394",
+      "BED32E",
+      "E4483C",
+      "92D050",
+      "009A78"
     ],
     "deck_files": [
+      "Bausch (BAU)\\03 BAU_Opth_PET_2024_Q3\\BAUSCH + LOMB ECP - Patient Final Report.pptx",
       "Bausch (BAU)\\04 BAU Integrated Report (PET + ECP-Pt)\\[ZoomRx] B+L DED Integrated Report - Wave 1 v1.0.pptx"
     ]
   },
@@ -507,22 +517,48 @@
     "client": "LEO",
     "competitor": null,
     "therapy_area": "Dermatology/AD",
-    "deck_count": 2,
+    "deck_count": 3,
     "palette_filtered": [
       "D5685F",
       "6F439A",
       "009B77",
+      "C017A2",
+      "C8DEED",
+      "84A0B5",
+      "D39AD0",
       "C014A3",
       "FED006",
-      "EAAFE0",
-      "90117A",
-      "D561C1",
-      "946A2C",
-      "2E8082"
+      "EAAFE0"
     ],
     "deck_files": [
       "LEO Pharma\\2021 Message Tracking - Adbry PET\\V1_Adbry PET_W1'26 (Wave 22)_migrated deck.pptx",
+      "LEO Pharma\\2024 Tralokinumab HCP-P\\V1_FINAL_Adbry_HCP-Pt Conversations_Feb'25.pptx",
       "LEO Pharma\\2025 Tralokinumab HCP-P\\V1_Adbry_HCP-Pt Conversations_Oct'25.pptx"
+    ]
+  },
+  "LIBTAYO": {
+    "brand": "LIBTAYO",
+    "client": "REGENERON",
+    "competitor": null,
+    "therapy_area": "Oncology/NMSC",
+    "deck_count": 4,
+    "palette_filtered": [
+      "DC0077",
+      "004F6F",
+      "C83333",
+      "338533",
+      "96BBBB",
+      "C19875",
+      "D34D4D",
+      "DE0D7E",
+      "A4D271",
+      "929442"
+    ],
+    "deck_files": [
+      "Merck (MER)\\Tracker Changes\\LIBTAYO Metastatic NSCLC Messages (Wave 3).pptx",
+      "Regeneron (RGN)\\04 Libtayo PET\\[ZoomRx] Libtayo (Mar \u201926 - May \u201926) NMSC Message Recall & Effectiveness Report - Adjuvant CSCC Focused _ Synapse connected v1.0.pptx",
+      "Regeneron (RGN)\\Qual One-Pager\\ZoomRx - RGN - Libtayo NMSC Q4 '25 Qual One-Pager Summaries.pptx",
+      "Regeneron (RGN)\\Recruitment Tracker\\Libtayo Skin SFE [May - Jun'26] Recruitment Tracker.pptx"
     ]
   },
   "RHAPSIDO": {
@@ -578,49 +614,25 @@
     "client": "PFIZER",
     "competitor": null,
     "therapy_area": "Vaccines/Maternal",
-    "deck_count": 5,
+    "deck_count": 6,
     "palette_filtered": [
       "0000C9",
       "0095FF",
-      "602A81",
-      "F49C34",
-      "67BB6E",
-      "43964A",
-      "B9B9B9",
-      "D95776",
-      "9D73F7",
-      "0DBDBA"
+      "E356DC",
+      "94D448",
+      "BEF202",
+      "0287A2",
+      "004B70",
+      "03075E",
+      "C065BA",
+      "602A81"
     ],
     "deck_files": [
+      "Pfizer\\01 Digital Integration\\US Maternal Abrysvo HCP NPP Digital Integrated Report.pptx",
       "Pfizer\\05 PFZ_ABRYSVO_PET\\Pfizer_Abrysvo_PET _2023_Final_Report_v1.pptx",
       "Pfizer\\06 PFZ_ABRYSVO_Maternal_PET\\US Abrysvo Maternal HCP CFC Promotional Effectiveness Tracking (ZoomRx)_Q4 \u201825 - Full Report V3.0.pptx",
       "Pfizer\\08 PFZ_ABRYSVO_Maternal_Digital Tracking\\ZoomRx_Abrysvo Digital Tracker_Full Report_V1.pptx",
-      "Pfizer\\12 PFZ_ABRYSVO_Maternal_HCP-Pt Study\\ZoomRx - Pfizer - Abrysvo MAT - HCP-Patient Conversations - KO - v2.pptx",
-      "Pfizer\\17 PFZ_Pharms Quant\\ZoomRx - Pfizer_Abrysvo_Pharmacist_Quant_Full Report.pptx"
-    ]
-  },
-  "LIBTAYO": {
-    "brand": "LIBTAYO",
-    "client": "REGENERON",
-    "competitor": null,
-    "therapy_area": "Oncology/NMSC",
-    "deck_count": 3,
-    "palette_filtered": [
-      "DC0077",
-      "004F6F",
-      "C83333",
-      "338533",
-      "96BBBB",
-      "C19875",
-      "D34D4D",
-      "DE0D7E",
-      "A4D271",
-      "929442"
-    ],
-    "deck_files": [
-      "Regeneron (RGN)\\04 Libtayo PET\\[ZoomRx] Libtayo (Mar \u201926 - May \u201926) NMSC Message Recall & Effectiveness Report - Adjuvant CSCC Focused _ Synapse connected v1.0.pptx",
-      "Regeneron (RGN)\\Qual One-Pager\\ZoomRx - RGN - Libtayo NMSC Q4 '25 Qual One-Pager Summaries.pptx",
-      "Regeneron (RGN)\\Recruitment Tracker\\Libtayo Skin SFE [May - Jun'26] Recruitment Tracker.pptx"
+      "Pfizer\\12 PFZ_ABRYSVO_Maternal_HCP-Pt Study\\ZoomRx - Pfizer - Abrysvo MAT - HCP-Patient Conversations - KO - v2.pptx"
     ]
   },
   "DUPIXENT_EoE": {
@@ -628,10 +640,16 @@
     "client": "REGENERON_SANOFI",
     "competitor": null,
     "therapy_area": "Immunology/EoE",
-    "deck_count": 1,
-    "palette_filtered": [],
+    "deck_count": 2,
+    "palette_filtered": [
+      "219491",
+      "A7A7A7",
+      "F79646",
+      "1BA2DA"
+    ],
     "deck_files": [
-      "Sanofi - Genzyme (SAN)\\10 SAN_Dupixent_EoE_HCP-PT+Qual_2025\\ZoomRx_SAN RGN_Dupixent_EoE PROJECT FISHBOWL_Additional Analysis.pptx"
+      "Sanofi - Genzyme (SAN)\\10 SAN_Dupixent_EoE_HCP-PT+Qual_2025\\ZoomRx_SAN RGN_Dupixent_EoE PROJECT FISHBOWL_Additional Analysis.pptx",
+      "Sanofi - Genzyme (SAN)\\Quarterly KPI\\ZoomRx_Dupixent EoE PET Rep Activity_Q4 '24.pptx"
     ]
   }
 }

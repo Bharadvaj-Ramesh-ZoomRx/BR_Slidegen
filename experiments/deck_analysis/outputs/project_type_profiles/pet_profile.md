@@ -1,10 +1,10 @@
 # PET Project Type Profile
 
-**Decks analyzed:** 192
-**Total slides:** 10,271
-**Avg slides/deck:** 53.5
-**Total charts:** 17,000
-**Total tables:** 18,682
+**Decks analyzed:** 276
+**Total slides:** 13,949
+**Avg slides/deck:** 50.5
+**Total charts:** 21,918
+**Total tables:** 23,579
 
 ---
 
@@ -12,88 +12,81 @@
 
 | Pattern | Count | % |
 |---|---|---|
-| `bar_clustered_horizontal` | 5,245 | 30.9% |
-| `line_markers_trended` | 2,895 | 17.0% |
-| `xy_scatter_abacus` | 2,170 | 12.8% |
-| `column_stacked_100_vertical` | 1,767 | 10.4% |
-| `bar_stacked_100_horizontal` | 1,268 | 7.5% |
-| `bar_stacked_horizontal` | 1,246 | 7.3% |
-| `column_clustered_vertical` | 1,123 | 6.6% |
-| `column_stacked_vertical` | 588 | 3.5% |
-| `doughnut_default` | 502 | 3.0% |
-| `xy_scatter_lines` | 81 | 0.5% |
-| `pie_default` | 43 | 0.3% |
-| `unmapped_LINE_MARKERS_STACKED` | 25 | 0.1% |
-| `unmapped_DOUGHNUT_EXPLODED` | 20 | 0.1% |
-| `bubble` | 11 | 0.1% |
-| `unmapped_AREA_STACKED_100` | 9 | 0.1% |
+| `bar_clustered_horizontal` | 6,787 | 31.0% |
+| `line_markers_trended` | 3,622 | 16.5% |
+| `xy_scatter_abacus` | 2,745 | 12.5% |
+| `column_stacked_100_vertical` | 2,367 | 10.8% |
+| `bar_stacked_horizontal` | 1,600 | 7.3% |
+| `bar_stacked_100_horizontal` | 1,571 | 7.2% |
+| `column_clustered_vertical` | 1,314 | 6.0% |
+| `column_stacked_vertical` | 800 | 3.6% |
+| `doughnut_default` | 784 | 3.6% |
+| `xy_scatter_lines` | 95 | 0.4% |
+| `pie_default` | 78 | 0.4% |
+| `unmapped_LINE_MARKERS_STACKED` | 77 | 0.4% |
+| `unmapped_DOUGHNUT_EXPLODED` | 39 | 0.2% |
+| `bubble` | 15 | 0.1% |
+| `unmapped_AREA_STACKED_100` | 11 | 0.1% |
 
 ## Slide Composition Signatures
 
 | Signature | Slides |
 |---|---|
-| `0_chart_0_table` | 2,501 |
-| `1_chart_1_table` | 1,002 |
-| `0_chart_1_table` | 907 |
-| `1_chart_2_table` | 697 |
-| `2_chart_2_table` | 400 |
-| `2_chart_1_table` | 318 |
-| `1_chart_3_table` | 312 |
-| `3_chart_1_table` | 243 |
-| `0_chart_2_table` | 222 |
-| `2_chart_3_table` | 215 |
-| `1_chart_0_table` | 196 |
-| `3_chart_2_table` | 186 |
-| `2_chart_0_table` | 172 |
-| `3_chart_0_table` | 169 |
-| `2_chart_4_table` | 157 |
+| `0_chart_0_table` | 3,612 |
+| `0_chart_1_table` | 1,350 |
+| `1_chart_1_table` | 1,322 |
+| `1_chart_2_table` | 917 |
+| `2_chart_2_table` | 485 |
+| `2_chart_1_table` | 451 |
+| `1_chart_3_table` | 424 |
+| `3_chart_1_table` | 316 |
+| `0_chart_2_table` | 289 |
+| `1_chart_0_table` | 286 |
+| `2_chart_0_table` | 267 |
+| `2_chart_3_table` | 258 |
+| `3_chart_2_table` | 248 |
+| `3_chart_0_table` | 241 |
+| `2_chart_4_table` | 215 |
 
 ## Section/Topic Distribution
 
 | Section | Slides |
 |---|---|
-| Other | 15,841 |
-| Rep Performance | 2,020 |
-| Message Recall | 1,700 |
-| Usage | 1,203 |
-| Non-Personal Promotion | 1,143 |
-| Methodology | 1,092 |
-| Executive Summary | 1,072 |
-| Message Effectiveness | 797 |
-| Prescription Intent | 789 |
-| Competitive Landscape | 784 |
-| Call to Action | 220 |
-| Awareness | 210 |
-| Drivers and Barriers | 208 |
-| Digital Engagement | 208 |
-| HII | 189 |
-| Recommendations | 139 |
-| Trial | 114 |
-| Satisfaction | 37 |
-| Patient Conversations | 26 |
-| Loyalty | 20 |
+| Other | 21,042 |
+| Rep Performance | 2,764 |
+| Message Recall | 2,271 |
+| Methodology | 1,600 |
+| Usage | 1,556 |
+| Executive Summary | 1,490 |
+| Non-Personal Promotion | 1,484 |
+| Message Effectiveness | 1,089 |
+| Prescription Intent | 1,039 |
+| Competitive Landscape | 1,016 |
+| Digital Engagement | 318 |
+| HII | 272 |
+| Call to Action | 255 |
+| Drivers and Barriers | 252 |
+| Awareness | 244 |
+| Recommendations | 166 |
+| Trial | 140 |
+| Satisfaction | 52 |
+| Patient Conversations | 36 |
+| Loyalty | 24 |
 
 ## Sample Headlines
 
+- FY Q2 '25 PET Review
+- FY Q1‘25 GEMTESA Fielding: IR Fielding was closed on 13th June and DR fielding was closed on Jun-30th (Tentatively) with final report to be delivered 
+- Q1 ’25 Timelines
+- Q2 ’25 Timelines
+- 1. Study Design
+- Methodology Overview
+- Study Design
+- Study Design: Q1 ’25 Interim Data
+- Study Design
 - Research Methodology
 - Objectives & Methodology
 - Channel Selections
 - Research Methodology
 - Key Business Questions
-- AGENDA - Survey Structure & Reporting Updates
-- PET reporting updates
-PET survey: Open questions
-PET reporting timeline updates
-ATU survey updates
-ATU report updates
-NPP behavioral audience feasibil
-- AbbVie and J&J share of voice was on par  in Q1 ’26, co-leading the market; most AbbVie details continued to be multi-product discussions, while most 
-- Sales Force Activity - Share of Voice *
-Q3 ’25 | Q4 ’25 | Q1 ’26
-- Sales Force Activity & Rep Performance
-- VRAYLAR aMDD & BPPromotional Effectiveness Tracking Research
-- 1. Study Design & Respondent Profile
-- Respondent Profile – HCPs Reporting Sales Rep Interactions in Screener
-- Respondent Profile
-(Q4 ‘25 | Q1 ‘26 interim)
-- Study Design: Q1 ‘26 interim
+- Sales Force Activity Market Basket Overview

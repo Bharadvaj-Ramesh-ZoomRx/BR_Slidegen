@@ -46,12 +46,12 @@ CHART_PATTERNS = {
         "label_pos": "ctr",
     },
 
-    # ── Patterns derived from real-deck analysis (551 decks, 35,352 charts) ──
+    # ── Patterns derived from real-deck analysis (905 decks, 50,072 charts) ──
     # Each pattern below reflects observed OOXML defaults, so renderers
     # built on top get client-quality output without per-renderer tuning.
     # Source: experiments/deck_analysis/outputs/mass_scan_summary.md
 
-    # 9,825 occurrences (27.8%). Horizontal bar chart with
+    # 13,994 occurrences (27.9%). Horizontal bar chart with
     # inverted category axis and labels hidden (labels live in companion table).
     "bar_clustered_horizontal": {
         "bar_dir": "bar",
@@ -70,7 +70,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 3,515 occurrences (9.9%). Horizontal 100% stacked for composition/intent.
+    # 5,528 occurrences (11.0%). Horizontal 100% stacked for composition/intent.
     "bar_stacked_100_horizontal": {
         "bar_dir": "bar",
         "grouping": "percentStacked",
@@ -88,7 +88,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 5,966 occurrences (16.9%). Vertical 100% stacked.
+    # 8,227 occurrences (16.4%). Vertical 100% stacked.
     "column_stacked_100_vertical": {
         "bar_dir": "col",
         "grouping": "percentStacked",
@@ -106,7 +106,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 2,202 occurrences (6.2%). Side-by-side vertical bars for QoQ comparison.
+    # 2,869 occurrences (5.7%). Side-by-side vertical bars for QoQ comparison.
     "column_clustered_vertical": {
         "bar_dir": "col",
         "grouping": "clustered",
@@ -124,7 +124,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 5,055 occurrences (14.3%). Multi-wave trend lines.
+    # 6,857 occurrences (13.7%). Multi-wave trend lines.
     "line_markers_trended": {
         "grouping": "standard",
         "label_pos": "t",
@@ -138,7 +138,7 @@ CHART_PATTERNS = {
         "line_width_emu": 25400,     # 2pt (827 occurrences)
     },
 
-    # 3,221 occurrences (9.1%). Scatter for abacus / MBD / quadrant plots.
+    # 4,260 occurrences (8.5%). Scatter for abacus / MBD / quadrant plots.
     "xy_scatter_abacus": {
         "label_pos": "t",
         "label_fsize": 8,
@@ -152,7 +152,7 @@ CHART_PATTERNS = {
         "hide_cat_labels": False,
     },
 
-    # 1,106 occurrences (3.1%). Segment composition breakdowns.
+    # 1,752 occurrences (3.5%). Segment composition breakdowns.
     "doughnut_default": {
         "label_pos": "ctr",
         "label_fsize": 8,
@@ -165,7 +165,7 @@ CHART_PATTERNS = {
 
     # ── New patterns from 551-deck grounding (Apr 2026) ──
 
-    # 2,579 occurrences (7.3%). Horizontal stacked (non-100%) bar.
+    # 3,637 occurrences (7.3%). Horizontal stacked (non-100%) bar.
     "bar_stacked_horizontal": {
         "bar_dir": "bar",
         "grouping": "stacked",
@@ -183,7 +183,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 1,263 occurrences (3.6%). Vertical stacked (non-100%) column.
+    # 1,801 occurrences (3.6%). Vertical stacked (non-100%) column.
     "column_stacked_vertical": {
         "bar_dir": "col",
         "grouping": "stacked",
@@ -201,7 +201,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 251 occurrences (0.7%). Pie chart for composition breakdowns.
+    # 472 occurrences (0.9%). Pie chart for composition breakdowns.
     "pie_default": {
         "label_pos": "outEnd",
         "label_fsize": 8,
@@ -211,7 +211,7 @@ CHART_PATTERNS = {
         "series_no_border": True,
     },
 
-    # 178 occurrences (0.5%). Scatter with connecting lines (trend paths).
+    # 207 occurrences (0.4%). Scatter with connecting lines (trend paths).
     "xy_scatter_lines": {
         "label_pos": "t",
         "label_fsize": 8,
@@ -224,7 +224,7 @@ CHART_PATTERNS = {
         "line_width_emu": 19050,
     },
 
-    # 76 occurrences (0.2%). Bubble charts (rare, typically quadrant analysis).
+    # 109 occurrences (0.2%). Bubble charts (rare, typically quadrant analysis).
     "bubble": {
         "label_pos": "t",
         "label_fsize": 8,

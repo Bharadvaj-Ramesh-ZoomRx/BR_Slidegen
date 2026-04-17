@@ -1354,7 +1354,7 @@ Examples:
         if rel in scanned_files:
             continue
 
-        print(f"  [{i+1}/{len(pptx_files)}] {rel[:80]}...", end="", flush=True)
+        print(f"  [{i+1}/{len(pptx_files)}] {rel[:80].encode('ascii', 'replace').decode()}...", end="", flush=True)
         try:
             meta = analyze_deck(pptx_path, base_dir)
             inventories.append(meta)

@@ -7,10 +7,10 @@
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
 | **TRUQAP** | AZN | 0.10 | color=near (18), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
+| **MIEBO** | BL | 0.08 | color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 | **OTEZLA** | AMGEN | 0.08 | color=loose (44), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 | **TEPEZZA** | JJ | 0.08 | color=loose (33), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **LYNPARZA** | AZN | 0.08 | color=loose (57), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **UPLIZNA** | AMGEN | 0.07 | color=loose (45), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **DUPIXENT_EoE** | REGENERON_SANOFI | 0.08 | color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 
 ## ABRYSVO
 - **Client:** PFIZER
@@ -18,11 +18,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **MIEBO** | BL | 0.14 | color=near (28), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
-| **CCA_PP_TRACKER** | CCA | 0.14 | color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **BONE_HCP_TRACKER** | AMGEN | 0.14 | color=near (11), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **ONIVYDE** | IPSEN | 0.14 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **ADBRY** | LEO | 0.11 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **LYNPARZA** | AZN | 0.14 | color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **CALQUENCE** | AZN | 0.11 | color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **LIBTAYO** | REGENERON | 0.09 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **ULTOMIRIS** | ALEXION | 0.08 | color=loose (43), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
+| **TEZSPIRE** | AZN | 0.08 | color=loose (49), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 
 ## ADBRY
 - **Client:** LEO
@@ -30,11 +30,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **OTEZLA** | AMGEN | 0.17 | color=loose (57), candidate_rank=primary, ta_overlap=0.5, minor_freq=10% (1/10) |
 | **ULTOMIRIS** | ALEXION | 0.14 | color=near (24), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
-| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 | **LOKELMA** | AZN | 0.14 | color=near (11), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.14 | color=near (24), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ABILIFY_MAINTENA** | OTSUKA | 0.10 | color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
+| **UNMAPPED** | VIR_BIOTECH | 0.10 | color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
 
 ## BLENREP
 - **Client:** GSK
@@ -43,10 +43,10 @@
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
 | **ENHERTU** | DSI_AZN | 0.25 | color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10) |
-| **TRUQAP** | AZN | 0.22 | color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
 | **DATROWAY** | DSI | 0.22 | color=loose (55), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
 | **CALQUENCE** | AZN | 0.22 | color=loose (42), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
-| **LYNPARZA** | AZN | 0.22 | color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
+| **TRUQAP** | AZN | 0.22 | color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
+| **LIBTAYO** | REGENERON | 0.20 | color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=20% (2/10) |
 
 ## BONE_HCP_TRACKER
 - **Client:** AMGEN
@@ -57,7 +57,7 @@
 | **UNMAPPED** | VIR_BIOTECH | 0.18 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
 | **ABILIFY_MAINTENA** | OTSUKA | 0.18 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
 | **OTEZLA** | AMGEN | 0.14 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **MIEBO** | BL | 0.11 | color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **TEZSPIRE** | AZN | 0.14 | color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 | **CALQUENCE** | AZN | 0.08 | color=loose (49), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 
 ## CALQUENCE
@@ -68,9 +68,9 @@
 |---|---|---|---|
 | **TRUQAP** | AZN | 0.25 | color=loose (42), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10) |
 | **ENHERTU** | DSI_AZN | 0.22 | color=loose (57), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
-| **MIEBO** | BL | 0.14 | color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.14 | color=loose (44), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10) |
 | **DATROWAY** | DSI | 0.14 | color=loose (59), candidate_rank=secondary, ta_overlap=0.5, minor_freq=50% (5/10) |
+| **LYNPARZA** | AZN | 0.13 | color=loose (54), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10) |
 
 ## CCA_PP_TRACKER
 - **Client:** CCA
@@ -78,7 +78,7 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **PHYSICIANS_SFE_PET** | ALNYLAM | 0.18 | color=loose (54), candidate_rank=secondary, ta_overlap=1.0, minor_freq=40% (4/10) |
+| **PHYSICIANS_SFE_PET** | ALNYLAM | 0.36 | color=loose (54), candidate_rank=primary, ta_overlap=1.0, minor_freq=40% (4/10) |
 | **TEPEZZA** | JJ | 0.14 | color=near (18), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 | **CALQUENCE** | AZN | 0.14 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
 | **BONE_HCP_TRACKER** | AMGEN | 0.13 | color=near (19), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
@@ -96,17 +96,29 @@
 | **CALQUENCE** | AZN | 0.25 | color=loose (41), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10) |
 | **CCA_PP_TRACKER** | CCA | 0.14 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 
+## DUPIXENT_EoE
+- **Client:** REGENERON_SANOFI
+- **Therapy area:** Immunology/EoE
+
+| Candidate | Client | Score | Reason |
+|---|---|---|---|
+| **CCA_PP_TRACKER** | CCA | 0.14 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4) |
+| **BONE_HCP_TRACKER** | AMGEN | 0.14 | color=near (21), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4) |
+| **PHYSICIANS_SFE_PET** | ALNYLAM | 0.08 | color=loose (58), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4) |
+| **ENHERTU** | DSI_AZN | 0.08 | color=loose (53), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4) |
+| **LOKELMA** | AZN | 0.07 | color=near (19), candidate_rank=secondary, ta_overlap=0.0, minor_freq=75% (3/4) |
+
 ## EMPAVELI
 - **Client:** APELLIS
 - **Therapy area:** Hematology
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **ABILIFY_MAINTENA** | OTSUKA | 0.18 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
-| **UNMAPPED** | VIR_BIOTECH | 0.18 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
-| **ULTOMIRIS** | ALEXION | 0.14 | color=loose (42), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10) |
-| **OTEZLA** | AMGEN | 0.11 | color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
-| **TEPEZZA** | JJ | 0.08 | color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ULTOMIRIS** | ALEXION | 0.28 | color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **LYNPARZA** | AZN | 0.12 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10) |
+| **UPLIZNA** | AMGEN | 0.11 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **OJJAARA** | GSK | 0.08 | color=loose (52), candidate_rank=secondary, ta_overlap=0.5, minor_freq=10% (1/10) |
+| **OTEZLA** | AMGEN | 0.08 | color=loose (47), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 
 ## ENHERTU
 - **Client:** DSI_AZN
@@ -114,11 +126,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **DATROWAY** | DSI | 0.35 | color=exact, candidate_rank=secondary, ta_overlap=0.5, minor_freq=80% (8/10) |
-| **BLENREP** | GSK | 0.28 | color=loose (59), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
-| **ONIVYDE** | IPSEN | 0.28 | color=loose (37), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
-| **CCA_PP_TRACKER** | CCA | 0.14 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
-| **TRUQAP** | AZN | 0.14 | color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=60% (6/10) |
+| **DATROWAY** | DSI | 0.35 | color=exact, candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **ONIVYDE** | IPSEN | 0.29 | color=near (21), candidate_rank=primary, ta_overlap=0.5, minor_freq=10% (1/10) |
+| **BLENREP** | GSK | 0.28 | color=loose (59), candidate_rank=primary, ta_overlap=0.5, minor_freq=80% (8/10) |
+| **CCA_PP_TRACKER** | CCA | 0.14 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
+| **TEZSPIRE** | AZN | 0.14 | color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 
 ## JEMPERLI-ZEJULA
 - **Client:** GSK
@@ -138,11 +150,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **LYNPARZA** | AZN | 0.49 | color=near (29), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
 | **CALQUENCE** | AZN | 0.28 | color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.28 | color=loose (55), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
 | **BLENREP** | GSK | 0.28 | color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=70% (7/10) |
-| **ENHERTU** | DSI_AZN | 0.14 | color=loose (45), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10) |
+| **LYNPARZA** | AZN | 0.24 | color=near (5), candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **TRUQAP** | AZN | 0.14 | color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10) |
 
 ## LOKELMA
 - **Client:** AZN
@@ -150,7 +162,7 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **MIEBO** | BL | 0.14 | color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
+| **MIEBO** | BL | 0.14 | color=near (23), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **CALQUENCE** | AZN | 0.13 | color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
 | **UPLIZNA** | AMGEN | 0.08 | color=loose (57), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 | **OTEZLA** | AMGEN | 0.08 | color=loose (54), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
@@ -162,11 +174,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **ENHERTU** | DSI_AZN | 0.22 | color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10) |
-| **UPLIZNA** | AMGEN | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **TRUQAP** | AZN | 0.14 | color=loose (47), candidate_rank=secondary, ta_overlap=0.5, minor_freq=60% (6/10) |
-| **UNMAPPED** | VIR_BIOTECH | 0.11 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
-| **ABILIFY_MAINTENA** | OTSUKA | 0.11 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **CALQUENCE** | AZN | 0.28 | color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **JEMPERLI-ZEJULA** | GSK | 0.28 | color=loose (56), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **LIBTAYO** | REGENERON | 0.24 | color=near (5), candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10) |
+| **UPLIZNA** | AMGEN | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **MIEBO** | BL | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10) |
 
 ## MIEBO
 - **Client:** BL
@@ -174,11 +186,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **ABILIFY_MAINTENA** | OTSUKA | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **UNMAPPED** | VIR_BIOTECH | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **UPLIZNA** | AMGEN | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **CALQUENCE** | AZN | 0.13 | color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
-| **DATROWAY** | DSI | 0.08 | color=loose (59), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **UNMAPPED** | VIR_BIOTECH | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ABILIFY_MAINTENA** | OTSUKA | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **UPLIZNA** | AMGEN | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
+| **TRUQAP** | AZN | 0.14 | color=near (16), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
+| **LYNPARZA** | AZN | 0.14 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
 
 ## OJJAARA
 - **Client:** GSK
@@ -186,9 +198,9 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
+| **LYNPARZA** | AZN | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 | **UNMAPPED** | VIR_BIOTECH | 0.14 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
 | **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
-| **EMPAVELI** | APELLIS | 0.11 | color=loose (33), candidate_rank=secondary, ta_overlap=0.5, minor_freq=30% (3/10) |
 | **BLENREP** | GSK | 0.08 | color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 | **ONIVYDE** | IPSEN | 0.08 | color=loose (46), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 
@@ -199,9 +211,9 @@
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
 | **ENHERTU** | DSI_AZN | 0.49 | color=near (25), candidate_rank=primary, ta_overlap=0.5, minor_freq=70% (7/10) |
+| **TRUQAP** | AZN | 0.14 | color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=80% (8/10) |
 | **CCA_PP_TRACKER** | CCA | 0.14 | color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 | **BONE_HCP_TRACKER** | AMGEN | 0.14 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **TEZSPIRE** | AZN | 0.14 | color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 | **DATROWAY** | DSI | 0.14 | color=loose (44), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10) |
 
 ## OTEZLA
@@ -210,11 +222,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **ADBRY** | LEO | 0.20 | color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=20% (2/10) |
-| **MIEBO** | BL | 0.14 | color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
-| **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **BONE_HCP_TRACKER** | AMGEN | 0.08 | color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
+| **ADBRY** | LEO | 0.28 | color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=50% (5/10) |
+| **UNMAPPED** | VIR_BIOTECH | 0.13 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **ABILIFY_MAINTENA** | OTSUKA | 0.13 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **DUPIXENT_EoE** | REGENERON_SANOFI | 0.08 | color=loose (36), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **BONE_HCP_TRACKER** | AMGEN | 0.07 | color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
 
 ## PHYSICIANS_SFE_PET
 - **Client:** ALNYLAM
@@ -222,11 +234,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **CCA_PP_TRACKER** | CCA | 0.20 | color=loose (51), candidate_rank=secondary, ta_overlap=1.0, minor_freq=80% (8/10) |
-| **LYNPARZA** | AZN | 0.14 | color=near (7), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **UPLIZNA** | AMGEN | 0.11 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
-| **EMPAVELI** | APELLIS | 0.08 | color=loose (46), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
-| **OJJAARA** | GSK | 0.08 | color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
+| **CCA_PP_TRACKER** | CCA | 0.20 | color=loose (55), candidate_rank=secondary, ta_overlap=1.0, minor_freq=70% (7/10) |
+| **LOKELMA** | AZN | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **TRUQAP** | AZN | 0.09 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **UPLIZNA** | AMGEN | 0.08 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10) |
+| **ONIVYDE** | IPSEN | 0.08 | color=loose (36), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 
 ## RHAPSIDO
 - **Client:** NOVARTIS
@@ -234,11 +246,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
+| **DUPIXENT_EoE** | REGENERON_SANOFI | 0.28 | color=loose (34), candidate_rank=primary, ta_overlap=0.5, minor_freq=80% (8/10) |
 | **ULTOMIRIS** | ALEXION | 0.14 | color=near (20), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **LOKELMA** | AZN | 0.14 | color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.14 | color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 | **CALQUENCE** | AZN | 0.14 | color=near (8), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **OTEZLA** | AMGEN | 0.08 | color=loose (56), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 
 ## TEPEZZA
 - **Client:** JJ
@@ -246,11 +258,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
+| **TEZSPIRE** | AZN | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 | **ULTOMIRIS** | ALEXION | 0.14 | color=near (27), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **LYNPARZA** | AZN | 0.08 | color=loose (53), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **DUPIXENT_EoE** | REGENERON_SANOFI | 0.14 | color=near (10), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 | **LOKELMA** | AZN | 0.08 | color=loose (36), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.08 | color=loose (38), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **UPLIZNA** | AMGEN | 0.08 | color=loose (48), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
 
 ## TEZSPIRE
 - **Client:** AZN
@@ -258,10 +270,10 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
-| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
-| **EMPAVELI** | APELLIS | 0.14 | color=near (15), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **TEPEZZA** | JJ | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=50% (5/10) |
+| **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ENHERTU** | DSI_AZN | 0.14 | color=near (22), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
+| **EMPAVELI** | APELLIS | 0.14 | color=near (15), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 | **RHAPSIDO** | NOVARTIS | 0.08 | color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10) |
 
 ## TRUQAP
@@ -270,11 +282,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **LYNPARZA** | AZN | 0.63 | color=exact, candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.25 | color=loose (30), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10) |
+| **LYNPARZA** | AZN | 0.22 | color=near (28), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10) |
 | **LIBTAYO** | REGENERON | 0.22 | color=near (29), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10) |
-| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |
+| **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
+| **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
 
 ## ULTOMIRIS
 - **Client:** ALEXION
@@ -285,7 +297,7 @@
 | **OJJAARA** | GSK | 0.20 | color=loose (32), candidate_rank=primary, ta_overlap=0.5, minor_freq=20% (2/10) |
 | **ABILIFY_MAINTENA** | OTSUKA | 0.14 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
 | **UNMAPPED** | VIR_BIOTECH | 0.14 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
-| **TEZSPIRE** | AZN | 0.14 | color=near (16), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
+| **LYNPARZA** | AZN | 0.13 | color=near (28), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
 | **JEMPERLI-ZEJULA** | GSK | 0.11 | color=near (22), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
 
 ## UNMAPPED
@@ -294,11 +306,11 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
+| **LYNPARZA** | AZN | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
 | **CALQUENCE** | AZN | 0.18 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10) |
+| **TEZSPIRE** | AZN | 0.16 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10) |
 | **UPLIZNA** | AMGEN | 0.14 | color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10) |
-| **MIEBO** | BL | 0.14 | color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10) |
-| **ULTOMIRIS** | ALEXION | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=70% (7/10) |
-| **TEPEZZA** | JJ | 0.08 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=30% (3/10) |
+| **MIEBO** | BL | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10) |
 
 ## UPLIZNA
 - **Client:** AMGEN
@@ -306,8 +318,8 @@
 
 | Candidate | Client | Score | Reason |
 |---|---|---|---|
-| **TEPEZZA** | JJ | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10) |
-| **ULTOMIRIS** | ALEXION | 0.10 | color=near (21), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
-| **LYNPARZA** | AZN | 0.10 | color=near (30), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
-| **LOKELMA** | AZN | 0.10 | color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
-| **JEMPERLI-ZEJULA** | GSK | 0.10 | color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
+| **TEZSPIRE** | AZN | 0.20 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10) |
+| **LYNPARZA** | AZN | 0.14 | color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10) |
+| **TEPEZZA** | JJ | 0.10 | color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=60% (6/10) |
+| **ONIVYDE** | IPSEN | 0.08 | color=loose (41), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10) |
+| **ADBRY** | LEO | 0.08 | color=loose (43), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10) |

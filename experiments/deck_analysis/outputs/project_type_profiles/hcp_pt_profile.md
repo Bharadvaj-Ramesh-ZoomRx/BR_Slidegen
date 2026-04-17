@@ -1,10 +1,10 @@
 # HCP-Pt Project Type Profile
 
-**Decks analyzed:** 60
-**Total slides:** 1,945
+**Decks analyzed:** 83
+**Total slides:** 2,692
 **Avg slides/deck:** 32.4
-**Total charts:** 845
-**Total tables:** 1,242
+**Total charts:** 1,188
+**Total tables:** 1,635
 
 ---
 
@@ -12,60 +12,61 @@
 
 | Pattern | Count | % |
 |---|---|---|
-| `bar_stacked_horizontal` | 233 | 27.6% |
-| `bar_clustered_horizontal` | 177 | 20.9% |
-| `column_stacked_100_vertical` | 119 | 14.1% |
-| `doughnut_default` | 109 | 12.9% |
-| `bar_stacked_100_horizontal` | 97 | 11.5% |
-| `column_stacked_vertical` | 40 | 4.7% |
-| `column_clustered_vertical` | 32 | 3.8% |
-| `pie_default` | 19 | 2.2% |
-| `xy_scatter_abacus` | 13 | 1.5% |
+| `bar_stacked_horizontal` | 297 | 25.0% |
+| `bar_clustered_horizontal` | 285 | 24.0% |
+| `bar_stacked_100_horizontal` | 160 | 13.5% |
+| `column_stacked_100_vertical` | 151 | 12.7% |
+| `doughnut_default` | 149 | 12.5% |
+| `column_stacked_vertical` | 55 | 4.6% |
+| `column_clustered_vertical` | 36 | 3.0% |
+| `xy_scatter_abacus` | 25 | 2.1% |
+| `pie_default` | 21 | 1.8% |
+| `unmapped_PIE_EXPLODED` | 3 | 0.3% |
+| `unmapped_DOUGHNUT_EXPLODED` | 3 | 0.3% |
 | `bubble` | 2 | 0.2% |
-| `unmapped_DOUGHNUT_EXPLODED` | 2 | 0.2% |
-| `unmapped_PIE_EXPLODED` | 2 | 0.2% |
+| `line_markers_trended` | 1 | 0.1% |
 
 ## Slide Composition Signatures
 
 | Signature | Slides |
 |---|---|
-| `0_chart_0_table` | 1,086 |
-| `0_chart_1_table` | 375 |
-| `0_chart_2_table` | 76 |
-| `1_chart_1_table` | 48 |
-| `1_chart_0_table` | 47 |
-| `0_chart_3_table` | 37 |
-| `1_chart_2_table` | 35 |
-| `2_chart_2_table` | 28 |
-| `2_chart_1_table` | 20 |
-| `3_chart_0_table` | 20 |
-| `0_chart_4_table` | 17 |
-| `3_chart_2_table` | 16 |
-| `2_chart_0_table` | 15 |
-| `4_chart_0_table` | 12 |
-| `3_chart_1_table` | 11 |
+| `0_chart_0_table` | 1,520 |
+| `0_chart_1_table` | 488 |
+| `1_chart_1_table` | 97 |
+| `0_chart_2_table` | 94 |
+| `1_chart_0_table` | 70 |
+| `1_chart_2_table` | 45 |
+| `2_chart_2_table` | 44 |
+| `0_chart_3_table` | 41 |
+| `2_chart_1_table` | 29 |
+| `3_chart_0_table` | 28 |
+| `0_chart_4_table` | 24 |
+| `2_chart_0_table` | 23 |
+| `3_chart_1_table` | 20 |
+| `4_chart_0_table` | 19 |
+| `3_chart_2_table` | 18 |
 
 ## Section/Topic Distribution
 
 | Section | Slides |
 |---|---|
-| Other | 2,811 |
-| Executive Summary | 389 |
-| Methodology | 232 |
-| Patient Conversations | 131 |
-| Drivers and Barriers | 98 |
-| Recommendations | 86 |
-| Prescription Intent | 76 |
-| Competitive Landscape | 73 |
-| Call to Action | 54 |
-| Treatment Journey | 17 |
-| Awareness | 16 |
-| Usage | 15 |
-| Loyalty | 14 |
-| Rep Performance | 10 |
-| Trial | 9 |
-| Satisfaction | 6 |
-| Digital Engagement | 5 |
+| Other | 3,833 |
+| Executive Summary | 558 |
+| Methodology | 277 |
+| Patient Conversations | 230 |
+| Drivers and Barriers | 117 |
+| Call to Action | 115 |
+| Recommendations | 110 |
+| Prescription Intent | 101 |
+| Competitive Landscape | 96 |
+| Awareness | 31 |
+| Treatment Journey | 23 |
+| Loyalty | 22 |
+| Usage | 20 |
+| Trial | 17 |
+| Rep Performance | 11 |
+| Satisfaction | 8 |
+| Digital Engagement | 8 |
 | HII | 2 |
 | Non-Personal Promotion | 1 |
 

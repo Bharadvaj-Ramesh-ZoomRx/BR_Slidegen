@@ -4,10 +4,22 @@
     "client": "VIR_BIOTECH",
     "candidates": [
       {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.2,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+      },
+      {
         "candidate_brand": "CALQUENCE",
         "candidate_client": "AZN",
         "score": 0.18,
         "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
+      },
+      {
+        "candidate_brand": "TEZSPIRE",
+        "candidate_client": "AZN",
+        "score": 0.16,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
       },
       {
         "candidate_brand": "UPLIZNA",
@@ -18,20 +30,8 @@
       {
         "candidate_brand": "MIEBO",
         "candidate_client": "BL",
-        "score": 0.14,
-        "reason": "color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
-      },
-      {
-        "candidate_brand": "ULTOMIRIS",
-        "candidate_client": "ALEXION",
         "score": 0.1,
-        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=70% (7/10)"
-      },
-      {
-        "candidate_brand": "TEPEZZA",
-        "candidate_client": "JJ",
-        "score": 0.08,
-        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=30% (3/10)"
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10)"
       }
     ]
   },
@@ -42,8 +42,8 @@
       {
         "candidate_brand": "PHYSICIANS_SFE_PET",
         "candidate_client": "ALNYLAM",
-        "score": 0.18,
-        "reason": "color=loose (54), candidate_rank=secondary, ta_overlap=1.0, minor_freq=40% (4/10)"
+        "score": 0.36,
+        "reason": "color=loose (54), candidate_rank=primary, ta_overlap=1.0, minor_freq=40% (4/10)"
       },
       {
         "candidate_brand": "TEPEZZA",
@@ -94,10 +94,10 @@
         "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
-        "candidate_brand": "TEZSPIRE",
+        "candidate_brand": "LYNPARZA",
         "candidate_client": "AZN",
-        "score": 0.14,
-        "reason": "color=near (16), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
+        "score": 0.126,
+        "reason": "color=near (28), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
       },
       {
         "candidate_brand": "JEMPERLI-ZEJULA",
@@ -115,31 +115,31 @@
         "candidate_brand": "CCA_PP_TRACKER",
         "candidate_client": "CCA",
         "score": 0.2,
-        "reason": "color=loose (51), candidate_rank=secondary, ta_overlap=1.0, minor_freq=80% (8/10)"
+        "reason": "color=loose (55), candidate_rank=secondary, ta_overlap=1.0, minor_freq=70% (7/10)"
       },
       {
-        "candidate_brand": "LYNPARZA",
+        "candidate_brand": "LOKELMA",
         "candidate_client": "AZN",
-        "score": 0.14,
-        "reason": "color=near (7), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
+        "score": 0.1,
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=70% (7/10)"
+      },
+      {
+        "candidate_brand": "TRUQAP",
+        "candidate_client": "AZN",
+        "score": 0.09,
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=40% (4/10)"
       },
       {
         "candidate_brand": "UPLIZNA",
         "candidate_client": "AMGEN",
-        "score": 0.112,
-        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
+        "score": 0.084,
+        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10)"
       },
       {
-        "candidate_brand": "EMPAVELI",
-        "candidate_client": "APELLIS",
+        "candidate_brand": "ONIVYDE",
+        "candidate_client": "IPSEN",
         "score": 0.08,
-        "reason": "color=loose (46), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "OJJAARA",
-        "candidate_client": "GSK",
-        "score": 0.08,
-        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+        "reason": "color=loose (36), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
       }
     ]
   },
@@ -150,32 +150,32 @@
       {
         "candidate_brand": "ADBRY",
         "candidate_client": "LEO",
-        "score": 0.196,
-        "reason": "color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=20% (2/10)"
-      },
-      {
-        "candidate_brand": "MIEBO",
-        "candidate_client": "BL",
-        "score": 0.14,
-        "reason": "color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+        "score": 0.28,
+        "reason": "color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=50% (5/10)"
       },
       {
         "candidate_brand": "UNMAPPED",
         "candidate_client": "VIR_BIOTECH",
-        "score": 0.14,
-        "reason": "color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+        "score": 0.126,
+        "reason": "color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
       },
       {
         "candidate_brand": "ABILIFY_MAINTENA",
         "candidate_client": "OTSUKA",
-        "score": 0.14,
-        "reason": "color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+        "score": 0.126,
+        "reason": "color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
+      },
+      {
+        "candidate_brand": "DUPIXENT_EoE",
+        "candidate_client": "REGENERON_SANOFI",
+        "score": 0.08,
+        "reason": "color=loose (36), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       },
       {
         "candidate_brand": "BONE_HCP_TRACKER",
         "candidate_client": "AMGEN",
-        "score": 0.08,
-        "reason": "color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+        "score": 0.072,
+        "reason": "color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
       }
     ]
   },
@@ -202,10 +202,10 @@
         "reason": "color=near (14), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
-        "candidate_brand": "MIEBO",
-        "candidate_client": "BL",
-        "score": 0.112,
-        "reason": "color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
+        "candidate_brand": "TEZSPIRE",
+        "candidate_client": "AZN",
+        "score": 0.14,
+        "reason": "color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
       },
       {
         "candidate_brand": "CALQUENCE",
@@ -215,82 +215,16 @@
       }
     ]
   },
-  "UPLIZNA": {
-    "therapy_area": "Neurology/NMOSD",
-    "client": "AMGEN",
-    "candidates": [
-      {
-        "candidate_brand": "TEPEZZA",
-        "candidate_client": "JJ",
-        "score": 0.1,
-        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10)"
-      },
-      {
-        "candidate_brand": "ULTOMIRIS",
-        "candidate_client": "ALEXION",
-        "score": 0.098,
-        "reason": "color=near (21), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
-      },
-      {
-        "candidate_brand": "LYNPARZA",
-        "candidate_client": "AZN",
-        "score": 0.098,
-        "reason": "color=near (30), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
-      },
-      {
-        "candidate_brand": "LOKELMA",
-        "candidate_client": "AZN",
-        "score": 0.098,
-        "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
-      },
-      {
-        "candidate_brand": "JEMPERLI-ZEJULA",
-        "candidate_client": "GSK",
-        "score": 0.098,
-        "reason": "color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
-      }
-    ]
-  },
-  "TEZSPIRE": {
-    "therapy_area": "Respiratory",
-    "client": "AZN",
-    "candidates": [
-      {
-        "candidate_brand": "UNMAPPED",
-        "candidate_client": "VIR_BIOTECH",
-        "score": 0.14,
-        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.14,
-        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "EMPAVELI",
-        "candidate_client": "APELLIS",
-        "score": 0.14,
-        "reason": "color=near (15), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
-      },
-      {
-        "candidate_brand": "TEPEZZA",
-        "candidate_client": "JJ",
-        "score": 0.1,
-        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=50% (5/10)"
-      },
-      {
-        "candidate_brand": "RHAPSIDO",
-        "candidate_client": "NOVARTIS",
-        "score": 0.084,
-        "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10)"
-      }
-    ]
-  },
   "TEPEZZA": {
     "therapy_area": "Endocrinology/TED",
     "client": "JJ",
     "candidates": [
+      {
+        "candidate_brand": "TEZSPIRE",
+        "candidate_client": "AZN",
+        "score": 0.2,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+      },
       {
         "candidate_brand": "ULTOMIRIS",
         "candidate_client": "ALEXION",
@@ -298,10 +232,10 @@
         "reason": "color=near (27), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       },
       {
-        "candidate_brand": "LYNPARZA",
-        "candidate_client": "AZN",
-        "score": 0.08,
-        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "candidate_brand": "DUPIXENT_EoE",
+        "candidate_client": "REGENERON_SANOFI",
+        "score": 0.14,
+        "reason": "color=near (10), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       },
       {
         "candidate_brand": "LOKELMA",
@@ -314,12 +248,78 @@
         "candidate_client": "GSK",
         "score": 0.08,
         "reason": "color=loose (38), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+      }
+    ]
+  },
+  "UPLIZNA": {
+    "therapy_area": "Neurology/NMOSD",
+    "client": "AMGEN",
+    "candidates": [
+      {
+        "candidate_brand": "TEZSPIRE",
+        "candidate_client": "AZN",
+        "score": 0.2,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
-        "candidate_brand": "UPLIZNA",
-        "candidate_client": "AMGEN",
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.14,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
+      },
+      {
+        "candidate_brand": "TEPEZZA",
+        "candidate_client": "JJ",
+        "score": 0.1,
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=60% (6/10)"
+      },
+      {
+        "candidate_brand": "ONIVYDE",
+        "candidate_client": "IPSEN",
         "score": 0.08,
-        "reason": "color=loose (48), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+        "reason": "color=loose (41), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "ADBRY",
+        "candidate_client": "LEO",
+        "score": 0.08,
+        "reason": "color=loose (43), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+      }
+    ]
+  },
+  "TEZSPIRE": {
+    "therapy_area": "Respiratory",
+    "client": "AZN",
+    "candidates": [
+      {
+        "candidate_brand": "UNMAPPED",
+        "candidate_client": "VIR_BIOTECH",
+        "score": 0.14,
+        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+      },
+      {
+        "candidate_brand": "ABILIFY_MAINTENA",
+        "candidate_client": "OTSUKA",
+        "score": 0.14,
+        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+      },
+      {
+        "candidate_brand": "ENHERTU",
+        "candidate_client": "DSI_AZN",
+        "score": 0.14,
+        "reason": "color=near (22), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "EMPAVELI",
+        "candidate_client": "APELLIS",
+        "score": 0.14,
+        "reason": "color=near (15), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
+      },
+      {
+        "candidate_brand": "RHAPSIDO",
+        "candidate_client": "NOVARTIS",
+        "score": 0.084,
+        "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10)"
       }
     ]
   },
@@ -328,34 +328,34 @@
     "client": "APELLIS",
     "candidates": [
       {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.18,
-        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
-      },
-      {
-        "candidate_brand": "UNMAPPED",
-        "candidate_client": "VIR_BIOTECH",
-        "score": 0.18,
-        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
-      },
-      {
         "candidate_brand": "ULTOMIRIS",
         "candidate_client": "ALEXION",
-        "score": 0.14,
-        "reason": "color=loose (42), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10)"
+        "score": 0.28,
+        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.12,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=10% (1/10)"
+      },
+      {
+        "candidate_brand": "UPLIZNA",
+        "candidate_client": "AMGEN",
+        "score": 0.112,
+        "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
+      },
+      {
+        "candidate_brand": "OJJAARA",
+        "candidate_client": "GSK",
+        "score": 0.084,
+        "reason": "color=loose (52), candidate_rank=secondary, ta_overlap=0.5, minor_freq=10% (1/10)"
       },
       {
         "candidate_brand": "OTEZLA",
         "candidate_client": "AMGEN",
-        "score": 0.112,
-        "reason": "color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
-      },
-      {
-        "candidate_brand": "TEPEZZA",
-        "candidate_client": "JJ",
         "score": 0.08,
-        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+        "reason": "color=loose (47), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       }
     ]
   },
@@ -367,31 +367,31 @@
         "candidate_brand": "DATROWAY",
         "candidate_client": "DSI",
         "score": 0.35,
-        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.5, minor_freq=80% (8/10)"
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "ONIVYDE",
+        "candidate_client": "IPSEN",
+        "score": 0.294,
+        "reason": "color=near (21), candidate_rank=primary, ta_overlap=0.5, minor_freq=10% (1/10)"
       },
       {
         "candidate_brand": "BLENREP",
         "candidate_client": "GSK",
         "score": 0.28,
-        "reason": "color=loose (59), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "ONIVYDE",
-        "candidate_client": "IPSEN",
-        "score": 0.28,
-        "reason": "color=loose (37), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+        "reason": "color=loose (59), candidate_rank=primary, ta_overlap=0.5, minor_freq=80% (8/10)"
       },
       {
         "candidate_brand": "CCA_PP_TRACKER",
         "candidate_client": "CCA",
         "score": 0.14,
-        "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+        "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
       },
       {
-        "candidate_brand": "TRUQAP",
+        "candidate_brand": "TEZSPIRE",
         "candidate_client": "AZN",
         "score": 0.14,
-        "reason": "color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=60% (6/10)"
+        "reason": "color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       }
     ]
   },
@@ -412,12 +412,6 @@
         "reason": "color=loose (57), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
       },
       {
-        "candidate_brand": "MIEBO",
-        "candidate_client": "BL",
-        "score": 0.14,
-        "reason": "color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
-      },
-      {
         "candidate_brand": "JEMPERLI-ZEJULA",
         "candidate_client": "GSK",
         "score": 0.14,
@@ -428,6 +422,12 @@
         "candidate_client": "DSI",
         "score": 0.14,
         "reason": "color=loose (59), candidate_rank=secondary, ta_overlap=0.5, minor_freq=50% (5/10)"
+      },
+      {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.126,
+        "reason": "color=loose (54), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10)"
       }
     ]
   },
@@ -472,34 +472,34 @@
     "client": "AZN",
     "candidates": [
       {
-        "candidate_brand": "ENHERTU",
-        "candidate_client": "DSI_AZN",
-        "score": 0.224,
-        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
+        "candidate_brand": "CALQUENCE",
+        "candidate_client": "AZN",
+        "score": 0.28,
+        "reason": "color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "JEMPERLI-ZEJULA",
+        "candidate_client": "GSK",
+        "score": 0.28,
+        "reason": "color=loose (56), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "LIBTAYO",
+        "candidate_client": "REGENERON",
+        "score": 0.245,
+        "reason": "color=near (5), candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10)"
       },
       {
         "candidate_brand": "UPLIZNA",
         "candidate_client": "AMGEN",
         "score": 0.14,
-        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
       },
       {
-        "candidate_brand": "TRUQAP",
-        "candidate_client": "AZN",
-        "score": 0.14,
-        "reason": "color=loose (47), candidate_rank=secondary, ta_overlap=0.5, minor_freq=60% (6/10)"
-      },
-      {
-        "candidate_brand": "UNMAPPED",
-        "candidate_client": "VIR_BIOTECH",
-        "score": 0.112,
-        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
-      },
-      {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.112,
-        "reason": "color=near (6), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
+        "candidate_brand": "MIEBO",
+        "candidate_client": "BL",
+        "score": 0.1,
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=80% (8/10)"
       }
     ]
   },
@@ -508,16 +508,16 @@
     "client": "AZN",
     "candidates": [
       {
-        "candidate_brand": "LYNPARZA",
-        "candidate_client": "AZN",
-        "score": 0.63,
-        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10)"
-      },
-      {
         "candidate_brand": "JEMPERLI-ZEJULA",
         "candidate_client": "GSK",
         "score": 0.252,
         "reason": "color=loose (30), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10)"
+      },
+      {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.22,
+        "reason": "color=near (28), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10)"
       },
       {
         "candidate_brand": "LIBTAYO",
@@ -526,16 +526,16 @@
         "reason": "color=near (29), candidate_rank=secondary, ta_overlap=0.5, minor_freq=40% (4/10)"
       },
       {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.14,
-        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
-      },
-      {
         "candidate_brand": "UNMAPPED",
         "candidate_client": "VIR_BIOTECH",
         "score": 0.14,
-        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+      },
+      {
+        "candidate_brand": "ABILIFY_MAINTENA",
+        "candidate_client": "OTSUKA",
+        "score": 0.14,
+        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
       }
     ]
   },
@@ -547,7 +547,7 @@
         "candidate_brand": "MIEBO",
         "candidate_client": "BL",
         "score": 0.14,
-        "reason": "color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
+        "reason": "color=near (23), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
       },
       {
         "candidate_brand": "CALQUENCE",
@@ -580,34 +580,34 @@
     "client": "BL",
     "candidates": [
       {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.2,
-        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
-      },
-      {
         "candidate_brand": "UNMAPPED",
         "candidate_client": "VIR_BIOTECH",
         "score": 0.2,
-        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+      },
+      {
+        "candidate_brand": "ABILIFY_MAINTENA",
+        "candidate_client": "OTSUKA",
+        "score": 0.2,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
       },
       {
         "candidate_brand": "UPLIZNA",
         "candidate_client": "AMGEN",
         "score": 0.14,
-        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
+        "reason": "color=near (12), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
       },
       {
-        "candidate_brand": "CALQUENCE",
+        "candidate_brand": "TRUQAP",
         "candidate_client": "AZN",
-        "score": 0.126,
-        "reason": "color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
+        "score": 0.14,
+        "reason": "color=near (16), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
-        "candidate_brand": "DATROWAY",
-        "candidate_client": "DSI",
-        "score": 0.08,
-        "reason": "color=loose (59), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.14,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
       }
     ]
   },
@@ -616,6 +616,12 @@
     "client": "GSK",
     "candidates": [
       {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.2,
+        "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+      },
+      {
         "candidate_brand": "UNMAPPED",
         "candidate_client": "VIR_BIOTECH",
         "score": 0.14,
@@ -626,12 +632,6 @@
         "candidate_client": "OTSUKA",
         "score": 0.14,
         "reason": "color=exact, candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
-      },
-      {
-        "candidate_brand": "EMPAVELI",
-        "candidate_client": "APELLIS",
-        "score": 0.112,
-        "reason": "color=loose (33), candidate_rank=secondary, ta_overlap=0.5, minor_freq=30% (3/10)"
       },
       {
         "candidate_brand": "BLENREP",
@@ -658,12 +658,6 @@
         "reason": "color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=40% (4/10)"
       },
       {
-        "candidate_brand": "TRUQAP",
-        "candidate_client": "AZN",
-        "score": 0.224,
-        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
-      },
-      {
         "candidate_brand": "DATROWAY",
         "candidate_client": "DSI",
         "score": 0.224,
@@ -676,10 +670,16 @@
         "reason": "color=loose (42), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
       },
       {
-        "candidate_brand": "LYNPARZA",
+        "candidate_brand": "TRUQAP",
         "candidate_client": "AZN",
         "score": 0.224,
-        "reason": "color=loose (52), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
+        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.5, minor_freq=30% (3/10)"
+      },
+      {
+        "candidate_brand": "LIBTAYO",
+        "candidate_client": "REGENERON",
+        "score": 0.196,
+        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=20% (2/10)"
       }
     ]
   },
@@ -730,6 +730,12 @@
         "reason": "color=near (25), candidate_rank=primary, ta_overlap=0.5, minor_freq=70% (7/10)"
       },
       {
+        "candidate_brand": "TRUQAP",
+        "candidate_client": "AZN",
+        "score": 0.14,
+        "reason": "color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=80% (8/10)"
+      },
+      {
         "candidate_brand": "CCA_PP_TRACKER",
         "candidate_client": "CCA",
         "score": 0.14,
@@ -740,12 +746,6 @@
         "candidate_client": "AMGEN",
         "score": 0.14,
         "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
-      },
-      {
-        "candidate_brand": "TEZSPIRE",
-        "candidate_client": "AZN",
-        "score": 0.14,
-        "reason": "color=near (13), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       },
       {
         "candidate_brand": "DATROWAY",
@@ -760,22 +760,10 @@
     "client": "LEO",
     "candidates": [
       {
-        "candidate_brand": "OTEZLA",
-        "candidate_client": "AMGEN",
-        "score": 0.168,
-        "reason": "color=loose (57), candidate_rank=primary, ta_overlap=0.5, minor_freq=10% (1/10)"
-      },
-      {
         "candidate_brand": "ULTOMIRIS",
         "candidate_client": "ALEXION",
         "score": 0.14,
         "reason": "color=near (24), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
-      },
-      {
-        "candidate_brand": "ABILIFY_MAINTENA",
-        "candidate_client": "OTSUKA",
-        "score": 0.14,
-        "reason": "color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
         "candidate_brand": "LOKELMA",
@@ -788,6 +776,54 @@
         "candidate_client": "GSK",
         "score": 0.14,
         "reason": "color=near (24), candidate_rank=primary, ta_overlap=0.0, minor_freq=80% (8/10)"
+      },
+      {
+        "candidate_brand": "ABILIFY_MAINTENA",
+        "candidate_client": "OTSUKA",
+        "score": 0.098,
+        "reason": "color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
+      },
+      {
+        "candidate_brand": "UNMAPPED",
+        "candidate_client": "VIR_BIOTECH",
+        "score": 0.098,
+        "reason": "color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
+      }
+    ]
+  },
+  "LIBTAYO": {
+    "therapy_area": "Oncology/NMSC",
+    "client": "REGENERON",
+    "candidates": [
+      {
+        "candidate_brand": "CALQUENCE",
+        "candidate_client": "AZN",
+        "score": 0.28,
+        "reason": "color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "JEMPERLI-ZEJULA",
+        "candidate_client": "GSK",
+        "score": 0.28,
+        "reason": "color=loose (55), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "BLENREP",
+        "candidate_client": "GSK",
+        "score": 0.28,
+        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=70% (7/10)"
+      },
+      {
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
+        "score": 0.245,
+        "reason": "color=near (5), candidate_rank=secondary, ta_overlap=0.5, minor_freq=90% (9/10)"
+      },
+      {
+        "candidate_brand": "TRUQAP",
+        "candidate_client": "AZN",
+        "score": 0.14,
+        "reason": "color=loose (58), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10)"
       }
     ]
   },
@@ -795,6 +831,12 @@
     "therapy_area": "Immunology",
     "client": "NOVARTIS",
     "candidates": [
+      {
+        "candidate_brand": "DUPIXENT_EoE",
+        "candidate_client": "REGENERON_SANOFI",
+        "score": 0.28,
+        "reason": "color=loose (34), candidate_rank=primary, ta_overlap=0.5, minor_freq=80% (8/10)"
+      },
       {
         "candidate_brand": "ULTOMIRIS",
         "candidate_client": "ALEXION",
@@ -818,12 +860,6 @@
         "candidate_client": "AZN",
         "score": 0.14,
         "reason": "color=near (8), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
-      },
-      {
-        "candidate_brand": "OTEZLA",
-        "candidate_client": "AMGEN",
-        "score": 0.08,
-        "reason": "color=loose (56), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       }
     ]
   },
@@ -838,6 +874,12 @@
         "reason": "color=near (18), candidate_rank=primary, ta_overlap=0.0, minor_freq=20% (2/10)"
       },
       {
+        "candidate_brand": "MIEBO",
+        "candidate_client": "BL",
+        "score": 0.08,
+        "reason": "color=loose (50), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+      },
+      {
         "candidate_brand": "OTEZLA",
         "candidate_client": "AMGEN",
         "score": 0.08,
@@ -850,16 +892,10 @@
         "reason": "color=loose (33), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
       },
       {
-        "candidate_brand": "LYNPARZA",
-        "candidate_client": "AZN",
+        "candidate_brand": "DUPIXENT_EoE",
+        "candidate_client": "REGENERON_SANOFI",
         "score": 0.08,
-        "reason": "color=loose (57), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
-      },
-      {
-        "candidate_brand": "UPLIZNA",
-        "candidate_client": "AMGEN",
-        "score": 0.072,
-        "reason": "color=loose (45), candidate_rank=primary, ta_overlap=0.0, minor_freq=40% (4/10)"
+        "reason": "color=loose (60), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
       }
     ]
   },
@@ -868,70 +904,70 @@
     "client": "PFIZER",
     "candidates": [
       {
-        "candidate_brand": "MIEBO",
-        "candidate_client": "BL",
+        "candidate_brand": "LYNPARZA",
+        "candidate_client": "AZN",
         "score": 0.14,
-        "reason": "color=near (28), candidate_rank=primary, ta_overlap=0.0, minor_freq=90% (9/10)"
+        "reason": "color=near (9), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
       },
+      {
+        "candidate_brand": "CALQUENCE",
+        "candidate_client": "AZN",
+        "score": 0.112,
+        "reason": "color=near (25), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
+      },
+      {
+        "candidate_brand": "LIBTAYO",
+        "candidate_client": "REGENERON",
+        "score": 0.09,
+        "reason": "color=exact, candidate_rank=secondary, ta_overlap=0.0, minor_freq=40% (4/10)"
+      },
+      {
+        "candidate_brand": "ULTOMIRIS",
+        "candidate_client": "ALEXION",
+        "score": 0.08,
+        "reason": "color=loose (43), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+      },
+      {
+        "candidate_brand": "TEZSPIRE",
+        "candidate_client": "AZN",
+        "score": 0.08,
+        "reason": "color=loose (49), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (5/10)"
+      }
+    ]
+  },
+  "DUPIXENT_EoE": {
+    "therapy_area": "Immunology/EoE",
+    "client": "REGENERON_SANOFI",
+    "candidates": [
       {
         "candidate_brand": "CCA_PP_TRACKER",
         "candidate_client": "CCA",
         "score": 0.14,
-        "reason": "color=near (17), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4)"
       },
       {
         "candidate_brand": "BONE_HCP_TRACKER",
         "candidate_client": "AMGEN",
         "score": 0.14,
-        "reason": "color=near (11), candidate_rank=primary, ta_overlap=0.0, minor_freq=70% (7/10)"
+        "reason": "color=near (21), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4)"
       },
       {
-        "candidate_brand": "ONIVYDE",
-        "candidate_client": "IPSEN",
-        "score": 0.14,
-        "reason": "color=near (26), candidate_rank=primary, ta_overlap=0.0, minor_freq=60% (6/10)"
-      },
-      {
-        "candidate_brand": "ADBRY",
-        "candidate_client": "LEO",
-        "score": 0.112,
-        "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.0, minor_freq=30% (3/10)"
-      }
-    ]
-  },
-  "LIBTAYO": {
-    "therapy_area": "Oncology/NMSC",
-    "client": "REGENERON",
-    "candidates": [
-      {
-        "candidate_brand": "LYNPARZA",
-        "candidate_client": "AZN",
-        "score": 0.49,
-        "reason": "color=near (29), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "CALQUENCE",
-        "candidate_client": "AZN",
-        "score": 0.28,
-        "reason": "color=loose (49), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "JEMPERLI-ZEJULA",
-        "candidate_client": "GSK",
-        "score": 0.28,
-        "reason": "color=loose (55), candidate_rank=primary, ta_overlap=0.5, minor_freq=90% (9/10)"
-      },
-      {
-        "candidate_brand": "BLENREP",
-        "candidate_client": "GSK",
-        "score": 0.28,
-        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.5, minor_freq=70% (7/10)"
+        "candidate_brand": "PHYSICIANS_SFE_PET",
+        "candidate_client": "ALNYLAM",
+        "score": 0.08,
+        "reason": "color=loose (58), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4)"
       },
       {
         "candidate_brand": "ENHERTU",
         "candidate_client": "DSI_AZN",
-        "score": 0.14,
-        "reason": "color=loose (45), candidate_rank=secondary, ta_overlap=0.5, minor_freq=70% (7/10)"
+        "score": 0.08,
+        "reason": "color=loose (53), candidate_rank=primary, ta_overlap=0.0, minor_freq=50% (2/4)"
+      },
+      {
+        "candidate_brand": "LOKELMA",
+        "candidate_client": "AZN",
+        "score": 0.07,
+        "reason": "color=near (19), candidate_rank=secondary, ta_overlap=0.0, minor_freq=75% (3/4)"
       }
     ]
   }

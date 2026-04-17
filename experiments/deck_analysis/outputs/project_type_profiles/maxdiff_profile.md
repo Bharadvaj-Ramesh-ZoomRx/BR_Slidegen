@@ -1,10 +1,10 @@
 # MaxDiff Project Type Profile
 
-**Decks analyzed:** 4
-**Total slides:** 211
-**Avg slides/deck:** 52.8
-**Total charts:** 89
-**Total tables:** 131
+**Decks analyzed:** 7
+**Total slides:** 338
+**Avg slides/deck:** 48.3
+**Total charts:** 216
+**Total tables:** 217
 
 ---
 
@@ -12,53 +12,61 @@
 
 | Pattern | Count | % |
 |---|---|---|
-| `column_clustered_vertical` | 27 | 30.3% |
-| `pie_default` | 15 | 16.9% |
-| `bar_clustered_horizontal` | 12 | 13.5% |
-| `bubble` | 12 | 13.5% |
-| `bar_stacked_100_horizontal` | 10 | 11.2% |
-| `column_stacked_100_vertical` | 6 | 6.7% |
-| `xy_scatter_abacus` | 5 | 5.6% |
-| `bar_stacked_horizontal` | 1 | 1.1% |
-| `column_stacked_vertical` | 1 | 1.1% |
+| `bar_clustered_horizontal` | 49 | 22.7% |
+| `column_clustered_vertical` | 31 | 14.4% |
+| `bar_stacked_horizontal` | 31 | 14.4% |
+| `xy_scatter_abacus` | 23 | 10.6% |
+| `column_stacked_100_vertical` | 21 | 9.7% |
+| `pie_default` | 18 | 8.3% |
+| `bar_stacked_100_horizontal` | 16 | 7.4% |
+| `bubble` | 12 | 5.6% |
+| `doughnut_default` | 11 | 5.1% |
+| `line_markers_trended` | 2 | 0.9% |
+| `column_stacked_vertical` | 1 | 0.5% |
+| `xy_scatter_lines` | 1 | 0.5% |
 
 ## Slide Composition Signatures
 
 | Signature | Slides |
 |---|---|
-| `0_chart_0_table` | 139 |
-| `0_chart_1_table` | 19 |
-| `1_chart_1_table` | 14 |
+| `0_chart_0_table` | 187 |
+| `1_chart_1_table` | 46 |
+| `0_chart_1_table` | 29 |
+| `2_chart_1_table` | 15 |
 | `0_chart_4_table` | 9 |
-| `0_chart_3_table` | 5 |
-| `1_chart_0_table` | 5 |
-| `0_chart_2_table` | 4 |
+| `1_chart_0_table` | 8 |
+| `0_chart_3_table` | 6 |
+| `0_chart_2_table` | 6 |
+| `2_chart_2_table` | 5 |
+| `3_chart_1_table` | 4 |
 | `6_chart_1_table` | 3 |
+| `4_chart_1_table` | 3 |
 | `1_chart_2_table` | 2 |
-| `2_chart_2_table` | 2 |
-| `0_chart_5_table` | 1 |
-| `0_chart_6_table` | 1 |
-| `1_chart_3_table` | 1 |
-| `3_chart_1_table` | 1 |
-| `9_chart_2_table` | 1 |
+| `12_chart_1_table` | 2 |
+| `2_chart_0_table` | 2 |
 
 ## Section/Topic Distribution
 
 | Section | Slides |
 |---|---|
-| Other | 420 |
-| Drivers and Barriers | 31 |
-| Methodology | 20 |
-| Executive Summary | 12 |
+| Other | 556 |
+| Drivers and Barriers | 32 |
+| Methodology | 31 |
+| Executive Summary | 29 |
+| Prescription Intent | 12 |
+| Message Recall | 12 |
+| Usage | 11 |
+| Message Effectiveness | 10 |
 | Treatment Journey | 8 |
+| Competitive Landscape | 8 |
+| Rep Performance | 7 |
 | Awareness | 5 |
-| Prescription Intent | 5 |
-| Competitive Landscape | 4 |
+| Call to Action | 4 |
+| Loyalty | 4 |
 | Trial | 3 |
-| Call to Action | 3 |
-| Loyalty | 3 |
 | Satisfaction | 2 |
-| Usage | 1 |
+| Recommendations | 2 |
+| Digital Engagement | 1 |
 
 ## Sample Headlines
 

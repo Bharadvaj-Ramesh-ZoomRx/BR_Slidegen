@@ -71,11 +71,9 @@ This skill is **client-agnostic and brand-agnostic**. It works for any pharmaceu
 
 ## What a PET Deck Universally Contains
 
-Based on analysis of **192 PET decks** across the full client portfolio (551-deck corpus, 10,271 slides, 17,000 charts). Every PET deck follows a consistent section structure. The specific slides within each section vary by study scope, but the sections themselves are universal.
+Based on analysis of **276 PET decks** across the full client portfolio (905-deck corpus, 13,949 slides, 21,918 charts). Every PET deck follows a consistent section structure. The specific slides within each section vary by study scope, but the sections themselves are universal.
 
-**PET chart pattern distribution (192 decks):** `bar_clustered_horizontal` 30.9% | `line_markers_trended` 17.0% | `xy_scatter_abacus` 12.8% | `column_stacked_100_vertical` 10.4% | `bar_stacked_100_horizontal` 7.5% | `bar_stacked_horizontal` 7.3% | `column_clustered_vertical` 6.6% | `column_stacked_vertical` 3.5% | `doughnut_default` 3.0%
-
-**PET section distribution:** Rep Performance 2,020 slides | Message Recall 1,700 | Usage 1,203 | NPP 1,143 | Methodology 1,092 | Executive Summary 1,072 | Message Effectiveness 797 | Prescription Intent 789 | Competitive Landscape 784 | CTA 220 | HII 189
+**PET chart pattern distribution (276 decks):** `bar_clustered_horizontal` 31.0% | `line_markers_trended` 16.5% | `xy_scatter_abacus` 12.5% | `column_stacked_100_vertical` 10.8% | `bar_stacked_horizontal` 7.3% | `bar_stacked_100_horizontal` 7.2% | `column_clustered_vertical` 6.0% | `column_stacked_vertical` 3.6% | `doughnut_default` 3.6%
 
 ### Universal Sections (present in all PET decks)
 
