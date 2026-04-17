@@ -72,7 +72,13 @@ This skill is **client-agnostic and brand-agnostic**. It works for any pharmaceu
 
 ## What an ATU Deck Universally Contains
 
-Based on analysis of 8 ATU decks across 7 pharmaceutical clients (8 distinct brands), every ATU deck follows a consistent section structure organized around the brand funnel. The specific slides within each section vary by study scope, but the funnel-based organization is universal.
+Based on analysis of **87 ATU decks** across the full client portfolio (551-deck corpus, 4,623 slides, 7,900 charts). Every ATU deck follows a consistent section structure organized around the brand funnel.
+
+**ATU chart pattern distribution (87 decks):** `column_stacked_100_vertical` 24.3% | `bar_clustered_horizontal` 23.4% | `line_markers_trended` 13.5% | `bar_stacked_100_horizontal` 11.6% | `column_clustered_vertical` 8.1% | `xy_scatter_abacus` 7.2% | `bar_stacked_horizontal` 4.4% | `column_stacked_vertical` 3.2% | `doughnut_default` 2.1%
+
+**ATU section distribution:** Awareness 786 slides | Usage 672 | Executive Summary 550 | Prescription Intent 493 | Methodology 443 | Drivers & Barriers 368 | Competitive Landscape 356 | Trial 179 | Satisfaction 86
+
+**Key difference vs PET:** ATU has 2.3x more `column_stacked_100_vertical` (24.3% vs 10.4% in PET) reflecting heavy funnel composition analysis. PET has more `xy_scatter_abacus` (12.8% vs 7.2%) and `line_markers_trended` (17.0% vs 13.5%).
 
 ### Universal Sections (present in 6+ of 8 decks)
 
@@ -165,7 +171,7 @@ ATU decks always position the focal brand against its competitive set:
 
 ## ATU Chart Pattern Distribution
 
-Based on analysis of 1,347 charts across 8 ATU decks (649 slides):
+Based on analysis of 7,900 charts across 87 ATU decks (4,623 slides):
 
 | Chart Pattern | ATU % | PET % | ATU Emphasis |
 |---|---|---|---|
@@ -194,7 +200,7 @@ Based on analysis of 1,347 charts across 8 ATU decks (649 slides):
 When `atu-deck` is invoked by a workflow, it applies these methodology defaults before delegating:
 
 ### To `hypothesis-generator`
-- Ensure hypotheses cover all 8 ATU modules (Awareness, Trial, Usage, Perceptions, Competitive, Loyalty, Patient Profile, Treatment Journey)
+- Ensure hypotheses cover all ATU modules (Awareness, Trial, Usage, Perceptions, Competitive, Loyalty, Patient Profile, Treatment Journey)
 - Require PRIOR WAVE VALIDATION hypotheses for funnel metrics and competitive position carried forward
 - KBQ mapping must span funnel health, competitive positioning, adoption barriers, usage drivers, and patient selection
 

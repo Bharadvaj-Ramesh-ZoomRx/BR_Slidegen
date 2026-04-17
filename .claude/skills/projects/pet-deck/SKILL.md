@@ -71,7 +71,11 @@ This skill is **client-agnostic and brand-agnostic**. It works for any pharmaceu
 
 ## What a PET Deck Universally Contains
 
-Based on analysis of 32 PET decks across 17 pharmaceutical clients (30 distinct brands), every PET deck follows a consistent section structure. The specific slides within each section vary by study scope, but the sections themselves are universal.
+Based on analysis of **192 PET decks** across the full client portfolio (551-deck corpus, 10,271 slides, 17,000 charts). Every PET deck follows a consistent section structure. The specific slides within each section vary by study scope, but the sections themselves are universal.
+
+**PET chart pattern distribution (192 decks):** `bar_clustered_horizontal` 30.9% | `line_markers_trended` 17.0% | `xy_scatter_abacus` 12.8% | `column_stacked_100_vertical` 10.4% | `bar_stacked_100_horizontal` 7.5% | `bar_stacked_horizontal` 7.3% | `column_clustered_vertical` 6.6% | `column_stacked_vertical` 3.5% | `doughnut_default` 3.0%
+
+**PET section distribution:** Rep Performance 2,020 slides | Message Recall 1,700 | Usage 1,203 | NPP 1,143 | Methodology 1,092 | Executive Summary 1,072 | Message Effectiveness 797 | Prescription Intent 789 | Competitive Landscape 784 | CTA 220 | HII 189
 
 ### Universal Sections (present in all PET decks)
 
@@ -256,7 +260,7 @@ When setting up a PET project for a new brand, the project team must provide:
 
 ### Required
 
-1. **Brand entry in `BRAND{}`** — or a `brand_palette` override in `config.yaml`. Each brand needs: `client` key, `therapy_area`, `primary_current`, `primary_prior`, `secondary` colors, and optionally `competitor_brand`. If the brand was included in the 32-deck analysis, it already exists. Otherwise, extract colors from the client's slide master or brand guidelines.
+1. **Brand entry in `BRAND{}`** — or a `brand_palette` override in `config.yaml`. Each brand needs: `client` key, `therapy_area`, `primary_current`, `primary_prior`, `secondary` colors, and optionally `competitor_brand`. 85 CLIENT entries and 33 BRAND entries are populated from the 551-deck grounding exercise. If the brand is missing, extract colors from the client's slide master or brand guidelines.
 
 2. **Client slide master deck** — a clean `.pptx` template with the client's layout masters, logos, and footer elements. Stored at `projects/{name}/templates/template.pptx`. If unavailable, the pipeline generates from a blank template using `BRAND{}` / `CLIENT{}` definitions.
 

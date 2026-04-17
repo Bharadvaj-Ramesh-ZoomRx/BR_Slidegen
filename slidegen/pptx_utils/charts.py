@@ -46,12 +46,12 @@ CHART_PATTERNS = {
         "label_pos": "ctr",
     },
 
-    # ── Patterns derived from real-deck analysis (32 PET decks) ──
+    # ── Patterns derived from real-deck analysis (551 decks, 35,352 charts) ──
     # Each pattern below reflects observed OOXML defaults, so renderers
     # built on top get client-quality output without per-renderer tuning.
-    # Source: experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md §8
+    # Source: experiments/deck_analysis/outputs/mass_scan_summary.md
 
-    # 1,511 occurrences (35% of all PET charts). Horizontal bar chart with
+    # 9,825 occurrences (27.8%). Horizontal bar chart with
     # inverted category axis and labels hidden (labels live in companion table).
     "bar_clustered_horizontal": {
         "bar_dir": "bar",
@@ -70,7 +70,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 324 occurrences. Horizontal 100% stacked for composition/intent.
+    # 3,515 occurrences (9.9%). Horizontal 100% stacked for composition/intent.
     "bar_stacked_100_horizontal": {
         "bar_dir": "bar",
         "grouping": "percentStacked",
@@ -88,7 +88,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 486 occurrences (11% of PET charts). Vertical 100% stacked.
+    # 5,966 occurrences (16.9%). Vertical 100% stacked.
     "column_stacked_100_vertical": {
         "bar_dir": "col",
         "grouping": "percentStacked",
@@ -106,7 +106,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 119 occurrences. Side-by-side vertical bars for QoQ comparison.
+    # 2,202 occurrences (6.2%). Side-by-side vertical bars for QoQ comparison.
     "column_clustered_vertical": {
         "bar_dir": "col",
         "grouping": "clustered",
@@ -124,7 +124,7 @@ CHART_PATTERNS = {
         "invert_if_negative": False,
     },
 
-    # 595 occurrences (14% of PET charts). Multi-wave trend lines.
+    # 5,055 occurrences (14.3%). Multi-wave trend lines.
     "line_markers_trended": {
         "grouping": "standard",
         "label_pos": "t",
@@ -138,8 +138,7 @@ CHART_PATTERNS = {
         "line_width_emu": 25400,     # 2pt (827 occurrences)
     },
 
-    # 743 occurrences (17% of PET charts). Scatter for abacus / MBD /
-    # quadrant plots.
+    # 3,221 occurrences (9.1%). Scatter for abacus / MBD / quadrant plots.
     "xy_scatter_abacus": {
         "label_pos": "t",
         "label_fsize": 8,
@@ -153,7 +152,7 @@ CHART_PATTERNS = {
         "hide_cat_labels": False,
     },
 
-    # 138 occurrences. Segment composition breakdowns.
+    # 1,106 occurrences (3.1%). Segment composition breakdowns.
     "doughnut_default": {
         "label_pos": "ctr",
         "label_fsize": 8,
@@ -162,6 +161,77 @@ CHART_PATTERNS = {
         "show_title": False,
         "hole_size": 50,
         "series_no_border": True,
+    },
+
+    # ── New patterns from 551-deck grounding (Apr 2026) ──
+
+    # 2,579 occurrences (7.3%). Horizontal stacked (non-100%) bar.
+    "bar_stacked_horizontal": {
+        "bar_dir": "bar",
+        "grouping": "stacked",
+        "gap": 80,
+        "overlap": 100,
+        "invert_cat_axis": True,
+        "hide_cat_labels": True,
+        "label_pos": "ctr",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 1,263 occurrences (3.6%). Vertical stacked (non-100%) column.
+    "column_stacked_vertical": {
+        "bar_dir": "col",
+        "grouping": "stacked",
+        "gap": 100,
+        "overlap": 100,
+        "invert_cat_axis": False,
+        "hide_cat_labels": False,
+        "label_pos": "ctr",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "series_no_border": True,
+        "invert_if_negative": False,
+    },
+
+    # 251 occurrences (0.7%). Pie chart for composition breakdowns.
+    "pie_default": {
+        "label_pos": "outEnd",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "series_no_border": True,
+    },
+
+    # 178 occurrences (0.5%). Scatter with connecting lines (trend paths).
+    "xy_scatter_lines": {
+        "label_pos": "t",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": False,
+        "marker_symbol": "circle",
+        "marker_size": 7,
+        "line_width_emu": 19050,
+    },
+
+    # 76 occurrences (0.2%). Bubble charts (rare, typically quadrant analysis).
+    "bubble": {
+        "label_pos": "t",
+        "label_fsize": 8,
+        "val_num_format": "0%",
+        "show_legend": False,
+        "show_title": False,
+        "major_gridlines": True,
     },
 }
 

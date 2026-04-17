@@ -73,7 +73,7 @@ LAYOUTS = {
     },
 
     # ────────────────────────────────────────────────────────────────────────
-    # Layouts derived from real-deck coordinate analysis (32 PET decks).
+    # Layouts derived from real-deck coordinate analysis (551 decks, 24,740 slides).
     # Each entry lists the median coordinates from its signature cluster.
     # Use these as the default geometry; renderers can override specific
     # fields at call time if a deck needs tweaking.
