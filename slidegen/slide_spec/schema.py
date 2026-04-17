@@ -202,6 +202,9 @@ class ChartChrome:
     data_labels: DataLabelsSpec = field(default_factory=DataLabelsSpec)
     value_axis: AxisSpec = field(default_factory=AxisSpec)
     hide_category_labels: bool = True   # 99% of bar_clustered_horizontal uses a separate label table
+    # Bar/column chart geometry — None = use CHART_PATTERNS default
+    gap_width: Optional[int] = None     # gapWidth (0-500). Extracted from OOXML by deck-reader.
+    overlap: Optional[int] = None       # overlap (-100 to 100). Extracted from OOXML by deck-reader.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

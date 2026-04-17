@@ -552,13 +552,14 @@ def _render_bar_clustered_horizontal(
     series_list = [(s.name, list(s.values)) for s in component.data.series]
     colors = _series_colors(component, brand, context, deck_ref)
 
+    pattern = CHART_PATTERNS["bar_clustered_horizontal"]
     cf, chart = add_clustered_bar_chart(
         slide, cats, series_list,
         rect[0], rect[1], rect[2], rect[3],
         colors=colors,
         legend=component.chrome.legend.show,
-        gap=CHART_PATTERNS["bar_clustered_horizontal"]["gap"],
-        overlap=CHART_PATTERNS["bar_clustered_horizontal"]["overlap"],
+        gap=component.chrome.gap_width or pattern["gap"],
+        overlap=component.chrome.overlap if component.chrome.overlap is not None else pattern["overlap"],
     )
     invert_cat_axis(chart)
     if component.chrome.hide_category_labels:
@@ -590,9 +591,10 @@ def _render_column_clustered_vertical(
     chart = cf.chart
 
     pattern = CHART_PATTERNS["column_clustered_vertical"]
-    set_plot_area_gap(chart, pattern["gap"])
-    if pattern.get("overlap"):
-        set_overlap(chart, pattern["overlap"])
+    set_plot_area_gap(chart, component.chrome.gap_width or pattern["gap"])
+    ov = component.chrome.overlap if component.chrome.overlap is not None else pattern.get("overlap")
+    if ov:
+        set_overlap(chart, ov)
     for i, s in enumerate(chart.series):
         if i < len(colors):
             set_series_color(s, colors[i])
@@ -826,7 +828,7 @@ def _render_single_bar(
         slide, component.data.categories, list(series.values),
         rect[0], rect[1], rect[2], rect[3],
         fill_color=colors[0],
-        gap=CHART_PATTERNS["single_bar"]["gap"],
+        gap=component.chrome.gap_width or CHART_PATTERNS["single_bar"]["gap"],
     )
     return chart
 
@@ -857,7 +859,7 @@ def _render_stacked_bar_legacy(
         chart_data,
     )
     chart = cf.chart
-    set_plot_area_gap(chart, CHART_PATTERNS["stacked_bar"]["gap"])
+    set_plot_area_gap(chart, component.chrome.gap_width or CHART_PATTERNS["stacked_bar"]["gap"])
     invert_cat_axis(chart)
     for i, s in enumerate(chart.series):
         if i < len(colors):
@@ -1193,9 +1195,11 @@ def _render_value_table_component(
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = C_LBGREY if r % 2 == 0 else C_WHITE
             cell.text_frame.text = str(cell_val)
-            for run in cell.text_frame.paragraphs[0].runs:
-                run.font.size = Pt(8)
-                run.font.color.rgb = C_TEXT
+            # Only apply font defaults if not a pass-through table (deck-reader)
+            if component.alternating_rows:
+                for run in cell.text_frame.paragraphs[0].runs:
+                    run.font.size = Pt(8)
+                    run.font.color.rgb = C_TEXT
 
     namer.name(tbl_shape)
     return tbl_shape

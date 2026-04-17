@@ -571,8 +571,19 @@ def _extract_chart_chrome_from_ooxml(chart) -> ChartChrome:
 
         # gapWidth
         gw = cs.find(f".//{{{ns}}}gapWidth")
+        if gw is not None:
+            try:
+                chrome.gap_width = int(gw.get("val"))
+            except (ValueError, TypeError):
+                pass
+
         # overlap
         ov = cs.find(f".//{{{ns}}}overlap")
+        if ov is not None:
+            try:
+                chrome.overlap = int(ov.get("val"))
+            except (ValueError, TypeError):
+                pass
 
         # dLblPos (data label position)
         dlp = cs.find(f".//{{{ns}}}dLblPos")
@@ -619,28 +630,62 @@ def _extract_chart_chrome_from_ooxml(chart) -> ChartChrome:
     return chrome
 
 
-def _extract_table_data_from_shape(shape) -> tuple[list[str], list[list[str]]]:
-    """Extract labels and rows from a table shape."""
+def _extract_table_data_from_shape(shape) -> tuple[list[str], list[list[str]], dict]:
+    """Extract labels, rows, and formatting from a table shape.
+
+    Returns (labels, rows, formatting) where formatting contains:
+    - font_name: most common font in the table
+    - font_size_pt: most common font size
+    - font_color: most common text color
+    """
     labels = []
     rows = []
+    formatting = {}
     try:
         table = shape.table
         n_rows = len(table.rows)
         n_cols = len(table.columns)
         if n_rows == 0 or n_cols == 0:
-            return [], []
+            return [], [], {}
+
+        font_names = []
+        font_sizes = []
+        font_colors = []
 
         for row_idx in range(n_rows):
             row = []
             for col_idx in range(n_cols):
-                row.append(table.cell(row_idx, col_idx).text.strip())
+                cell = table.cell(row_idx, col_idx)
+                row.append(cell.text.strip())
+                # Extract font formatting
+                try:
+                    for p in cell.text_frame.paragraphs:
+                        for run in p.runs:
+                            if run.font.name:
+                                font_names.append(run.font.name)
+                            if run.font.size:
+                                font_sizes.append(round(run.font.size.pt, 1))
+                            if run.font.color and run.font.color.rgb:
+                                font_colors.append(f"#{run.font.color.rgb}")
+                            break
+                        break
+                except Exception:
+                    pass
             rows.append(row)
 
-        # First column as labels (most common pattern in PET decks)
         labels = [row[0] for row in rows if row]
+
+        # Most common formatting values
+        from collections import Counter
+        if font_names:
+            formatting["font_name"] = Counter(font_names).most_common(1)[0][0]
+        if font_sizes:
+            formatting["font_size_pt"] = Counter(font_sizes).most_common(1)[0][0]
+        if font_colors:
+            formatting["font_color"] = Counter(font_colors).most_common(1)[0][0]
     except Exception:
         pass
-    return labels, rows
+    return labels, rows, formatting
 
 
 def read_tagged_shapes(
@@ -773,23 +818,27 @@ def read_tagged_shapes(
                     chrome=chart_chrome,
                 ))
             elif shape_type == "table" and shape.has_table:
-                labels, rows = _extract_table_data_from_shape(shape)
+                labels, rows, tbl_fmt = _extract_table_data_from_shape(shape)
                 if rows:
                     n_cols = len(rows[0]) if rows else 0
                     if n_cols <= 1:
-                        # Single-column → label table
+                        # Single-column → label table with extracted font
                         slide_components.append(LabelTableComponent(
                             position=position,
                             labels=labels,
+                            font_size_pt=tbl_fmt.get("font_size_pt", 9.0),
+                            font_name=tbl_fmt.get("font_name"),
+                            alternating_rows=False,  # don't apply SlideGen styling
                         ))
                     else:
                         # Multi-column → value table (preserves all columns)
-                        headers = rows[0] if rows else []
-                        data_rows = rows[1:] if len(rows) > 1 else []
+                        # Don't split header/body — pass all rows as data
+                        # (the original table may not have a header row)
                         slide_components.append(ValueTableComponent(
                             position=position,
-                            headers=headers,
-                            rows=data_rows,
+                            headers=[],
+                            rows=rows,
+                            alternating_rows=False,
                         ))
             elif shape.has_text_frame:
                 text = shape.text_frame.text.strip()
