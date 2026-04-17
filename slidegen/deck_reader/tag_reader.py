@@ -602,6 +602,9 @@ def read_tagged_shapes(
     for slide_idx, slide in enumerate(prs.slides):
         slide_tagged = 0
         slide_untagged = 0
+        slide_components = []       # ALL components on this slide
+        slide_lineage = None        # best lineage found (first tagged shape with Synapse IDs)
+        slide_has_synapse = False
 
         for shape in slide.shapes:
             summary.total_shapes += 1
@@ -617,7 +620,6 @@ def read_tagged_shapes(
 
             if not is_tagged:
                 slide_untagged += 1
-                # Collect info for Tier 2
                 shape_type = _classify_shape(shape)
                 us = UntaggedShape(
                     slide_index=slide_idx,
@@ -647,7 +649,7 @@ def read_tagged_shapes(
                 if report_config:
                     summary.report_configs_resolved += 1
 
-            # Resolve PivotConfig from Custom XML Part
+            # Resolve PivotConfig
             pivot_config = None
             if has_pivot_hash:
                 p_hash = tags[TAG_PIVOT_CONFIG_HASH]
@@ -655,7 +657,7 @@ def read_tagged_shapes(
                 if pivot_config:
                     summary.pivot_configs_resolved += 1
 
-            # Parse MappingConfig (stored directly as JSON on shape tag)
+            # Parse MappingConfig
             mapping_config = None
             if has_mapping:
                 try:
@@ -669,28 +671,30 @@ def read_tagged_shapes(
             if report_config:
                 lineage = _report_config_to_lineage(report_config, tags)
             else:
-                # Minimal lineage from tags alone
                 lineage.analysis_type = tags.get(TAG_ANALYSIS_TYPE)
                 lineage.last_data_pull = tags.get(TAG_LAST_REFRESH)
                 error_msg = tags.get(TAG_REFRESH_ERROR)
                 lineage.last_refresh_error = error_msg if error_msg else None
                 lineage.config_hash = tags.get(TAG_REPORT_CONFIG_HASH)
 
-            # Extract headline
-            headline_text = _extract_headline_from_slide(slide)
+            # Keep the best lineage (first one with Synapse IDs)
+            has_ids = (lineage.project_id is not None or
+                       lineage.reporting_plan_id is not None or
+                       bool(lineage.analysis_ids))
+            if has_ids and not slide_has_synapse:
+                slide_lineage = lineage
+                slide_has_synapse = True
+            elif slide_lineage is None:
+                slide_lineage = lineage
 
-            # Build SlideSpec with REAL chart/table data extracted from OOXML.
-            # Tags carry config (what Synapse analysis to fetch); the chart XML
-            # carries the actual data that was rendered. We extract both.
+            # Extract component from this shape
             position = _shape_to_position(shape)
-
-            components = []
             shape_type = _classify_shape(shape)
             if shape_type == "chart" and shape.has_chart:
                 chart = shape.chart
                 chart_pattern = _classify_chart_from_ooxml(chart)
                 chart_data = _extract_chart_data_from_ooxml(chart)
-                components.append(ChartComponent(
+                slide_components.append(ChartComponent(
                     position=position,
                     chart_pattern=chart_pattern,
                     data=chart_data,
@@ -699,38 +703,41 @@ def read_tagged_shapes(
             elif shape_type == "table" and shape.has_table:
                 labels, rows = _extract_table_data_from_shape(shape)
                 if labels:
-                    components.append(LabelTableComponent(
+                    slide_components.append(LabelTableComponent(
                         position=position,
                         labels=labels,
                     ))
-            else:
-                components.append(TextboxComponent(
-                    position=position,
-                    text=shape.text_frame.text[:200] if shape.has_text_frame else "",
-                ))
+            elif shape.has_text_frame:
+                text = shape.text_frame.text.strip()
+                if text and len(text) > 5:
+                    slide_components.append(TextboxComponent(
+                        position=position,
+                        text=text[:200],
+                    ))
 
-            # Determine spec completeness:
-            # Tier 1 with resolved lineage = complete (data source is known)
-            # Tier 1 with lineage but no Synapse IDs = layout_complete_data_missing
-            has_synapse_lineage = (
-                lineage.project_id is not None or
-                lineage.reporting_plan_id is not None or
-                bool(lineage.analysis_ids)
-            )
-            completeness = "complete" if has_synapse_lineage else "layout_complete_data_missing"
+        # After processing all shapes on this slide: build ONE SlideSpec
+        if slide_components:
+            headline_text = _extract_headline_from_slide(slide)
+
+            # Classify layout from component composition
+            n_charts = sum(1 for c in slide_components if c.type == "chart")
+            n_tables = sum(1 for c in slide_components if c.type in ("label_table", "value_table"))
+            layout_key = f"observed_{n_charts}_chart_{n_tables}_table"
+
+            completeness = "complete" if slide_has_synapse else "layout_complete_data_missing"
 
             spec = SlideSpec(
-                slide_id=f"tagged_{slide_idx:03d}_{shape.name.replace(' ', '_')[:20]}",
+                slide_id=f"slide_{slide_idx:03d}",
                 slide_index=slide_idx,
-                layout="observed_1chart_1table",
+                layout=layout_key,
                 headline=HeadlineSpec(text=headline_text),
-                components=components,
-                data_lineage=lineage,
+                components=slide_components,
+                data_lineage=slide_lineage or DataLineage(),
                 metadata=SlideMetadata(
                     created_by="deck-reader-tier1",
                     created_at=None,
                     tier="1",
-                    confidence="high" if has_synapse_lineage else "medium",
+                    confidence="high" if slide_has_synapse else "medium",
                 ),
                 spec_completeness=completeness,
                 spec_version=SPEC_VERSION,

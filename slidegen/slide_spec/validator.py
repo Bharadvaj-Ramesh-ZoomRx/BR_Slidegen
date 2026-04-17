@@ -154,7 +154,14 @@ def _validate_label_table(c: LabelTableComponent, path: str, errors: list[str]) 
 
 
 def _cross_component_length_check(spec: SlideSpec, errors: list[str]) -> None:
-    """If a slide has a chart + label_table + delta_column, their row counts should match."""
+    """If a slide has a chart + label_table + delta_column, their row counts should match.
+
+    Skip for deck-reader specs — extracted components are independent shapes on the
+    same slide and may have intentionally different row counts (e.g., label table
+    includes header/footer rows that don't correspond to chart categories).
+    """
+    if spec.metadata and spec.metadata.created_by and "deck-reader" in spec.metadata.created_by:
+        return
     charts = [c for c in spec.components if isinstance(c, ChartComponent)]
     label_tables = [c for c in spec.components if isinstance(c, LabelTableComponent)]
     deltas = [c for c in spec.components if isinstance(c, DeltaColumnComponent)]
@@ -217,9 +224,11 @@ def validate_spec(spec: SlideSpec, strict: bool = False) -> list[str]:
     if not spec.components:
         errors.append("components is empty — slide must have at least one component")
 
-    # Layout existence
+    # Layout existence — skip for deck-reader specs where all components have explicit positions
+    # (the layout key is informational, not needed for rendering)
+    all_explicit = all(c.position.is_explicit() for c in spec.components) if spec.components else False
     layouts = _try_load_layouts()
-    if layouts is not None and spec.layout and spec.layout not in layouts:
+    if layouts is not None and spec.layout and spec.layout not in layouts and not all_explicit:
         errors.append(
             f"layout={spec.layout!r} not in LAYOUTS{{}}. "
             f"Available: {sorted(layouts.keys())}"

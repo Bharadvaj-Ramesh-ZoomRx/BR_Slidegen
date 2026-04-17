@@ -54,15 +54,25 @@ def read_deck(
         source_data_path=source_data_path,
     )
 
-    # Merge: Tier 1 specs take precedence (keyed by slide_index)
-    tier1_indices = {s.slide_index for s in tier1_specs}
-    merged = list(tier1_specs)
-    for spec in tier2_specs:
-        if spec.slide_index not in tier1_indices:
-            merged.append(spec)
+    # Merge: combine Tier 1 + Tier 2 components for the same slide.
+    # A slide may have both tagged shapes (Tier 1) and untagged shapes (Tier 2).
+    # The merged spec gets all components, with Tier 1 lineage taking precedence.
+    tier1_by_idx = {s.slide_index: s for s in tier1_specs}
+    tier2_by_idx = {s.slide_index: s for s in tier2_specs}
 
-    # Sort by slide_index
-    merged.sort(key=lambda s: s.slide_index)
+    all_indices = sorted(set(tier1_by_idx.keys()) | set(tier2_by_idx.keys()))
+    merged = []
+    for idx in all_indices:
+        t1 = tier1_by_idx.get(idx)
+        t2 = tier2_by_idx.get(idx)
+        if t1 and t2:
+            # Both tiers have components for this slide — merge components
+            t1.components.extend(t2.components)
+            merged.append(t1)
+        elif t1:
+            merged.append(t1)
+        else:
+            merged.append(t2)
 
     summary = {
         "tier1": tier1_summary,
