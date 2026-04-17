@@ -23,8 +23,8 @@ from pptx import Presentation
 from pptx.enum.chart import XL_CHART_TYPE
 
 from slidegen.slide_spec.schema import (
-    SlideSpec, HeadlineSpec, FooterSpec, Position, DataLineage, SlideMetadata,
-    ChartComponent, LabelTableComponent, ValueTableComponent,
+    SlideSpec, HeadlineSpec, FooterSpec, Position, DataLineage, DataLineageCandidate,
+    SlideMetadata, ChartComponent, LabelTableComponent, ValueTableComponent,
     DeltaColumnComponent, TextboxComponent,
     ChartData, Series, ChartChrome, DataLabelsSpec,
     dump_spec, SPEC_VERSION,
@@ -333,9 +333,10 @@ def infer_untagged_shapes(
         if not components:
             continue
 
-        # Cross-reference categories against source data
+        # Cross-reference categories against source data → lineage candidates
         extraction_method = ""
         question_codes = []
+        candidates = []
         for comp in components:
             if isinstance(comp, ChartComponent) and comp.data.categories:
                 extraction_method, question_codes, xref_conf = \
@@ -344,14 +345,33 @@ def infer_untagged_shapes(
                     )
                 if xref_conf == "low":
                     overall_confidence = "low"
+                # Build candidate from cross-reference result
+                if extraction_method and question_codes:
+                    candidates.append(DataLineageCandidate(
+                        method=extraction_method,
+                        question_codes=question_codes,
+                        source_description=f"Cross-referenced from chart categories vs source_data.json",
+                        confidence={"high": 0.9, "medium": 0.6, "low": 0.3}.get(xref_conf, 0.3),
+                        reason=f"Category labels matched {len(question_codes)} question code(s)",
+                    ))
                 break
 
+        # If we found a confident match, populate lineage; otherwise leave empty
+        has_lineage = bool(extraction_method and question_codes and overall_confidence != "low")
         lineage = DataLineage(
             data_source=pptx_path.stem,
-            extraction_method=extraction_method,
-            question_codes=question_codes,
+            extraction_method=extraction_method if has_lineage else "",
+            question_codes=question_codes if has_lineage else [],
             source_file=str(pptx_path.name),
         )
+
+        # Determine spec_completeness
+        if has_lineage:
+            completeness = "complete"
+        elif components:
+            completeness = "layout_complete_data_missing"
+        else:
+            completeness = "partial"
 
         spec = SlideSpec(
             slide_id=f"inferred_{slide_idx:03d}",
@@ -363,10 +383,13 @@ def infer_untagged_shapes(
             metadata=SlideMetadata(
                 created_by="deck-reader-tier2",
                 created_at=None,
-                speaker_notes=f"Confidence: {overall_confidence}. "
-                              f"Inferred from {len(chart_shapes)} charts, "
+                tier="2",
+                confidence=overall_confidence,
+                speaker_notes=f"Inferred from {len(chart_shapes)} charts, "
                               f"{len(table_shapes)} tables on slide {slide_idx + 1}.",
             ),
+            spec_completeness=completeness,
+            data_lineage_candidates=candidates,
             spec_version=SPEC_VERSION,
         )
 

@@ -30,9 +30,9 @@ from pptx import Presentation
 from pptx.util import Inches, Emu
 
 from slidegen.slide_spec.schema import (
-    SlideSpec, HeadlineSpec, FooterSpec, Position, DataLineage, SlideMetadata,
-    ChartComponent, LabelTableComponent, TextboxComponent, ChartData, Series,
-    ChartChrome, DataLabelsSpec, LegendSpec, AxisSpec,
+    SlideSpec, HeadlineSpec, FooterSpec, Position, DataLineage, DataLineageCandidate,
+    SlideMetadata, ChartComponent, LabelTableComponent, TextboxComponent,
+    ChartData, Series, ChartChrome, DataLabelsSpec, LegendSpec, AxisSpec,
     dump_spec, SPEC_VERSION,
 )
 
@@ -709,6 +709,16 @@ def read_tagged_shapes(
                     text=shape.text_frame.text[:200] if shape.has_text_frame else "",
                 ))
 
+            # Determine spec completeness:
+            # Tier 1 with resolved lineage = complete (data source is known)
+            # Tier 1 with lineage but no Synapse IDs = layout_complete_data_missing
+            has_synapse_lineage = (
+                lineage.project_id is not None or
+                lineage.reporting_plan_id is not None or
+                bool(lineage.analysis_ids)
+            )
+            completeness = "complete" if has_synapse_lineage else "layout_complete_data_missing"
+
             spec = SlideSpec(
                 slide_id=f"tagged_{slide_idx:03d}_{shape.name.replace(' ', '_')[:20]}",
                 slide_index=slide_idx,
@@ -719,7 +729,10 @@ def read_tagged_shapes(
                 metadata=SlideMetadata(
                     created_by="deck-reader-tier1",
                     created_at=None,
+                    tier="1",
+                    confidence="high" if has_synapse_lineage else "medium",
                 ),
+                spec_completeness=completeness,
                 spec_version=SPEC_VERSION,
             )
             specs.append(spec)

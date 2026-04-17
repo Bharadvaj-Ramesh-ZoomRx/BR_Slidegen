@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 
-SPEC_VERSION = "1.0"
+SPEC_VERSION = "1.1"  # v1.1: added spec_completeness, data_lineage_candidates, metadata.tier/confidence
 
 
 # Top 6 chart patterns by real-deck frequency (88% coverage) — Apr 15 analysis.
@@ -395,14 +395,38 @@ class DataLineage:
 
 
 @dataclass
+class DataLineageCandidate:
+    """A proposed data source for a slide whose lineage is unresolved.
+
+    Populated by deck-reader Tier 2 when structural inference finds possible
+    matches but can't confirm. The analyst reviews candidates and picks one
+    (or provides their own) before the spec is frozen into config.yaml.
+    """
+    method: str = ""                     # "question_code" | "synapse_report" | "raw_aggregate"
+    question_codes: list[str] = field(default_factory=list)
+    source_description: str = ""         # human-readable: "Q2_10Z — Message Recall Top2Box"
+    confidence: float = 0.0              # 0.0-1.0 — how sure we are this is right
+    reason: str = ""                     # why this candidate was proposed
+
+    # Optional Synapse identifiers (when inference suggests a Synapse source)
+    analysis_id: Optional[int] = None
+    reporting_plan_id: Optional[int] = None
+
+
+@dataclass
 class SlideMetadata:
     """Provenance + orchestration hints. Read by workflows, not by renderers."""
-    created_by: Optional[str] = None    # e.g. "slide-plan-generator-hypothesis"
+    created_by: Optional[str] = None    # e.g. "slide-plan-generator-hypothesis" | "deck-reader-tier1"
     created_at: Optional[str] = None    # ISO 8601
     hypothesis_refs: list[str] = field(default_factory=list)
     arc: Optional[str] = None           # "ACT NOW: Efficacy drift"
     role_in_arc: Optional[str] = None   # "evidence" | "closure" | "convergence"
     speaker_notes: Optional[str] = None # overrides auto-generated notes if set
+
+    # deck-reader provenance (two-pass model)
+    tier: Optional[str] = None          # "1" (Connector tag) | "2" (structural inference)
+    confidence: Optional[str] = None    # "high" | "medium" | "low"
+    original_tag_lineage: Optional[dict] = None  # preserved tag JSON when tag fails health check
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -416,6 +440,27 @@ class SlideSpec:
 
     A valid SlideSpec is sufficient input for slide-creator to render one
     client-ready slide with zero additional inference.
+
+    ## Two-pass model (deck-reader → analyst review → config.yaml)
+
+    When deck-reader creates specs from an existing PPTX:
+
+    **Pass 1 (automatic):** Layout, components, headline, chart data, positions,
+    brand detection — everything extractable from the PPTX itself. This always
+    completes. The spec is renderable after Pass 1.
+
+    **Pass 2 (data lineage):** Where did the numbers come from? For Synapse-
+    connected shapes, tags provide this. For unconnected shapes, deck-reader
+    proposes candidates in `data_lineage_candidates` and sets
+    `spec_completeness="layout_complete_data_missing"`. The analyst reviews,
+    picks the right candidate (or provides their own), and the spec becomes
+    "complete" — ready to freeze into config.yaml.
+
+    `spec_completeness` values:
+      - "complete" — layout + data lineage both resolved. Renderable AND refreshable.
+      - "layout_complete_data_missing" — renderable (can re-create the slide) but NOT
+        refreshable (don't know where to get new data). Analyst must resolve.
+      - "partial" — some components could not be extracted. Render will be approximate.
     """
     slide_id: str                       # unique within deck, e.g. "zrx_005"
     slide_index: int                    # 0-based position in deck
@@ -430,6 +475,10 @@ class SlideSpec:
     footer: Optional[FooterSpec] = None
     data_lineage: Optional[DataLineage] = None
     metadata: Optional[SlideMetadata] = None
+
+    # Two-pass deck-reader fields
+    spec_completeness: str = "complete"  # "complete" | "layout_complete_data_missing" | "partial"
+    data_lineage_candidates: list[DataLineageCandidate] = field(default_factory=list)
 
     # Versioning
     spec_version: str = SPEC_VERSION
@@ -535,6 +584,11 @@ def load_spec(source: Union[str, Path, dict]) -> SlideSpec:
     lineage = DataLineage(**data["data_lineage"]) if data.get("data_lineage") else None
     metadata = SlideMetadata(**data["metadata"]) if data.get("metadata") else None
 
+    # Data lineage candidates (two-pass model)
+    candidates = []
+    for cand_d in data.get("data_lineage_candidates", []):
+        candidates.append(DataLineageCandidate(**cand_d))
+
     return SlideSpec(
         slide_id=data["slide_id"],
         slide_index=data["slide_index"],
@@ -547,6 +601,8 @@ def load_spec(source: Union[str, Path, dict]) -> SlideSpec:
         footer=footer,
         data_lineage=lineage,
         metadata=metadata,
+        spec_completeness=data.get("spec_completeness", "complete"),
+        data_lineage_candidates=candidates,
         spec_version=data.get("spec_version", SPEC_VERSION),
     )
 
