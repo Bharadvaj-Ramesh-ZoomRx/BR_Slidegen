@@ -106,20 +106,14 @@ def cmd_render(args):
 
 
 def cmd_render_all(args):
-    """Clone source deck and verify spec extraction round-trips correctly.
+    """Clone + refresh: clone source deck, update chart data in place.
 
-    Instead of deconstructing and reconstructing slides (which loses template
-    elements, duplicates placeholders, and fights PowerPoint's layout model),
-    this clones the source deck as-is. The specs are extracted for verification
-    and future refresh — but the output deck is a direct copy.
-
-    For a REFRESH (new data), the workflow would: clone the deck, then for
-    each tagged shape, update its chart data from the new data source.
+    This preserves ALL formatting, layout, template, decorative shapes.
+    Only the DATA inside chart shapes is updated (round-trip by default,
+    or with new data when provided by the refresh workflow).
     """
     from slidegen.deck_reader import read_deck
-    from slidegen.slide_spec import validate_spec
-    from pptx import Presentation
-    import shutil
+    from slidegen.slide_refresher import refresh_deck, verify_round_trip
 
     specs, summary = read_deck(args.deck)
     out = Path(args.out or "deck_rerendered.pptx")
@@ -128,41 +122,31 @@ def cmd_render_all(args):
     print(f"  Slides: {summary.get('total_slides', '?')}")
     print(f"  Specs extracted: {len(specs)}")
 
-    # Verify specs
-    valid = 0
-    invalid = 0
-    for spec in specs:
-        errors = validate_spec(spec)
-        if errors:
-            invalid += 1
-            if args.force:
-                continue
-            comp_types = [c.type for c in spec.components]
-            print(f"  Slide {spec.slide_index}: {len(errors)} validation errors — {comp_types}")
-            for e in errors[:2]:
-                print(f"    {e}")
-        else:
-            valid += 1
+    # Completeness summary
+    from collections import Counter
+    completeness = Counter(s.spec_completeness for s in specs)
+    tiers = Counter(s.metadata.tier if s.metadata else '?' for s in specs)
+    print(f"  Completeness: {dict(completeness)}")
+    print(f"  Tiers: {dict(tiers)}")
 
-    print(f"\n  Valid specs: {valid}/{len(specs)}")
-    if invalid:
-        print(f"  Invalid specs: {invalid}")
+    # Clone + refresh (round-trip: writes extracted data back)
+    result = refresh_deck(args.deck, str(out), specs=specs)
+    print(f"\n  Charts refreshed: {result.charts_refreshed}")
+    print(f"  Charts failed: {result.charts_failed}")
+    if result.errors:
+        for e in result.errors[:5]:
+            print(f"    {e}")
 
-    # Clone the source deck directly (preserves ALL formatting perfectly)
-    shutil.copy2(args.deck, str(out))
-    print(f"\n  Output: {out} (clone of source — {out.stat().st_size:,} bytes)")
-    print(f"  Specs saved for refresh workflow use.")
+    # Verify round-trip fidelity
+    verify = verify_round_trip(args.deck, str(out))
+    print(f"\n  Verification: {verify['total_issues']} issues")
+    if verify['total_issues'] == 0:
+        print(f"  PASS — all {verify['orig_slides']} slides match shape-for-shape")
+    else:
+        for si in verify['slide_issues'][:5]:
+            print(f"    Slide {si['slide']}: {si['issues']}")
 
-    # Show component summary per slide
-    print(f"\n  Per-slide component summary:")
-    for spec in specs:
-        comp_counts = {}
-        for c in spec.components:
-            comp_counts[c.type] = comp_counts.get(c.type, 0) + 1
-        comp_str = " ".join(f"{v}{k[0].upper()}" for k, v in sorted(comp_counts.items()))
-        completeness = spec.spec_completeness[0].upper()  # C/L/P
-        print(f"    Slide {spec.slide_index:2d} [{completeness}] {comp_str:20s} {spec.headline.text[:50]}")
-
+    print(f"\n  Output: {out} ({out.stat().st_size:,} bytes)")
     return 0
 
 
