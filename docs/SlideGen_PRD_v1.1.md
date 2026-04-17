@@ -9,34 +9,34 @@
 
 ## The Bottom Line
 
-SlideGen is a **library of composable skills + a robust `pptx\\\_utils` Python package** that Claude Code uses to execute any supported consulting workflow — from new deck creation to wave refresh to single-slide client follow-ups to executive summary synthesis.
+SlideGen is a **library of composable skills + a robust `pptx_utils` Python package** that Claude Code uses to execute any supported consulting workflow — from new deck creation to wave refresh to single-slide client follow-ups to executive summary synthesis.
 
 **Three-layer architecture:**
 
 1. **Skills (SKILL.md files)** — orchestration knowledge: which patterns to use for which workflows
-2. **`pptx\\\_utils` package** — composition primitives: brand definitions, layouts, shape builders, chart builders, lxml helpers. Hard-won OOXML knowledge encoded as callable Python functions.
-3. **Generated scripts** — \~30-line glue code Claude writes per slide, composing `pptx\\\_utils` calls per the skill's instructions.
+2. **`pptx_utils` package** — composition primitives: brand definitions, layouts, shape builders, chart builders, lxml helpers. Hard-won OOXML knowledge encoded as callable Python functions.
+3. **Generated scripts** — ~30-line glue code Claude writes per slide, composing `pptx_utils` calls per the skill's instructions.
 
-**Without `pptx\\\_utils`, Claude rediscovers lxml gaps every session.** Without skills, Claude doesn't know which utilities to compose. Both are building blocks. Both grow over time as workflows demand.
+**Without `pptx_utils`, Claude rediscovers lxml gaps every session.** Without skills, Claude doesn't know which utilities to compose. Both are building blocks. Both grow over time as workflows demand.
 
 **Workflows drive the inventory.** We enumerate every workflow Galen-Consulting needs to support, then ask: "what skills and utility functions must exist so Claude Code can compose any of these?"
 
-**Key design insight (Apr 14):** Get the slide specification right with intelligent skills UP FRONT, then let deterministic rendering (via `pptx\\\_utils`) produce perfect slides every time. Intelligence flows INTO the spec; deterministic code reads the spec.
+**Key design insight (Apr 14):** Get the slide specification right with intelligent skills UP FRONT, then let deterministic rendering (via `pptx_utils`) produce perfect slides every time. Intelligence flows INTO the spec; deterministic code reads the spec.
 
 By end of Q3, this should work for all major project types (PET, ATU, PCA, HCP-Pt, Digital Trackers) and demonstrate enough versatility that consulting leadership can engage with FY27 staffing decisions.
 
-**Deck analysis grounding:** Reverse-engineering of **32 real PET decks spanning 17 pharma clients** (4,354 charts, 4,950 tables, 3,569 headlines) plus **8 ATU decks across 7 clients** (1,347 charts, 1,539 tables) concretely quantified what the skills and `pptx\_utils` must support. ATU analysis confirmed the same chart-type vocabulary with different frequency distribution (2.8x more stacked-100 composition charts, half the line/scatter usage). See §6.6 for PET findings; see `experiments/deck\_analysis/outputs/atu\_analysis.md` for ATU findings.
+**Deck analysis grounding:** Reverse-engineering of **32 real PET decks spanning 17 pharma clients** (4,354 charts, 4,950 tables, 3,569 headlines) plus **8 ATU decks across 7 clients** (1,347 charts, 1,539 tables) concretely quantified what the skills and `pptx_utils` must support. ATU analysis confirmed the same chart-type vocabulary with different frequency distribution (2.8x more stacked-100 composition charts, half the line/scatter usage). See §6.6 for PET findings; see `experiments/deck_analysis/outputs/atu_analysis.md` for ATU findings.
 
 \---
 
-## 1\. Problem Statement/context
+## 1. Problem Statement/context
 
 ### 1.1 What's broken with the current Vinoth experiment
 
 |**What's working**|**What's broken**|
 |-|-|
 |Slide plan generation (hypothesis bank → narrative threads → validated analysis → slide plan)|Slide rendering — reverse-engineered from a J\&J deck, hardcoded patterns, breaks on edge cases (wrong colors, zero-data messages included, misplaced data in tables)|
-|Skill-based intelligence layer up to slide\_plan.md|Plumbing from slide plan → config.yaml → PowerPoint deck — too deterministic, no intelligence in the rendering layer|
+|Skill-based intelligence layer up to slide_plan.md|Plumbing from slide plan → config.yaml → PowerPoint deck — too deterministic, no intelligence in the rendering layer|
 |Synapse CLI (built standalone by Rajesh)|CLI not yet integrated as a tool into SlideGen|
 |Project context, market context, prior wave context, survey context skills|Skills are too interwoven with Vinoth's hypothesis-driven approach — can't extract pieces for other workflows|
 
@@ -60,17 +60,17 @@ The Sagan agents model offers the alternative: build a library of well-defined c
 
 \---
 
-## 2\. Solution: Skills Composed by Claude Code
+## 2. Solution: Skills Composed by Claude Code
 
 ### 2.1 Design Principles
 
-**1. Skills + `pptx\\\_utils` are co-equal building blocks.** Skills are orchestration knowledge (when to do what). `pptx\\\_utils` is composition primitives (how to actually produce a shape, chart, table, etc.). Neither works without the other. Both grow over time.
+**1. Skills + `pptx_utils` are co-equal building blocks.** Skills are orchestration knowledge (when to do what). `pptx_utils` is composition primitives (how to actually produce a shape, chart, table, etc.). Neither works without the other. Both grow over time.
 
 **2. Workflows drive the inventory.** Enumerate workflows first, derive what skills and utilities must exist. Every claimed workflow must be executable as a composition. No exceptions.
 
-**3. Generate-from-scratch, not canonical templates.** `pptx\\\_utils` produces client-delivery quality slides directly via python-pptx + lxml. No dependency on project teams setting up canonical chart templates in hidden slides — that activation energy kills adoption. Brand/layout/pattern definitions live in Python (`BRAND{}`, `LAYOUTS{}`, `CHART\\\_PATTERNS{}`), not in template decks.
+**3. Generate-from-scratch, not canonical templates.** `pptx_utils` produces client-delivery quality slides directly via python-pptx + lxml. No dependency on project teams setting up canonical chart templates in hidden slides — that activation energy kills adoption. Brand/layout/pattern definitions live in Python (`BRAND{}`, `LAYOUTS{}`, `CHART_PATTERNS{}`), not in template decks.
 
-**4. Deterministic where possible, intelligent where necessary.** Slide rendering is deterministic (`pptx\\\_utils` calls, scale, cost, reliability). Slide planning is intelligent (skills that reason about data, hypotheses, narratives). Split is clean: intelligence flows into the spec, deterministic code reads the spec.
+**4. Deterministic where possible, intelligent where necessary.** Slide rendering is deterministic (`pptx_utils` calls, scale, cost, reliability). Slide planning is intelligent (skills that reason about data, hypotheses, narratives). Split is clean: intelligence flows into the spec, deterministic code reads the spec.
 
 **5. Slide-level granularity.** The atomic deliverable is one slide. Narrative arcs, hypothesis frameworks, and section structures are layers above the atomic slide.
 
@@ -78,11 +78,11 @@ The Sagan agents model offers the alternative: build a library of well-defined c
 
 **7. Visualization selection is deterministic.** Metric tag → Question type default → Human-in-the-loop prompt. Pick chart type by rule, only ask humans on genuine ambiguity.
 
-**8. Specifications are first-class artifacts.** `slide\\\_plan.md` is a contract between the intelligent layer and deterministic layer. Other skills read, write, reason about it.
+**8. Specifications are first-class artifacts.** `slide_plan.md` is a contract between the intelligent layer and deterministic layer. Other skills read, write, reason about it.
 
 **9. Human-in-the-loop at decision points, not every step.** Approval gates exist at meaningful boundaries. Within a skill's execution, the agent runs uninterrupted.
 
-**10. Start thin, grow deliberately.** Begin with the most-used `pptx\\\_utils` helpers. Let Claude handle long tail via inline lxml + skill instructions — flagged for later extraction into `pptx\\\_utils`. Library grows based on real usage, not speculation.
+**10. Start thin, grow deliberately.** Begin with the most-used `pptx_utils` helpers. Let Claude handle long tail via inline lxml + skill instructions — flagged for later extraction into `pptx_utils`. Library grows based on real usage, not speculation.
 
 ### 2.2 Architecture Overview
 
@@ -118,26 +118,26 @@ The Sagan agents model offers the alternative: build a library of well-defined c
                             │  skills reference utilities by name
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  GENERATED SCRIPT (what Claude writes per slide, \\\~30 lines)      │
+│  GENERATED SCRIPT (what Claude writes per slide, ~30 lines)      │
 │                                                                  │
-│   Composes pptx\\\_utils calls per skill instructions.              │
+│   Composes pptx_utils calls per skill instructions.              │
 │   Hand-crafted glue, not a framework. Disposable.                │
 └──────────────────────────┬──────────────────────────────────────┘
-                            │  calls pptx\\\_utils functions
+                            │  calls pptx_utils functions
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  pptx\\\_utils PACKAGE (composition primitives — Python)            │
+│  pptx_utils PACKAGE (composition primitives — Python)            │
 │                                                                  │
 │   brand.py       — BRAND{} — client color/font definitions       │
 │   layout.py      — LAYOUTS{} — coordinate presets                │
-│   shapes.py      — textbox(), solidrect(), horiz\\\_line(), ...     │
-│   charts.py      — make\\\_clustered\\\_bar(), CHART\\\_PATTERNS{}        │
-│   tables.py      — delta\\\_table(), value\\\_table()                  │
-│   text.py        — format\\\_run(), delta\\\_format(), ...             │
-│   images.py      — add\\\_logo(), insert\\\_image()                    │
-│   deck.py        — open\\\_template(), clear\\\_slide(), save\\\_deck()   │
-│   lxml\\\_helpers.py— set\\\_plot\\\_area\\\_gap(), invert\\\_cat\\\_axis(), ...   │
-│   registry.py    — reconcile(), register\\\_shape(), ...            │
+│   shapes.py      — textbox(), solidrect(), horiz_line(), ...     │
+│   charts.py      — make_clustered_bar(), CHART_PATTERNS{}        │
+│   tables.py      — delta_table(), value_table()                  │
+│   text.py        — format_run(), delta_format(), ...             │
+│   images.py      — add_logo(), insert_image()                    │
+│   deck.py        — open_template(), clear_slide(), save_deck()   │
+│   lxml_helpers.py— set_plot_area_gap(), invert_cat_axis(), ...   │
+│   registry.py    — reconcile(), register_shape(), ...            │
 │   com.py         — win32com helpers for live editing             │
 └──────────────────────────┬──────────────────────────────────────┘
                             │
@@ -155,28 +155,28 @@ The Sagan agents model offers the alternative: build a library of well-defined c
 1. Reads user intent → picks a workflow skill
 2. Workflow skill invokes project-type skill (e.g., PET)
 3. Project-type skill invokes planning/analysis/creation skills
-4. Skills instruct Claude what `pptx\\\_utils` functions to compose
-5. Claude writes a \~30-line generated script composing those functions
-6. Script executes — `pptx\\\_utils` does the deterministic heavy lifting
+4. Skills instruct Claude what `pptx_utils` functions to compose
+5. Claude writes a ~30-line generated script composing those functions
+6. Script executes — `pptx_utils` does the deterministic heavy lifting
 7. Output: client-delivery-quality `.pptx`
 
 **Why this works:**
 
 * Skills = *knowledge* about what to do (SKILL.md files, Claude-readable)
-* `pptx\\\_utils` = *primitives* for doing it (Python, stable, reusable)
+* `pptx_utils` = *primitives* for doing it (Python, stable, reusable)
 * Generated script = *glue* composing them for one specific slide (Claude writes, disposable)
 
-Without `pptx\\\_utils`, Claude writes 200-line scripts rediscovering lxml every session. Without skills, Claude doesn't know which utilities to call or in what order. Both are necessary.
+Without `pptx_utils`, Claude writes 200-line scripts rediscovering lxml every session. Without skills, Claude doesn't know which utilities to call or in what order. Both are necessary.
 
 \---
 
-## 3\. Workflows We Need to Support
+## 3. Workflows We Need to Support
 
 Derived from Sriram's Apr 14 "hypothetical workflows" exercise + a MECE audit against actual user utterances. Workflows map 1:1 to verbs users say — create, refresh, edit, add, annotate, restructure, audit, summarize. Eight MECE workflows cover the full deck lifecycle.
 
 ### Workflow 1: Create deck — `create-deck-workflow`
 
-**Input:** Project brief, raw data (or Synapse setup), KBQs. Optional `mode="hypothesis"` + pre-built `hypothesis\\\_bank.md` for Vinoth's storyboarding flow.
+**Input:** Project brief, raw data (or Synapse setup), KBQs. Optional `mode="hypothesis"` + pre-built `hypothesis_bank.md` for Vinoth's storyboarding flow.
 **Output:** Complete first-cut deck following ZoomRx methodology for the project type.
 **Modes:** `briefing` (default — data + KBQs → hypotheses → slides) and `hypothesis` (pre-built hypotheses → narrative arcs → slides; the "storyboarding" path).
 
@@ -187,8 +187,8 @@ Derived from Sriram's Apr 14 "hypothetical workflows" exercise + a MECE audit ag
 
 ### Workflow 3: Edit slide — `edit-slide-workflow`
 
-**Input:** Deck, slide ID, action (`rebuild` / `data\\\_refresh` / `edit`). For edit mode, a list of slide-editor instructions.
-**Output:** Same deck with the slide regenerated. Rebuild re-renders from current spec; data\_refresh re-pulls from Synapse/Excel first; edit applies whitelisted structural/style changes.
+**Input:** Deck, slide ID, action (`rebuild` / `data_refresh` / `edit`). For edit mode, a list of slide-editor instructions.
+**Output:** Same deck with the slide regenerated. Rebuild re-renders from current spec; data_refresh re-pulls from Synapse/Excel first; edit applies whitelisted structural/style changes.
 
 ### Workflow 4: Add slide — `add-slide-workflow`
 
@@ -208,22 +208,22 @@ Derived from Sriram's Apr 14 "hypothetical workflows" exercise + a MECE audit ag
 ### Workflow 7: Audit deck — `deck-audit-workflow`
 
 **Input:** Deck to audit, optional staleness threshold, optional severity filter.
-**Output:** Read-only audit report flagging data errors, unsupported claims, stale lineage, missing citations on ES slides, and structural inconsistencies. Report written to `<deck>.audit\\\_<timestamp>.md`; deck is not mutated. Runs as a repeatable pre-delivery QA step (including in CI).
+**Output:** Read-only audit report flagging data errors, unsupported claims, stale lineage, missing citations on ES slides, and structural inconsistencies. Report written to `<deck>.audit_<timestamp>.md`; deck is not mutated. Runs as a repeatable pre-delivery QA step (including in CI).
 
 ### Workflow 8: Executive summary — `executive-summary-workflow`
 
-**Input:** Full deck, KBQs to answer, optional narrative\_threads.md.
-**Output:** 1-3 ES slides with findings citing back to supporting `slide\\\_id`s. Every bullet has `metadata.citations: list\\\[slide\\\_id]`. Unsourced claims rejected.
+**Input:** Full deck, KBQs to answer, optional narrative_threads.md.
+**Output:** 1-3 ES slides with findings citing back to supporting `slide_id`s. Every bullet has `metadata.citations: list\[slide_id]`. Unsourced claims rejected.
 
 ### Pre-condition: Retroactive Spec Generation
 
-Before any of Workflows 2-8 can run on an *existing* deck (one not created by SlideGen), a one-time bootstrapping step is required: **`deck-reader` reads the existing PPTX and produces slide specs for every slide**, stored in `projects/{name}/context/{wave}/slide\_specs/` alongside a bootstrapped `config.yaml`. This is the "one-time retrofitting" that gives the system backward compatibility with the hundreds of client decks already in use.
+Before any of Workflows 2-8 can run on an *existing* deck (one not created by SlideGen), a one-time bootstrapping step is required: **`deck-reader` reads the existing PPTX and produces slide specs for every slide**, stored in `projects/{name}/context/{wave}/slide_specs/` alongside a bootstrapped `config.yaml`. This is the "one-time retrofitting" that gives the system backward compatibility with the hundreds of client decks already in use.
 
 How it works:
 
 * For **Connector-tagged shapes**: Tier 1 extraction — reads `ReportConfigHash` → Synapse lineage → populates `DataLineage` with canonical IDs
 * For **untagged or unhealthy-tag shapes**: Tier 2 inference — parses headline text, chart pattern, category labels, cross-references against project config
-* The resulting `list\[SlideSpec]` + updated `config.yaml` are saved to the project folder and become the canonical inputs for all subsequent workflows
+* The resulting `list[SlideSpec]` + updated `config.yaml` are saved to the project folder and become the canonical inputs for all subsequent workflows
 
 After this one-time step, the deck is "SlideGen-legible" — refresh, edit, audit, and executive summary workflows all operate from the saved specs. Future waves auto-update the specs without re-bootstrapping.
 
@@ -231,7 +231,7 @@ After this one-time step, the deck is "SlideGen-legible" — refresh, edit, audi
 
 ### Supported via composition (not separate workflows)
 
-* **Template / brand migration** (swap brand on existing deck) — composable from `edit-slide-workflow` (in edit mode with `set\\\_brand` instructions per slide) + `refresh-deck-workflow` if data changes with brand. Evaluated for Q4 as a dedicated workflow if user demand warrants.
+* **Template / brand migration** (swap brand on existing deck) — composable from `edit-slide-workflow` (in edit mode with `set_brand` instructions per slide) + `refresh-deck-workflow` if data changes with brand. Evaluated for Q4 as a dedicated workflow if user demand warrants.
 * **Bulk headline revision** (retune all headlines for tighter narrative) — composable by running `edit-slide-workflow` in edit mode across slides in sequence.
 * **Variant deck generation** (different client-facing versions) — composable from `edit-slide-workflow` applied in batch.
 * **Deck reconcile** (sync registry after manual PowerPoint edits) — already implemented in `slidegen/reconcile.py`; used as a collaboration primitive by multiple workflows.
@@ -241,7 +241,7 @@ Synapse platform setup (creating segments, VQs, reporting plans, custom methodol
 
 \---
 
-## 4\. Comprehensive Skill Inventory
+## 4. Comprehensive Skill Inventory
 
 Derived from Workflows 1-9. Every workflow must be fully executable as a composition of skills in this list.
 
@@ -257,7 +257,7 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |`survey-context-builder`|✅|Parse survey draft → structured context|
 |`synapse-read`|🔧|Pull reports, segments, raw data, banner plans. Needs wrapping around Rajesh's Synapse CLI as tool|
 |`hashtag-benchmarks`|🆕|Pull industry benchmarks by metric + therapy area from Hashtag|
-|`raw-data-aggregator`|✅|Aggregate respondent-level data (top2box, yes\_pct, etc.)|
+|`raw-data-aggregator`|✅|Aggregate respondent-level data (top2box, yes_pct, etc.)|
 |`deck-reader`|🆕|Parse existing PPTX — slides, shapes, data lineage, structure, visualization types. **Dual-mode**: for shapes authored via Galen-PowerPoint Connector, reads `ReportConfigHash` shape tag → Custom XML Part for canonical Synapse lineage (Project/ReportingPlan/Analysis/Segment IDs). For untagged shapes, falls back to structural inference from headline + chart pattern + data shape, with user confirmation. See §6.8.|
 |`excel-indexer`|✅|Parse aggregated Excel data (banner plan export) into structured JSON|
 
@@ -277,7 +277,7 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 
 |Skill|Status|Purpose|
 |-|-|-|
-|`slide-creator`|🔧|Render single slide from complete spec via `pptx\\\_utils` composition (THE atomic unit — needs full refactor to be general, not J\&J-specific)|
+|`slide-creator`|🔧|Render single slide from complete spec via `pptx_utils` composition (THE atomic unit — needs full refactor to be general, not J\&J-specific)|
 |`slide-updater`|🆕|Update existing slide with fresh data, preserve structure and formatting|
 |`slide-editor`|🆕|Edit specific elements of existing slide (headline, callout, colors, data) — typically via win32com live edit|
 |`callout-adder`|🆕|Add data-driven annotation/callout to existing slide|
@@ -289,8 +289,8 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |Skill|Status|Purpose|
 |-|-|-|
 |`hypothesis-generator`|✅|Generate hypothesis bank from KBQs + context|
-|`sfea-insight-writer`|✅|PET/SFEA-specific. Two internal phases: Phase 0 validates hypotheses against survey data → `validated\_analysis.md`; Phase 1 synthesizes story arcs (CONVERGENCE/TENSION/DIVERGENCE/CLOSURE) + arc-informed headlines + ES + recommendations → `narrative\_threads.md`. Used by `pet-deck` project skill.|
-|`atu-insight-writer`|✅|ATU-specific parallel to sfea-insight-writer. Same two-phase structure but with ATU arc patterns (FUNNEL\_LEAKAGE, SHARE\_MOMENTUM, COMPETITIVE\_CONVERGENCE, BARRIER\_CLUSTER, LOYALTY\_EROSION, SEGMENT\_SPLIT, ADOPTION\_CURVE), share-driven headline framing, and barrier-aware recommendations. Used by `atu-deck` project skill.|
+|`sfea-insight-writer`|✅|PET/SFEA-specific. Two internal phases: Phase 0 validates hypotheses against survey data → `validated_analysis.md`; Phase 1 synthesizes story arcs (CONVERGENCE/TENSION/DIVERGENCE/CLOSURE) + arc-informed headlines + ES + recommendations → `narrative_threads.md`. Used by `pet-deck` project skill.|
+|`atu-insight-writer`|✅|ATU-specific parallel to sfea-insight-writer. Same two-phase structure but with ATU arc patterns (FUNNEL_LEAKAGE, SHARE_MOMENTUM, COMPETITIVE_CONVERGENCE, BARRIER_CLUSTER, LOYALTY_EROSION, SEGMENT_SPLIT, ADOPTION_CURVE), share-driven headline framing, and barrier-aware recommendations. Used by `atu-deck` project skill.|
 |`segment-comparator`|🆕|Compare segments with significance testing (T-test, chi-square as applicable)|
 |`trend-analyzer`|🆕|Trend analysis across waves|
 |`stat-sig-annotator`|🆕|Annotate slides with significance markers, low sample footnotes|
@@ -354,18 +354,18 @@ Each workflow skill maps user intent → composed skill sequence.
 * **4 collaboration skills** (2 exist, 2 new)
 * **7 tools** (4 exist, 1 refactor, 2 new)
 
-**Total: 52 skills + tools.** Of these, \~20 exist in some form today; \~10 need refactoring to be general-purpose; \~22 are new.
+**Total: 52 skills + tools.** Of these, ~20 exist in some form today; ~10 need refactoring to be general-purpose; ~22 are new.
 
 \---
 
-## 5\. Workflow → Skill Composition Map
+## 5. Workflow → Skill Composition Map
 
 Verifies that every workflow is fully executable as a composition of skills. If a workflow requires a skill not in the inventory, we're missing a building block.
 
 ### Workflow 1: Create deck
 
 **Composition:**
-`create-deck-workflow` → (`pet-deck` if PET project) → `project-context-builder` + `market-context-builder` + `survey-context-builder` + `prior-wave-context-builder` + `synapse-read` → `hypothesis-generator` (briefing mode) OR use provided `hypothesis\\\_bank.md` (hypothesis mode) → insight-writer (sfea or atu per project type) → `slide-plan-generator-hypothesis` → `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` (×N) → `deck-assembler`
+`create-deck-workflow` → (`pet-deck` if PET project) → `project-context-builder` + `market-context-builder` + `survey-context-builder` + `prior-wave-context-builder` + `synapse-read` → `hypothesis-generator` (briefing mode) OR use provided `hypothesis_bank.md` (hypothesis mode) → insight-writer (sfea or atu per project type) → `slide-plan-generator-hypothesis` → `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` (×N) → `deck-assembler`
 
 ### Workflow 2: Refresh deck
 
@@ -378,7 +378,7 @@ Verifies that every workflow is fully executable as a composition of skills. If 
 `edit-slide-workflow` → `deck-reader` (one slide) →
 
 * rebuild mode: `spec-validator` → `slide-creator`
-* data\_refresh mode: `synapse-read` (lineage-driven) → `slide-updater` → `spec-validator` → `slide-creator`
+* data_refresh mode: `synapse-read` (lineage-driven) → `slide-updater` → `spec-validator` → `slide-creator`
 * edit mode: `slide-editor` (whitelisted actions) → `spec-validator` → `slide-creator`
 → `deck-assembler` (replace at index)
 
@@ -396,10 +396,10 @@ Verifies that every workflow is fully executable as a composition of skills. If 
 **Composition:**
 `annotate-slide-workflow` → `deck-reader` (target slide) →
 
-* quote: `callout-writer` (from `qualitative\\\_data.json`)
+* quote: `callout-writer` (from `qualitative_data.json`)
 * insight: `segment-comparator` + `stat-sig-annotator` → `callout-writer` (data annotation)
 * freeform: direct `CalloutComponent` build
-→ `slide-editor` (add\_component action) → `spec-validator` → `slide-creator` → `deck-assembler` → optional `analysis-trace-store`
+→ `slide-editor` (add_component action) → `spec-validator` → `slide-creator` → `deck-assembler` → optional `analysis-trace-store`
 
 ### Workflow 6: Restructure deck
 
@@ -414,7 +414,7 @@ Verifies that every workflow is fully executable as a composition of skills. If 
 ### Workflow 7: Audit deck
 
 **Composition:**
-`deck-audit-workflow` → `deck-reader` (all slides) → check categories: data integrity, lineage/audit trail, citation coverage (ES slides), narrative coherence, sample size, structural, chrome/standards → aggregate `list\\\[Finding]` → write `<deck>.audit\\\_<timestamp>.md`
+`deck-audit-workflow` → `deck-reader` (all slides) → check categories: data integrity, lineage/audit trail, citation coverage (ES slides), narrative coherence, sample size, structural, chrome/standards → aggregate `list\[Finding]` → write `<deck>.audit_<timestamp>.md`
 (read-only — does not invoke `slide-creator` or `deck-assembler`)
 
 ### Workflow 8: Executive summary
@@ -424,7 +424,7 @@ Verifies that every workflow is fully executable as a composition of skills. If 
 
 \---
 
-## 6\. Key Design Decisions
+## 6. Key Design Decisions
 
 ### 6.1 Visualization Selection Hierarchy
 
@@ -461,12 +461,12 @@ The original PPT Agent brief proposed two approaches: (A) cloning canonical char
 
 Option A was rejected because it requires project teams to maintain canonical template slides per client — a significant setup burden for every new client or wave. Consulting teams won't do it consistently, and the system can't assume they will.
 
-**Implication: `pptx\\\_utils` must be robust enough to produce client-delivery quality without canonicals.** Brand definitions (`BRAND{}`), layout presets (`LAYOUTS{}`), and chart patterns (`CHART\\\_PATTERNS{}`) live in Python, not in template decks. The current system is already Option B — the problem isn't the approach, it's that the renderer was reverse-engineered from one J\&J deck and makes J\&J-specific assumptions. The fix is to make `pptx\\\_utils` general.
+**Implication: `pptx_utils` must be robust enough to produce client-delivery quality without canonicals.** Brand definitions (`BRAND{}`), layout presets (`LAYOUTS{}`), and chart patterns (`CHART_PATTERNS{}`) live in Python, not in template decks. The current system is already Option B — the problem isn't the approach, it's that the renderer was reverse-engineered from one J\&J deck and makes J\&J-specific assumptions. The fix is to make `pptx_utils` general.
 
 **Two rendering paths — both valid:**
 
 * **SlideSpec path (preferred):** Spec → `spec-validator` → `slide-creator` → deterministic PPTX. This is the repeatability path — the same spec produces the same slide every time, reviewable by any team member, reusable across waves.
-* **Direct Python path (exploratory):** Claude writes a \~30-line Python script directly assembling `pptx\_utils` calls, without going through a SlideSpec. Valid for one-off slides or exploratory work; does not produce a durable spec for refresh. The generated Python is the auditable artifact in this path. Siva (Apr 16): *"Having that as a flexible layer where you have a lot of these utils reverse engineered, you can put together many of these utils in a quick Python script to create that deck to start with."*
+* **Direct Python path (exploratory):** Claude writes a ~30-line Python script directly assembling `pptx_utils` calls, without going through a SlideSpec. Valid for one-off slides or exploratory work; does not produce a durable spec for refresh. The generated Python is the auditable artifact in this path. Siva (Apr 16): *"Having that as a flexible layer where you have a lot of these utils reverse engineered, you can put together many of these utils in a quick Python script to create that deck to start with."*
 
 In practice: SlideSpec path for all workflow-driven operations; direct Python path when exploring a new chart type or building outside a tracked workflow.
 
@@ -482,12 +482,12 @@ That's it. No hidden slides, no canonicals, no per-client rendering setup.
 
 The slide plan is the contract between intelligent skills and deterministic skills. A complete spec includes:
 
-* `slide\\\_id`, `slide\\\_type` (one of N chart types)
+* `slide_id`, `slide_type` (one of N chart types)
 * `headline` (talking header)
 * `data`: full values, labels, sort order, codes
 * `formatting`: colors, fonts, layout positions, period labels
 * `extras`: chart-type-specific parameters
-* `data\\\_source`: provenance (which question, which segment, which wave)
+* `data_source`: provenance (which question, which segment, which wave)
 
 The `spec-validator` skill enforces completeness before rendering. Renderers fail loudly on incomplete specs rather than inventing fallbacks.
 
@@ -515,18 +515,18 @@ Workflows are concrete and demonstrable. Skills emerge as artifacts of workflow 
 
 ### 6.6 Deck Analysis Findings (32 PET decks + 8 ATU decks)
 
-A reverse-engineering exercise analyzed every chart, table, headline, and coordinate in 32 real client PET decks. Full methodology + raw data in `experiments/deck\\\_analysis/outputs/ACTIONABLE\\\_FINDINGS.md`. Key findings that drive this PRD:
+A reverse-engineering exercise analyzed every chart, table, headline, and coordinate in 32 real client PET decks. Full methodology + raw data in `experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md`. Key findings that drive this PRD:
 
 **The 80/20 on chart types.** Top 6 chart types cover 88% of all client charts:
 
 |Chart type|Occurrences|%|
 |-|-|-|
-|`bar\\\_clustered` (horizontal)|1,511|35%|
-|`xy\\\_scatter` (abacus)|743|17%|
-|`line\\\_markers` (trended)|595|14%|
-|`column\\\_stacked\\\_100` (vertical)|486|11%|
-|`bar\\\_stacked\\\_100` (horizontal)|324|7%|
-|`bar\\\_stacked` (horizontal)|305|7%|
+|`bar_clustered` (horizontal)|1,511|35%|
+|`xy_scatter` (abacus)|743|17%|
+|`line_markers` (trended)|595|14%|
+|`column_stacked_100` (vertical)|486|11%|
+|`bar_stacked_100` (horizontal)|324|7%|
+|`bar_stacked` (horizontal)|305|7%|
 
 **Deterministic-first hypothesis validated.** Charts in real decks have almost no features that would require per-chart intelligence:
 
@@ -539,32 +539,32 @@ A reverse-engineering exercise analyzed every chart, table, headline, and coordi
 
 This means the slide plan spec can be **complete enough that deterministic rendering always produces correct output**. Renderers don't need to guess.
 
-**`pptx\\\_utils` inventory confirmed.** The OOXML properties that python-pptx does not expose — and that recur in real decks — are enumerable. A fixed list of \~20 `lxml\\\_helpers` functions covers 100% of observed needs. See `pptx\\\_utils/lxml\\\_helpers.py` (branch `vijay-slidegen`) for the current implementation.
+**`pptx_utils` inventory confirmed.** The OOXML properties that python-pptx does not expose — and that recur in real decks — are enumerable. A fixed list of ~20 `lxml_helpers` functions covers 100% of observed needs. See `pptx_utils/lxml_helpers.py` (branch `vijay-slidegen`) for the current implementation.
 
-**Canonical templates approach confirmed rejected.** No evidence across 32 decks that project teams maintain canonical chart templates in hidden slides. Rendering defaults live in `pptx\\\_utils`; brand-specific differentiation lives in `BRAND{}` alone.
+**Canonical templates approach confirmed rejected.** No evidence across 32 decks that project teams maintain canonical chart templates in hidden slides. Rendering defaults live in `pptx_utils`; brand-specific differentiation lives in `BRAND{}` alone.
 
-**BRAND{} and LAYOUTS{} populated from observation.** 17 client brand entries with series colors, fonts, and heading colors have been generated into `pptx\\\_utils/brand.py`. 6 layout presets with median coordinates from signature clusters (145 slides for `1\\\_chart\\\_1\\\_table`, 110 for `1\\\_chart\\\_2\\\_table`, etc.) have been generated into `pptx\\\_utils/layout.py`. Both live on branch `vijay-slidegen`.
+**BRAND{} and LAYOUTS{} populated from observation.** 17 client brand entries with series colors, fonts, and heading colors have been generated into `pptx_utils/brand.py`. 6 layout presets with median coordinates from signature clusters (145 slides for `1_chart_1_table`, 110 for `1_chart_2_table`, etc.) have been generated into `pptx_utils/layout.py`. Both live on branch `vijay-slidegen`.
 
-**Full-corpus regrounding via mass scan.** The 40-deck analysis established the initial baseline. `experiments/deck\_analysis/mass\_deck\_scanner.py` runs the same analysis at 10x scale across 400-500 client decks from the SharePoint archive (organized as `client/project/deck.pptx`). It extracts chart types, layout coordinates, brand colors, headline patterns, and component compositions, then **directly regenerates** `BRAND{}`, `LAYOUTS{}`, and `CHART\_PATTERNS{}` Python source from the full corpus — not a delta report, but a complete re-grounding. The generated files replace the current `pptx\_utils` modules after review. Sriram (Apr 16): *"When you build bottom up, it will get closer to exhaustive."* The scanner is resumable (saves every 25 decks), classifies decks by project type (PET/ATU/HCP-Pt/Digital Tracker/PCA/etc.) for coverage analysis, and the `experiments/deck\_analysis/visual\_regression.py` harness measures fidelity after each update.
+**Full-corpus regrounding via mass scan.** The 40-deck analysis established the initial baseline. `experiments/deck_analysis/mass_deck_scanner.py` runs the same analysis at 10x scale across 400-500 client decks from the SharePoint archive (organized as `client/project/deck.pptx`). It extracts chart types, layout coordinates, brand colors, headline patterns, and component compositions, then **directly regenerates** `BRAND{}`, `LAYOUTS{}`, and `CHART_PATTERNS{}` Python source from the full corpus — not a delta report, but a complete re-grounding. The generated files replace the current `pptx_utils` modules after review. Sriram (Apr 16): *"When you build bottom up, it will get closer to exhaustive."* The scanner is resumable (saves every 25 decks), classifies decks by project type (PET/ATU/HCP-Pt/Digital Tracker/PCA/etc.) for coverage analysis, and the `experiments/deck_analysis/visual_regression.py` harness measures fidelity after each update.
 
 ### 6.7 Slide Spec as the Contract
 
-The slide spec is a first-class artifact — the interface between intelligent planning skills and deterministic renderers. Implemented in `slidegen/slide\\\_spec/`:
+The slide spec is a first-class artifact — the interface between intelligent planning skills and deterministic renderers. Implemented in `slidegen/slide_spec/`:
 
-* **`slide\\\_spec/schema.py`** — Python dataclasses defining `SlideSpec` and its components (`ChartComponent`, `LabelTableComponent`, `ValueTableComponent`, `DeltaColumnComponent`, `CalloutComponent`, `ImageComponent`, `TextboxComponent`). JSON serde via `load\\\_spec()` / `dump\\\_spec()`.
-* **`slide\\\_spec/validator.py`** — `validate\\\_spec(spec)` returns list of errors; `validate\\\_spec(spec, strict=True)` raises. Checks completeness, layout/pattern/brand existence, color-token syntax, cross-component row-count coherence, position bounds.
+* **`slide_spec/schema.py`** — Python dataclasses defining `SlideSpec` and its components (`ChartComponent`, `LabelTableComponent`, `ValueTableComponent`, `DeltaColumnComponent`, `CalloutComponent`, `ImageComponent`, `TextboxComponent`). JSON serde via `load_spec()` / `dump_spec()`.
+* **`slide_spec/validator.py`** — `validate_spec(spec)` returns list of errors; `validate_spec(spec, strict=True)` raises. Checks completeness, layout/pattern/brand existence, color-token syntax, cross-component row-count coherence, position bounds.
 
 **Primary fidelity axes** (in priority order — slide-creator is measured against these):
 
 1. **Layout** — shape positions match observed real-deck clusters (≤0.1" drift). Validated against the 30 coordinate clusters from the Apr 15 deck analysis.
-2. **Visualization** — chart pattern matches one of the 10 `CHART\\\_PATTERNS` keys. Top 6 cover 88% of real charts; these are the hard P0 bar.
+2. **Visualization** — chart pattern matches one of the 10 `CHART_PATTERNS` keys. Top 6 cover 88% of real charts; these are the hard P0 bar.
 3. **Data** — categories × series shape matches; values render to the exact numeric labels expected.
 4. **Brand colors** — resolvable at render time, *not hardcoded into the schema*. Four resolution sources:
 
    * Explicit hex: `"#F75824"`
-   * `BRAND{}` token: `"{brand.primary\\\_current}"`
-   * Context file token: `"{context.brand\\\_palette.primary}"` (resolved from `market\\\_context.md` or `project\\\_context.md`)
-   * Deck-reader extraction: `"{deck.slide\\\_4.series\\\_0.color}"` (pulled from a prior wave PPTX by `deck-reader`)
+   * `BRAND{}` token: `"{brand.primary_current}"`
+   * Context file token: `"{context.brand_palette.primary}"` (resolved from `market_context.md` or `project_context.md`)
+   * Deck-reader extraction: `"{deck.slide_4.series_0.color}"` (pulled from a prior wave PPTX by `deck-reader`)
 
 Tokens are resolved by `slide-creator` at render time, not at spec creation time — which means the same spec is portable across brands and refresh cycles without rewriting.
 
@@ -579,7 +579,7 @@ Tokens are resolved by `slide-creator` at render time, not at spec creation time
 **Tier 1 — Trusted tag (preferred).** For shapes carrying a Connector tag that passes all 5 health checks:
 
 * Shape tag `ReportConfigHash` → SHA256 key into a Custom XML Part holding the `ReportConfigDto` JSON
-* The config DTO provides canonical identifiers: `ProjectId`, `ReportingPlanId`, `AnalysisIds\\\[]`, `SurveyId`, `SegmentIds\\\[]`, `StaticTimePeriodIds\\\[]` or `DynamicTimePeriod{LatestNDeliverables, IncludeLiveWave}` (deliverables), `AnalysisType`
+* The config DTO provides canonical identifiers: `ProjectId`, `ReportingPlanId`, `AnalysisIds\[]`, `SurveyId`, `SegmentIds\[]`, `StaticTimePeriodIds\[]` or `DynamicTimePeriod{LatestNDeliverables, IncludeLiveWave}` (deliverables), `AnalysisType`
 * Additional shape tags: `DataFrameConfigHashTag` (pivot config), `MappingConfig` (field-to-visual mapping), `LastRefreshTime`, `ColumnKeyLabelMap`, `RefreshErrorMsgTag`
 * These fields populate `DataLineage` directly — no inference required
 
@@ -594,10 +594,10 @@ Tokens are resolved by `slide-creator` at render time, not at spec creation time
 **Tier 2 — Structural inference (fallback).** For untagged shapes AND shapes whose tag failed any health check:
 
 * Parses headline text, chart pattern, category labels, and embedded table content
-* Cross-references against project config (`config.yaml`, `source\\\_data.json`) to propose likely extraction method + question codes
+* Cross-references against project config (`config.yaml`, `source_data.json`) to propose likely extraction method + question codes
 * Surfaces inference confidence with the spec; user confirmation only on `confidence="low"` inferences (driven by inference quality, NOT tag status)
-* Writes best-effort `DataLineage` into legacy fields (`data\\\_source`, `extraction\\\_method`, `question\\\_codes`, `source\\\_file`)
-* Failed-tag content preserved in `metadata.original\\\_tag\\\_lineage` for audit trail (not used for refresh)
+* Writes best-effort `DataLineage` into legacy fields (`data_source`, `extraction_method`, `question_codes`, `source_file`)
+* Failed-tag content preserved in `metadata.original_tag_lineage` for audit trail (not used for refresh)
 
 **Why two tiers, not three.** An earlier design had a "suspect" middle tier that required user confirmation per unhealthy tag. That's unusable in practice — a 40-slide deck with 10 suspect tags means 10 confirmations before refresh starts. Worse, tag-suspect cases are the ones where the chart has been manually edited — Tier 2 inference from the chart's actual content is a better source than a lineage the chart has drifted from.
 
@@ -612,10 +612,10 @@ Tokens are resolved by `slide-creator` at render time, not at spec creation time
 
 **Refresh workflow implications:**
 
-* **Tier 1 path**: deterministic — `deck-reader` → `DataLineage` with `reporting\\\_plan\\\_id`+`analysis\\\_ids` → `synapse-cli` fetches new data → `slide-updater` re-renders → tags updated with new `LastRefreshTime`
-* **Tier 2 path**: best-effort — `deck-reader` → inferred `DataLineage` with `question\\\_codes`+`source\\\_file` → Excel extraction via existing `data\\\_loaders` → `slide-updater` re-renders → user shown before/after for confirmation
+* **Tier 1 path**: deterministic — `deck-reader` → `DataLineage` with `reporting_plan_id`+`analysis_ids` → `synapse-cli` fetches new data → `slide-updater` re-renders → tags updated with new `LastRefreshTime`
+* **Tier 2 path**: best-effort — `deck-reader` → inferred `DataLineage` with `question_codes`+`source_file` → Excel extraction via existing `data_loaders` → `slide-updater` re-renders → user shown before/after for confirmation
 
-**Audit trail.** Every refreshed slide (either tier) ends up with `last\\\_data\\\_pull` (and `last\\\_refresh\\\_error` if applicable) in its spec lineage, mirroring the Connector's `LastRefreshTime`/`RefreshErrorMsgTag` pattern. The `shape\\\_registry.json` + spec together form the audit record.
+**Audit trail.** Every refreshed slide (either tier) ends up with `last_data_pull` (and `last_refresh_error` if applicable) in its spec lineage, mirroring the Connector's `LastRefreshTime`/`RefreshErrorMsgTag` pattern. The `shape_registry.json` + spec together form the audit record.
 
 See Galen-PowerPoint repo: `Docs/Export Import Tags - PRD.md` (Connector DTO-to-Excel column mapping), `Constants.cs` (shape tag constants), `Services/ShapeConfigurationServiceBase.cs` (hash-based config read). Reference these when implementing `deck-reader` Tier 1.
 
@@ -638,10 +638,10 @@ Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16)
 * Data fidelity — output values match source data exactly
 * Headline freshness — no stale headlines from prior wave (§6.10 principle)
 * Layout stability — no unexpected layout shifts when data shape is unchanged
-* Lineage completeness — `shape\_registry.json` has `last\_data\_pull` stamped on all refreshed slides
+* Lineage completeness — `shape_registry.json` has `last_data_pull` stamped on all refreshed slides
 * Regression — slides that should NOT change are unchanged
 
-**Where evals live:** `tests/evals/` — each eval is a directory with `input/` (prior wave PPTX + modified Excel), `expected/` (expected output metadata — not full PPTX), and a `run\_eval.py` that compares actual vs expected.
+**Where evals live:** `tests/evals/` — each eval is a directory with `input/` (prior wave PPTX + modified Excel), `expected/` (expected output metadata — not full PPTX), and a `run_eval.py` that compares actual vs expected.
 
 ### 6.10 Headlines must refresh with data
 
@@ -649,20 +649,20 @@ Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16)
 
 **Implementation:**
 
-* `slide-updater` invokes `headline-writer` by default after updating data. Caller passes `preserve\\\_headline=True` only when they've explicitly reconciled the text against new numbers (e.g. a wording-only edit where data is unchanged).
+* `slide-updater` invokes `headline-writer` by default after updating data. Caller passes `preserve_headline=True` only when they've explicitly reconciled the text against new numbers (e.g. a wording-only edit where data is unchanged).
 * Subheadline period references ("Q3 '25 vs Q4 '25") are rewritten when period labels shift.
-* `refresh-deck-workflow` regenerates `narrative\\\_threads.md` from new data *before* invoking `slide-updater` per slide — so updated headlines inherit from a fresh narrative backbone, not last wave's arcs.
+* `refresh-deck-workflow` regenerates `narrative_threads.md` from new data *before* invoking `slide-updater` per slide — so updated headlines inherit from a fresh narrative backbone, not last wave's arcs.
 * `deck-audit-workflow` flags any slide whose headline text contradicts the rendered data (BLOCKER severity).
 
 **Why this is explicit:** a previous iteration of `slide-updater` preserved headlines by default. That was wrong. Data + stale headline is the most visible kind of error in a client-ready deck and the hardest to spot in QA because the chart looks fine.
 
 \---
 
-## 7\. What We Keep vs. What We Discard
+## 7. What We Keep vs. What We Discard
 
 ### From the Vinoth experiment, KEEP:
 
-* Slide plan generation skills (`slide-plan-generator-hypothesis`) through narrative\_threads, validated\_analysis, slide\_plan — Vinoth is happy with these
+* Slide plan generation skills (`slide-plan-generator-hypothesis`) through narrative_threads, validated_analysis, slide_plan — Vinoth is happy with these
 * Context-building skills (project, market, prior wave, survey) — foundational and reusable
 * Skills framework pattern (CLAUDE.md, .claude/skills/, project folder structure)
 * Synapse CLI (Rajesh's work — wrap as tool)
@@ -693,7 +693,7 @@ Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16)
 
 \---
 
-## 8\. Technical Architecture
+## 8. Technical Architecture
 
 ### 8.1 Repository Structure (Target)
 
@@ -727,31 +727,31 @@ galen-consulting-r3m-report/
 ├── slidegen/
 │   ├── pipeline/
 │   │   ├── orchestrator.py
-│   │   ├── slide\\\_renderers/         # General-purpose renderers (22 types)
-│   │   ├── data\\\_loaders.py          # Four-track data access
-│   │   ├── config\\\_generator.py      # scaffold\\\_config\\\_from\\\_plan()
+│   │   ├── slide_renderers/         # General-purpose renderers (22 types)
+│   │   ├── data_loaders.py          # Four-track data access
+│   │   ├── config_generator.py      # scaffold_config_from_plan()
 │   │   └── ...
-│   ├── pptx\\\_utils/                  # ★ Composition primitives (co-equal building block)
+│   ├── pptx_utils/                  # ★ Composition primitives (co-equal building block)
 │   │   ├── brand.py                 # BRAND{} — per-client color/font defs
 │   │   ├── layout.py                # LAYOUTS{} — coordinate presets
-│   │   ├── shapes.py                # textbox, solidrect, horiz\\\_line, ...
-│   │   ├── charts.py                # CHART\\\_PATTERNS{}, chart builders
-│   │   ├── tables.py                # delta\\\_table, value\\\_table
-│   │   ├── text.py                  # format\\\_run, delta\\\_format, ...
-│   │   ├── images.py                # add\\\_logo, insert\\\_image
-│   │   ├── deck.py                  # open\\\_template, clear\\\_slide, save\\\_deck
-│   │   ├── lxml\\\_helpers.py          # set\\\_plot\\\_area\\\_gap, invert\\\_cat\\\_axis, ...
-│   │   ├── registry.py              # reconcile, register\\\_shape, ...
+│   │   ├── shapes.py                # textbox, solidrect, horiz_line, ...
+│   │   ├── charts.py                # CHART_PATTERNS{}, chart builders
+│   │   ├── tables.py                # delta_table, value_table
+│   │   ├── text.py                  # format_run, delta_format, ...
+│   │   ├── images.py                # add_logo, insert_image
+│   │   ├── deck.py                  # open_template, clear_slide, save_deck
+│   │   ├── lxml_helpers.py          # set_plot_area_gap, invert_cat_axis, ...
+│   │   ├── registry.py              # reconcile, register_shape, ...
 │   │   └── com.py                   # win32com helpers for live editing
-│   ├── slide\\\_spec/                  # ★ the spec contract (schema + validator)
+│   ├── slide_spec/                  # ★ the spec contract (schema + validator)
 │   │   ├── schema.py                # SlideSpec + components (dataclasses)
-│   │   ├── validator.py             # validate\\\_spec() — completeness + semantics
-│   │   ├── \\\_\\\_init\\\_\\\_.py              # Re-exports for external use
+│   │   ├── validator.py             # validate_spec() — completeness + semantics
+│   │   ├── __init__.py              # Re-exports for external use
 │   │   └── examples/                # Canonical example specs per chart pattern
-│   ├── deck\\\_reader/                 # parse existing decks (dual-mode per §6.8)
-│   │   ├── tag\\\_reader.py            # Tier 1 — Connector tag extraction
+│   ├── deck_reader/                 # parse existing decks (dual-mode per §6.8)
+│   │   ├── tag_reader.py            # Tier 1 — Connector tag extraction
 │   │   └── inference.py             # Tier 2 — structural inference fallback
-│   ├── viz\\\_selector/                # Metric > Q-type > HITL (deterministic)
+│   ├── viz_selector/                # Metric > Q-type > HITL (deterministic)
 │   ├── create.py                    # SlideBuilder class (python-pptx creation)
 │   ├── edit.py                      # LiveEditor class (win32com live editing)
 │   └── reconcile.py                 # Registry reconciliation from live PPT
@@ -767,8 +767,8 @@ Every skill has a SKILL.md with:
 * `inputs`: required and optional
 * `outputs`: what it produces
 * `tools`: which tools it calls
-* `composed\\\_skills`: which other skills it invokes
-* `example\\\_invocations`: sample usage
+* `composed_skills`: which other skills it invokes
+* `example_invocations`: sample usage
 * `pitfalls`: common failure modes
 
 ### 8.3 Project Setup Assets (minimal)
@@ -776,10 +776,10 @@ Every skill has a SKILL.md with:
 Project teams provide upfront — and only these:
 
 * **Client Slide Master Deck** (required) — client-provided template with layouts, logos, disclaimers. Slide master only — NO canonical chart templates required.
-* **Product→Color Map** (required) — JSON/Excel mapping brand names (+ aliases) to RGB/hex colors. Added to `BRAND{}` in `pptx\\\_utils/brand.py`.
-* **Project Metadata Config** (required) — Synapse `project\_id`, `reporting\_plan\_id`, `deliverable\_ids` (static period IDs) or dynamic period config (`latest\_n\_deliverables` + `include\_live\_wave`), `analysis\_ids`, industry-average filter IDs. These are the same identifiers the Galen-PowerPoint Connector stamps onto shapes (§6.8) — SlideGen reads them from the config when generating a new deck, and reads them from shape tags when refreshing an existing one.
+* **Product→Color Map** (required) — JSON/Excel mapping brand names (+ aliases) to RGB/hex colors. Added to `BRAND{}` in `pptx_utils/brand.py`.
+* **Project Metadata Config** (required) — Synapse `project_id`, `reporting_plan_id`, `deliverable_ids` (static period IDs) or dynamic period config (`latest_n_deliverables` + `include_live_wave`), `analysis_ids`, industry-average filter IDs. These are the same identifiers the Galen-PowerPoint Connector stamps onto shapes (§6.8) — SlideGen reads them from the config when generating a new deck, and reads them from shape tags when refreshing an existing one.
 
-Assets live in the project workspace. Brand colors become a `BRAND{}` entry in `pptx\\\_utils`; layouts are Python constants in `pptx\\\_utils/layout.py`.
+Assets live in the project workspace. Brand colors become a `BRAND{}` entry in `pptx_utils`; layouts are Python constants in `pptx_utils/layout.py`.
 
 **What project teams do NOT provide:**
 
@@ -788,7 +788,7 @@ Assets live in the project workspace. Brand colors become a `BRAND{}` entry in `
 * No theme `.thmx` files
 * No per-slide-type rendering hints
 
-All rendering knowledge lives in `pptx\\\_utils` (Python). Project teams provide branding + data, not rendering setup.
+All rendering knowledge lives in `pptx_utils` (Python). Project teams provide branding + data, not rendering setup.
 
 ### 8.4 Tool Contracts
 
@@ -796,14 +796,14 @@ Skills invoke tools via stable interfaces. Example:
 
 ```python
 # synapse-read skill calls Synapse CLI tool
-synapse\\\_cli.report\\\_pull(analysis\\\_id=99812, quarter="Q1-2026")
+synapse_cli.report_pull(analysis_id=99812, quarter="Q1-2026")
 ```
 
 Tools abstract external systems. Skills don't know about auth, retries, polling — the tool handles it.
 
 \---
 
-## 9\. Q3 Scope
+## 9. Q3 Scope
 
 **Target:** All 8 workflows working end-to-end across PET + ATU project types by end of Q3, with HCP-Pt + Digital Tracker + PCA project skills built in parallel by their respective project-team contributors using the same building blocks. Not an MVP — a **fully functional product across all core project types**. Deferring entire workflows to Q4 is not acceptable; sequencing *within* workflows (core paths before edge cases) is.
 
@@ -813,7 +813,7 @@ Primitives are the investment; workflows are the composition. Once the primitive
 
 **Rendering fidelity** — the atomic unit. Every workflow composes into it.
 
-* `slidegen/slide\_spec/` — spec schema + validator (DONE)
+* `slidegen/slide_spec/` — spec schema + validator (DONE)
 * `slide-creator` Python renderer — takes validated spec, produces one client-ready slide. Zero intelligence. (DONE; line/doughnut Repair bug outstanding)
 * Visual regression harness against the 30 coordinate clusters from Apr 15 deck analysis (≤0.1" drift on top-6 chart patterns)
 * Top-6 chart patterns (88% of real PET charts) proven to client-delivery parity
@@ -837,9 +837,9 @@ Once these primitives are feature-complete, workflow orchestration is trivial �
 
 ### 9.2 Workflow shipping
 
-The 8 workflow orchestrators ship at \~2/week once primitives are solid. Ship order reflects risk and strategic value:
+The 8 workflow orchestrators ship at ~2/week once primitives are solid. Ship order reflects risk and strategic value:
 
-1. **`edit-slide-workflow`** — end-to-end shake-down of the full stack (rebuild mode first, then data\_refresh + edit modes)
+1. **`edit-slide-workflow`** — end-to-end shake-down of the full stack (rebuild mode first, then data_refresh + edit modes)
 2. **`refresh-deck-workflow`** — primary Q3 demo; exercises deck-reader Tier 1 + Tier 2 + slide-updater + headline-writer
 3. **`create-deck-workflow`** — full briefing + hypothesis modes on new primitives
 4. **`add-slide-workflow`** — client-followup + segment-new-slide paths
@@ -852,8 +852,8 @@ The 8 workflow orchestrators ship at \~2/week once primitives are solid. Ship or
 
 |Date|Milestone|Definition of Done|
 |-|-|-|
-|**Apr 15 — DONE**|Deck analysis + `pptx\_utils` foundation|32 PET decks + 8 ATU decks analyzed; 18 BRAND entries, 11 LAYOUTS, 10 CHART\_PATTERNS, 9 new `lxml\_helpers` landed|
-|**Apr 16 — DONE**|Spec contract + slide-creator Python|`slidegen/slide\_spec/` + `slidegen/slide\_creator.py`; all 10 chart patterns render; 20 canonical example specs covering \~55% of real PET slide compositions|
+|**Apr 15 — DONE**|Deck analysis + `pptx_utils` foundation|32 PET decks + 8 ATU decks analyzed; 18 BRAND entries, 11 LAYOUTS, 10 CHART_PATTERNS, 9 new `lxml_helpers` landed|
+|**Apr 16 — DONE**|Spec contract + slide-creator Python|`slidegen/slide_spec/` + `slidegen/slide_creator.py`; all 10 chart patterns render; 20 canonical example specs covering ~55% of real PET slide compositions|
 |**Apr 16 — DONE**|Edit-mode + spec-producer primitives|`deck-reader` (dual-mode), `slide-updater`, `slide-editor`, `deck-assembler`, `viz-selector`, `layout-selector`, `headline-writer`, `callout-writer`, all `slide-plan-generator-\*`, all 3 analysis skills (`segment-comparator`, `stat-sig-annotator`, `trend-analyzer`)|
 |**End of Apr**|Rendering fidelity complete + evals bootstrapped|Visual regression passing on top-6 chart patterns × representative brands. Line/doughnut Repair bug closed. Connector-tag integration tested on real tagged PET deck. **Evals harness started** (`tests/evals/`) with ≥1 refresh eval using prior JJ RYB deck.|
 |**Mid-May**|First workflow end-to-end|`edit-slide-workflow` (rebuild mode) produces a refreshed slide on a real PET deck, audit trail intact.|
@@ -876,14 +876,14 @@ HCP-Pt, Digital Tracker, and PCA are **target Q3 deliverables** — built in par
 **Dependency:** this hinges on project-team contributors being identified, made available, and onboarded to the building blocks in the first half of Q3. Specifically:
 
 * **Contributor identification** — who owns the project skill for each of HCP-Pt / DT / PCA? Not yet assigned. Needs Sriram/Siva alignment before mid-May.
-* **Onboarding ramp** — a contributor who's never written a SlideGen skill before needs \~1 week of hands-on time with `pet-deck` to understand the pattern + building blocks.
+* **Onboarding ramp** — a contributor who's never written a SlideGen skill before needs ~1 week of hands-on time with `pet-deck` to understand the pattern + building blocks.
 * **Core team support** — Vijay/Bharadvaj/Pradeep need bandwidth to unblock contributors when they hit framework gaps. Estimated 20-30% of core-team time in weeks 8-13.
 
 **If contributors aren't available in time:** Q3 target falls back to "PET + ATU first-party complete, with HCP-Pt / DT / PCA skills scaffolded and ready for project-team landing in early Q4." That's still a better bar than the original "PET-only Q3" framing — but not the full 5-project Q3 target. The PRD names the full target explicitly so the resourcing dependency is visible early.
 
 \---
 
-## 10\. Risks \& Open Questions
+## 10. Risks \& Open Questions
 
 ### 10.1 Risks
 
@@ -895,27 +895,27 @@ HCP-Pt, Digital Tracker, and PCA are **target Q3 deliverables** — built in par
 |Wave refresh harder than new deck (backward compat)|Run parallel tracks — don't block new deck on refresh learnings.|
 |`viz-selector` rules get complex as edge cases emerge|Start with 10-15 most common metric/q-type mappings. Extend incrementally.|
 |Token cost at scale|Sriram said later concern. May switch models by skill type (Sonnet for rendering, Opus for planning).|
-|Skills become tightly coupled (repeat the prior-experiment mistake)|Explicit review: every skill declares inputs, outputs, composed\_skills in SKILL.md. No hidden assumptions. spec-validator enforces the contract at every boundary.|
+|Skills become tightly coupled (repeat the prior-experiment mistake)|Explicit review: every skill declares inputs, outputs, composed_skills in SKILL.md. No hidden assumptions. spec-validator enforces the contract at every boundary.|
 
 ### 10.2 Open Questions
 
-1. **How do we version skills + `pptx\\\_utils`?** Git-based, but how do users opt into new versions? OneDrive-sync model from existing docs?
+1. **How do we version skills + `pptx_utils`?** Git-based, but how do users opt into new versions? OneDrive-sync model from existing docs?
 2. **Skill registry mechanism:** does Claude Code auto-discover skills from directory structure, or explicit manifest?
-3. **How does `viz-selector` remember per-project overrides?** If a user overrides viz-selector's default for a given metric on one slide, should that override apply project-wide (persist as a local override to `METRIC\_TAG\_MAP`) or only to that slide? Currently per-slide-only via `edit-slide-workflow`. Project-level persistence is a possible future enhancement.
+3. **How does `viz-selector` remember per-project overrides?** If a user overrides viz-selector's default for a given metric on one slide, should that override apply project-wide (persist as a local override to `METRIC_TAG_MAP`) or only to that slide? Currently per-slide-only via `edit-slide-workflow`. Project-level persistence is a possible future enhancement.
 4. **What's the contract for `deck-reader` on client-branded decks?** Does it round-trip perfectly, or lose fidelity?
 5. **Should `analysis-trace-store` persist in the deck itself (shape metadata) or in a separate project-level store?**
 6. **For `executive-summary-writer`: how do we constrain hallucination?** Guardrails on citations, confidence indicators.
-7. **When does Claude write inline lxml vs. call `pptx\\\_utils`?** Siva's "start thin, grow deliberately" principle — at what threshold does a repeated inline pattern get extracted into the library?
+7. **When does Claude write inline lxml vs. call `pptx_utils`?** Siva's "start thin, grow deliberately" principle — at what threshold does a repeated inline pattern get extracted into the library?
 
 ### 10.3 Resolved questions
 
 Concretely answered during PRD iteration — captured here so the rationale isn't lost:
 
 * ✅ **When does `slide-creator` render from scratch vs. use canonical templates?** → Fully from-scratch. The Apr 15 deck analysis found no evidence of hidden canonical templates in any of the 32 decks. Brand differentiation is achievable via `BRAND{}` + `LAYOUTS{}` Python constants alone.
-* ✅ **How does `viz-selector` resolve ambiguity?** → Deterministic rule: (1) 36 pre-mapped pharma metric tags → chart pattern (from Apr 15 analysis of 4,354 real PET charts — full table in §6.1); (2) question type default for unrecognized metrics (likert → bar\_clustered\_horizontal, etc.); (3) `"UNRESOLVED"` sentinel when neither path applies, which `spec-validator` rejects, forcing the planner to surface an HITL prompt. **Users can always override** viz-selector's default via `edit-slide-workflow` edit mode with the `set\_chart\_pattern` action — the selector provides a default, not a prescription.
-* ✅ **Test strategy for `pptx\\\_utils` regression?** → Use the 30 coordinate clusters + per-chart OOXML inventory as a golden reference. For each renderer, compare against the corresponding real-deck signature cluster. Harness proposed in `experiments/deck\\\_analysis/outputs/ACTIONABLE\\\_FINDINGS.md`.
-* ✅ **How are brand colors sourced?** → Resolvable at render time from 4 sources: explicit hex, `BRAND{}` token, context-file reference (`market\\\_context.md` / `project\\\_context.md`), or deck-reader extraction from prior wave PPTX. `BRAND{}` is a convenience default, not a requirement. The spec carries color tokens; `slide-creator` resolves them. See §6.7.
-* ✅ **What is the spec-as-contract implementation?** → `slidegen/slide\\\_spec/` subpackage with `schema.py` (dataclasses) + `validator.py`. See §6.7.
+* ✅ **How does `viz-selector` resolve ambiguity?** → Deterministic rule: (1) 36 pre-mapped pharma metric tags → chart pattern (from Apr 15 analysis of 4,354 real PET charts — full table in §6.1); (2) question type default for unrecognized metrics (likert → bar_clustered_horizontal, etc.); (3) `"UNRESOLVED"` sentinel when neither path applies, which `spec-validator` rejects, forcing the planner to surface an HITL prompt. **Users can always override** viz-selector's default via `edit-slide-workflow` edit mode with the `set_chart_pattern` action — the selector provides a default, not a prescription.
+* ✅ **Test strategy for `pptx_utils` regression?** → Use the 30 coordinate clusters + per-chart OOXML inventory as a golden reference. For each renderer, compare against the corresponding real-deck signature cluster. Harness proposed in `experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md`.
+* ✅ **How are brand colors sourced?** → Resolvable at render time from 4 sources: explicit hex, `BRAND{}` token, context-file reference (`market_context.md` / `project_context.md`), or deck-reader extraction from prior wave PPTX. `BRAND{}` is a convenience default, not a requirement. The spec carries color tokens; `slide-creator` resolves them. See §6.7.
+* ✅ **What is the spec-as-contract implementation?** → `slidegen/slide_spec/` subpackage with `schema.py` (dataclasses) + `validator.py`. See §6.7.
 * ✅ **How do we extract data lineage from existing decks for refresh workflows?** → Dual-mode `deck-reader`. Tier 1 reads Galen-PowerPoint Connector tags (`ReportConfigHash` → Custom XML Part) for canonical Synapse lineage. Tier 2 falls back to structural inference with user confirmation for untagged shapes. Not every deck is Connector-authored, so Tier 2 is required. See §6.8.
 * ✅ **What's the priority order for fidelity?** → Layout, then visualization, then data, then brand colors. Brand colors are parameterized inputs; the first three axes are where `slide-creator` must deliver pixel/numeric parity with real decks. See §6.7.
 * ✅ **Q3 target — PET-only or broader?** → PET + ATU land first-party (weeks 1-9); HCP-Pt + Digital Tracker + PCA project skills land in parallel via project-team contributors (weeks 9-13), using the same building blocks. All 8 workflows × all 5 project types by end of Q3, with dogfooding on ≥2 live PET projects + 1 ATU. See §9.3 + §9.5.
@@ -923,7 +923,7 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 
 \---
 
-## 11\. Appendix
+## 11. Appendix
 
 ### 11.1 Relationship to Other Docs
 
@@ -932,9 +932,9 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * **Synapse CLI Proposal** — defines the data access layer SlideGen depends on. `synapse-read` wraps this CLI as a tool. Platform setup tasks (create segments, VQs, reporting plans, methodology configs) are the CLI's own responsibility, invoked directly by users outside SlideGen.
 * **Galen-PowerPoint Synapse Connector** — the existing PowerPoint add-in that stamps ReportConfig/PivotConfig/MappingConfig tags onto shapes. SlideGen's `deck-reader` leverages these tags as the Tier 1 (preferred) source of data lineage for refresh workflows. See §6.8. Key references: `Docs/Export Import Tags - PRD.md`, `Constants.cs`, `Services/ShapeConfigurationServiceBase.cs`.
 * **Original PPT Agent Brief (Sep 2025)** — source of several workflows (edit, add, segment analysis, executive summary) and architectural concepts (viz hierarchy, multi-element assembly, analysis traces). Superseded in modality (embedded-in-PPT → Claude Code terminal) but many ideas survive.
-* **Siva's SlideGen PRD (Mar 10, 2026)** — at `docs/SlideGen\_PRD.md`. The implementation blueprint (four-track data layer, win32com live editing, shape registry reconciliation, audit chain). This PRD (v1.1) is strategic direction; Siva's is the technical blueprint. Complementary, not contradictory.
-* **Existing SlideGen Workflow** — at `galen-consulting-r3m-report/docs/slidegen\\\_workflow.md`. Current 8-stage pipeline documentation.
-* **Deck Analysis** — at `experiments/deck\_analysis/` on branch `vijay-slidegen`. Two rounds: (1) 32 PET decks across 17 clients (Apr 15) — produced ACTIONABLE\_FINDINGS.md, deep\_report.md, layout\_clusters.md, plus JSON outputs. Source of the populated pptx\_utils. (2) 8 ATU decks across 7 clients (Apr 16) — produced atu\_analysis.md with ATU-vs-PET structural comparison. Source of the atu-deck project skill and atu-insight-writer.
+* **Siva's SlideGen PRD (Mar 10, 2026)** — at `docs/SlideGen_PRD.md`. The implementation blueprint (four-track data layer, win32com live editing, shape registry reconciliation, audit chain). This PRD (v1.1) is strategic direction; Siva's is the technical blueprint. Complementary, not contradictory.
+* **Existing SlideGen Workflow** — at `galen-consulting-r3m-report/docs/slidegen_workflow.md`. Current 8-stage pipeline documentation.
+* **Deck Analysis** — at `experiments/deck_analysis/` on branch `vijay-slidegen`. Two rounds: (1) 32 PET decks across 17 clients (Apr 15) — produced ACTIONABLE_FINDINGS.md, deep_report.md, layout_clusters.md, plus JSON outputs. Source of the populated pptx_utils. (2) 8 ATU decks across 7 clients (Apr 16) — produced atu_analysis.md with ATU-vs-PET structural comparison. Source of the atu-deck project skill and atu-insight-writer.
 * **Agentic MR PRD** — broader client-facing platform vision. SlideGen is an internal capability toward that vision; this PRD scopes it to internal use for Q3.
 
 ### 11.2 Glossary
@@ -944,11 +944,11 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * **Workflow skill:** Top-level orchestration skill mapping user intent to a composed sequence.
 * **Project-type skill:** Skill encoding methodology for one project type (PET, ATU, etc.).
 * **Atomic skill:** Single-purpose skill (slide-creator, viz-selector, etc.).
-* **`pptx\\\_utils`:** Python package of composition primitives (brand, layouts, shape builders, chart builders, lxml helpers). Co-equal building block with skills.
-* **Generated script:** \~30-line glue code Claude writes per slide, composing `pptx\\\_utils` calls per skill instructions. Disposable.
+* **`pptx_utils`:** Python package of composition primitives (brand, layouts, shape builders, chart builders, lxml helpers). Co-equal building block with skills.
+* **Generated script:** ~30-line glue code Claude writes per slide, composing `pptx_utils` calls per skill instructions. Disposable.
 * **Spec:** Slide plan output. Contract between intelligent and deterministic skills.
 * **Spec contract:** The required parameters a renderer needs. Enforced by spec-validator.
-* **BRAND{} / LAYOUTS{} / CHART\_PATTERNS{}:** Python dicts in `pptx\\\_utils` encoding per-client colors/fonts, coordinate presets, and named chart patterns respectively.
+* **BRAND{} / LAYOUTS{} / CHART_PATTERNS{}:** Python dicts in `pptx_utils` encoding per-client colors/fonts, coordinate presets, and named chart patterns respectively.
 
 ### 11.3 Key Quotes
 
@@ -966,7 +966,7 @@ All 8 workflows are in Q3 scope. Ship order reflects §9.2 — smallest-risk fir
 
 |#|Workflow|Skills Used|Ship Order|
 |-|-|-|-|
-|3|Edit slide|edit-slide-workflow, deck-reader, spec-validator, slide-updater, slide-editor, headline-writer, slide-creator, deck-assembler|1 (shake-down — rebuild mode first, then data\_refresh and edit modes)|
+|3|Edit slide|edit-slide-workflow, deck-reader, spec-validator, slide-updater, slide-editor, headline-writer, slide-creator, deck-assembler|1 (shake-down — rebuild mode first, then data_refresh and edit modes)|
 |2|Refresh deck|refresh-deck-workflow, pet-deck, deck-reader (Tier 1+2), prior-wave-context-builder, synapse-read, slide-plan-generator-refresh, slide-updater, slide-creator, trend-analyzer, headline-writer, deck-assembler|2 (primary demo)|
 |1|Create deck|create-deck-workflow, pet-deck, context-builders, hypothesis-generator, insight-writer (sfea or atu per project type), slide-plan-generator-hypothesis, viz-selector, layout-selector, headline-writer, slide-creator, deck-assembler|3|
 |4|Add slide|add-slide-workflow, deck-reader, synapse-read, slide-plan-generator-single, viz-selector, layout-selector, headline-writer, slide-creator, (segment-comparator + stat-sig-annotator for segment mode), deck-assembler|4|
