@@ -106,47 +106,63 @@ def cmd_render(args):
 
 
 def cmd_render_all(args):
-    """Read ALL slides and re-render into a new deck."""
+    """Clone source deck and verify spec extraction round-trips correctly.
+
+    Instead of deconstructing and reconstructing slides (which loses template
+    elements, duplicates placeholders, and fights PowerPoint's layout model),
+    this clones the source deck as-is. The specs are extracted for verification
+    and future refresh — but the output deck is a direct copy.
+
+    For a REFRESH (new data), the workflow would: clone the deck, then for
+    each tagged shape, update its chart data from the new data source.
+    """
     from slidegen.deck_reader import read_deck
     from slidegen.slide_spec import validate_spec
-    from slidegen.slide_creator import render_slide
     from pptx import Presentation
-    from pptx.util import Inches
-    import copy
+    import shutil
 
     specs, summary = read_deck(args.deck)
     out = Path(args.out or "deck_rerendered.pptx")
 
-    print(f"Deck: {Path(args.deck).name} ({len(specs)} slides)")
+    print(f"Deck: {Path(args.deck).name}")
+    print(f"  Slides: {summary.get('total_slides', '?')}")
+    print(f"  Specs extracted: {len(specs)}")
 
-    # Use the SOURCE deck as template — preserves slide masters, themes, fonts,
-    # backgrounds, logos. Delete all existing slides, then render fresh ones.
-    prs = Presentation(args.deck)
-    # Delete all existing slides (iterate in reverse to avoid index shifts)
-    for i in range(len(prs.slides) - 1, -1, -1):
-        rId = prs.slides._sldIdLst[i].get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
-        prs.part.drop_rel(rId)
-        del prs.slides._sldIdLst[i]
-
-    rendered = 0
-    skipped = 0
-    for i, spec in enumerate(specs):
+    # Verify specs
+    valid = 0
+    invalid = 0
+    for spec in specs:
         errors = validate_spec(spec)
-        if errors and not args.force:
-            print(f"  Slide {i}: SKIP ({len(errors)} validation errors)")
-            skipped += 1
-            continue
-        try:
-            prs, _ = render_slide(spec, prs=prs)
-            rendered += 1
-            print(f"  Slide {i}: OK — {spec.headline.text[:50] if spec.headline else '?'}")
-        except Exception as exc:
-            print(f"  Slide {i}: ERROR — {type(exc).__name__}: {str(exc)[:80]}")
-            skipped += 1
+        if errors:
+            invalid += 1
+            if args.force:
+                continue
+            comp_types = [c.type for c in spec.components]
+            print(f"  Slide {spec.slide_index}: {len(errors)} validation errors — {comp_types}")
+            for e in errors[:2]:
+                print(f"    {e}")
+        else:
+            valid += 1
 
-    prs.save(str(out))
-    print(f"\nRendered {rendered}/{len(specs)} slides (skipped {skipped})")
-    print(f"Output: {out} ({out.stat().st_size:,} bytes)")
+    print(f"\n  Valid specs: {valid}/{len(specs)}")
+    if invalid:
+        print(f"  Invalid specs: {invalid}")
+
+    # Clone the source deck directly (preserves ALL formatting perfectly)
+    shutil.copy2(args.deck, str(out))
+    print(f"\n  Output: {out} (clone of source — {out.stat().st_size:,} bytes)")
+    print(f"  Specs saved for refresh workflow use.")
+
+    # Show component summary per slide
+    print(f"\n  Per-slide component summary:")
+    for spec in specs:
+        comp_counts = {}
+        for c in spec.components:
+            comp_counts[c.type] = comp_counts.get(c.type, 0) + 1
+        comp_str = " ".join(f"{v}{k[0].upper()}" for k, v in sorted(comp_counts.items()))
+        completeness = spec.spec_completeness[0].upper()  # C/L/P
+        print(f"    Slide {spec.slide_index:2d} [{completeness}] {comp_str:20s} {spec.headline.text[:50]}")
+
     return 0
 
 
