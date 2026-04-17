@@ -1385,11 +1385,15 @@ def render_slide(
     slide = prs.slides.add_slide(prs.slide_layouts[blank_layout_idx])
     namer = ShapeNamer(spec.slide_index)
 
-    # 5. Apply chrome
-    _apply_section_bar(slide, spec, brand)
-    _apply_headline(slide, spec, brand)
-    _apply_subheadline(slide, spec, brand)
-    _apply_footer(slide, spec, brand)
+    # 5. Apply chrome — skip for deck-reader specs (they have their own headline
+    # as a component, and adding SlideGen chrome on top creates duplicates)
+    is_deck_reader = (spec.metadata and spec.metadata.created_by and
+                      "deck-reader" in spec.metadata.created_by)
+    if not is_deck_reader:
+        _apply_section_bar(slide, spec, brand)
+        _apply_headline(slide, spec, brand)
+        _apply_subheadline(slide, spec, brand)
+        _apply_footer(slide, spec, brand)
 
     # 6. Render components
     for component in spec.components:

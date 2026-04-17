@@ -31,8 +31,8 @@ from pptx.util import Inches, Emu
 
 from slidegen.slide_spec.schema import (
     SlideSpec, HeadlineSpec, FooterSpec, Position, DataLineage, DataLineageCandidate,
-    SlideMetadata, ChartComponent, LabelTableComponent, TextboxComponent,
-    ChartData, Series, ChartChrome, DataLabelsSpec, LegendSpec, AxisSpec,
+    SlideMetadata, ChartComponent, LabelTableComponent, ValueTableComponent,
+    TextboxComponent, ChartData, Series, ChartChrome, DataLabelsSpec, LegendSpec, AxisSpec,
     dump_spec, SPEC_VERSION,
 )
 
@@ -386,29 +386,43 @@ def _shape_to_position(shape) -> Position:
 
 
 def _extract_headline_from_slide(slide) -> str:
-    """Heuristic: find the headline text box on a slide.
+    """Heuristic: find the talking headline text box on a slide.
 
-    Looks for the topmost text box with large font or positioned near the top.
+    Real decks have two kinds of top-area text: (1) section tags ("Drivers
+    and Barriers", "Non-Personal Promotion") — short, at the very top, and
+    (2) talking headlines — longer, data-informed, typically 60-200 chars.
+
+    We pick the LONGEST text in the top 1.5" zone. Talking headlines are
+    almost always longer than section tags. Median PET headline: 73 chars.
     """
     candidates = []
     for shape in slide.shapes:
         if not shape.has_text_frame:
             continue
         text = shape.text_frame.text.strip()
-        if not text or len(text) < 5:
+        if not text or len(text) < 10:
             continue
         top_inches = _emu_to_inches(shape.top)
-        # Headline is typically in the top 1.5 inches
         if top_inches < 1.5:
-            # Score by position (higher = closer to top) and text length
-            candidates.append((top_inches, len(text), text, shape))
+            # Score: font size (larger = more likely headline), then text length
+            font_size = 0
+            try:
+                for p in shape.text_frame.paragraphs:
+                    for r in p.runs:
+                        if r.font.size:
+                            font_size = r.font.size.pt
+                        break
+                    break
+            except Exception:
+                pass
+            candidates.append((font_size, len(text), top_inches, text))
 
     if not candidates:
         return "Untitled Slide"
 
-    # Sort: prefer top-most, then longest text
-    candidates.sort(key=lambda c: (c[0], -c[1]))
-    return candidates[0][2]
+    # Pick by: largest font first, then longest text, then lower position
+    candidates.sort(key=lambda c: (-c[0], -c[1], c[2]))
+    return candidates[0][3]
 
 
 def _report_config_to_lineage(report_config: dict, tags: dict) -> DataLineage:
@@ -546,6 +560,63 @@ def _extract_chart_data_from_ooxml(chart) -> ChartData:
         series_list = [Series(name="unknown", values=[0.0], color="#999999")]
 
     return ChartData(categories=categories, series=series_list)
+
+
+def _extract_chart_chrome_from_ooxml(chart) -> ChartChrome:
+    """Extract chart formatting from OOXML: gapWidth, dLblPos, axis orientation, etc."""
+    chrome = ChartChrome()
+    try:
+        cs = chart._chartSpace
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+        # gapWidth
+        gw = cs.find(f".//{{{ns}}}gapWidth")
+        # overlap
+        ov = cs.find(f".//{{{ns}}}overlap")
+
+        # dLblPos (data label position)
+        dlp = cs.find(f".//{{{ns}}}dLblPos")
+        if dlp is not None:
+            pos_val = dlp.get("val", "")
+            # Map OOXML values to our DataLabelsSpec positions
+            pos_map = {"ctr": "ctr", "outEnd": "outEnd", "inEnd": "inEnd",
+                       "t": "above", "b": "below", "l": "left", "r": "right",
+                       "inBase": "inEnd", "bestFit": "outEnd"}
+            chrome.data_labels = DataLabelsSpec(
+                show=True,
+                position=pos_map.get(pos_val, pos_val),
+                format="0%",
+            )
+
+        # Axis orientation
+        orient = cs.find(f".//{{{ns}}}catAx/{{{ns}}}scaling/{{{ns}}}orientation")
+        if orient is not None and orient.get("val") == "maxMin":
+            chrome.hide_category_labels = True  # typically companion table pattern
+
+        # tickLblPos
+        tlp = cs.find(f".//{{{ns}}}catAx/{{{ns}}}tickLblPos")
+        if tlp is not None and tlp.get("val") == "none":
+            chrome.hide_category_labels = True
+
+        # Legend
+        legend = cs.find(f".//{{{ns}}}legend")
+        if legend is not None:
+            chrome.legend = LegendSpec(show=True)
+        else:
+            chrome.legend = LegendSpec(show=False)
+
+        # Gridlines
+        mg = cs.find(f".//{{{ns}}}majorGridlines")
+        chrome.gridlines = mg is not None
+
+        # Title
+        title = cs.find(f".//{{{ns}}}title")
+        if title is not None:
+            chrome.title = "(chart title)"
+
+    except Exception:
+        pass
+    return chrome
 
 
 def _extract_table_data_from_shape(shape) -> tuple[list[str], list[list[str]]]:
@@ -694,19 +765,32 @@ def read_tagged_shapes(
                 chart = shape.chart
                 chart_pattern = _classify_chart_from_ooxml(chart)
                 chart_data = _extract_chart_data_from_ooxml(chart)
+                chart_chrome = _extract_chart_chrome_from_ooxml(chart)
                 slide_components.append(ChartComponent(
                     position=position,
                     chart_pattern=chart_pattern,
                     data=chart_data,
-                    chrome=ChartChrome(),
+                    chrome=chart_chrome,
                 ))
             elif shape_type == "table" and shape.has_table:
                 labels, rows = _extract_table_data_from_shape(shape)
-                if labels:
-                    slide_components.append(LabelTableComponent(
-                        position=position,
-                        labels=labels,
-                    ))
+                if rows:
+                    n_cols = len(rows[0]) if rows else 0
+                    if n_cols <= 1:
+                        # Single-column → label table
+                        slide_components.append(LabelTableComponent(
+                            position=position,
+                            labels=labels,
+                        ))
+                    else:
+                        # Multi-column → value table (preserves all columns)
+                        headers = rows[0] if rows else []
+                        data_rows = rows[1:] if len(rows) > 1 else []
+                        slide_components.append(ValueTableComponent(
+                            position=position,
+                            headers=headers,
+                            rows=data_rows,
+                        ))
             elif shape.has_text_frame:
                 text = shape.text_frame.text.strip()
                 if text and len(text) > 5:
