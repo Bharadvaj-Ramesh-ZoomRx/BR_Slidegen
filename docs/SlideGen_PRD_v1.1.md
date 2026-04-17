@@ -3,7 +3,7 @@
 **Status:** Post-leadership review — Apr 16, 2026. Architecture direction validated by Sriram/Siva; comfortable to start moving.
 **Author:** Vijay Ganesan
 **Date:** April 16, 2026
-**Based on:** Q2 FY26 QBR (Apr 13) + follow-up calls with Sriram/Siva/Manoj (Apr 13-14) + SlideGen walkthrough with Sriram/Siva (Apr 16) + Original PPT Agent Brief (Sep 2025) + Siva's existing SlideGen PRD (Mar 10, 2026) + code walkthrough with Rajesh + **Deck analysis of 32 PET decks across 17 clients + 8 ATU decks across 7 clients** + Galen-PowerPoint Synapse Connector tag model review + workflow-taxonomy MECE audit.
+**Based on:** Q2 FY26 QBR (Apr 13) + follow-up calls with Sriram/Siva/Manoj (Apr 13-14) + SlideGen walkthrough with Sriram/Siva (Apr 16) + Original PPT Agent Brief (Sep 2025) + Siva's existing SlideGen PRD (Mar 10, 2026) + code walkthrough with Rajesh + **Deck analysis of 905 decks across 96 clients (276 PET, 143 ATU, 83 HCP-Pt, 50 Qual, 27 PCA, 26 DT)** + Galen-PowerPoint Synapse Connector tag model review + workflow-taxonomy MECE audit.
 
 \---
 
@@ -25,7 +25,7 @@ SlideGen is a **library of composable skills + a robust `pptx_utils` Python pack
 
 By end of Q3, this should work for all major project types (PET, ATU, PCA, HCP-Pt, Digital Trackers) and demonstrate enough versatility that consulting leadership can engage with FY27 staffing decisions.
 
-**Deck analysis grounding:** Reverse-engineering of **32 real PET decks spanning 17 pharma clients** (4,354 charts, 4,950 tables, 3,569 headlines) plus **8 ATU decks across 7 clients** (1,347 charts, 1,539 tables) concretely quantified what the skills and `pptx_utils` must support. ATU analysis confirmed the same chart-type vocabulary with different frequency distribution (2.8x more stacked-100 composition charts, half the line/scatter usage). See §6.6 for PET findings; see `experiments/deck_analysis/outputs/atu_analysis.md` for ATU findings.
+**Deck analysis grounding:** Reverse-engineering of **905 decks across 96 pharma clients** (50,072 charts, 50,303 tables, 36,914 slides) covering 2025+2026. By project type: 276 PET, 143 ATU, 83 HCP-Pt, 50 Qualitative, 27 PCA, 26 Digital Tracker, 7 MaxDiff, 5 SOV. This corpus directly populates `BRAND{}` (33 brands + 102 client entries), `CHART_PATTERNS{}` (15 patterns), `LAYOUTS{}` (14 presets), and per-project-type profiles that ground the project skills. See §6.6 for findings; see `experiments/deck_analysis/outputs/mass_scan_summary.md` for the full corpus summary.
 
 \---
 
@@ -513,37 +513,42 @@ May evolve to custom harness over time if cost or control demands it. Skills + t
 
 Workflows are concrete and demonstrable. Skills emerge as artifacts of workflow work.
 
-### 6.6 Deck Analysis Findings (32 PET decks + 8 ATU decks)
+### 6.6 Deck Analysis Findings (905 decks, 50,072 charts)
 
-A reverse-engineering exercise analyzed every chart, table, headline, and coordinate in 32 real client PET decks. Full methodology + raw data in `experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md`. Key findings that drive this PRD:
+A reverse-engineering exercise analyzed every chart, table, headline, and coordinate across 905 real client decks (2025+2026 corpus). Initial round: 32 PET + 8 ATU decks (Apr 15-16). Full corpus scan: 905 decks via `experiments/deck_analysis/mass_deck_scanner.py` (Apr 17). Full summary in `experiments/deck_analysis/outputs/mass_scan_summary.md`. Key findings:
 
-**The 80/20 on chart types.** Top 6 chart types cover 88% of all client charts:
+**The 80/20 on chart types.** Top 9 chart types cover 99% of all client charts:
 
 |Chart type|Occurrences|%|
 |-|-|-|
-|`bar_clustered` (horizontal)|1,511|35%|
-|`xy_scatter` (abacus)|743|17%|
-|`line_markers` (trended)|595|14%|
-|`column_stacked_100` (vertical)|486|11%|
-|`bar_stacked_100` (horizontal)|324|7%|
-|`bar_stacked` (horizontal)|305|7%|
+|`bar_clustered` (horizontal)|13,994|28%|
+|`column_stacked_100` (vertical)|8,227|16%|
+|`line_markers` (trended)|6,857|14%|
+|`bar_stacked_100` (horizontal)|5,528|11%|
+|`xy_scatter` (abacus)|4,260|9%|
+|`bar_stacked` (horizontal)|3,637|7%|
+|`column_clustered` (vertical)|2,869|6%|
+|`column_stacked` (vertical)|1,801|4%|
+|`doughnut`|1,752|4%|
 
-**Deterministic-first hypothesis validated.** Charts in real decks have almost no features that would require per-chart intelligence:
+**Deterministic-first hypothesis validated at scale.** Across 50,072 charts:
 
-* Chart title: present in only **1%** of charts (headline lives in separate text box)
-* Chart legend: present in only **1%** (companion table serves as legend)
-* Major gridlines: absent on **84%**
-* Data label number format: `"0%"` on **96%** of labels
-* Category axis inverted (maxMin): **43%** of charts — most common "non-default"
-* Category labels hidden (`tickLblPos="none"`): **371 charts** — companion table pattern
+* Chart title: present in only **0.6%** (306/50,072)
+* Chart legend: present in only **1.2%** (592/50,072)
+* Major gridlines: present on **6.3%** (3,170/50,072)
+* Data label number format: `"0%"` on **74%** of labels (36,910 occurrences)
+* Category axis inverted (maxMin): **29%** of charts (14,700)
+* Category labels hidden (`tickLblPos="none"`): **2,839 charts** — companion table pattern
+* Most common gapWidth: 100 (3,881), 50 (2,743), 150 (2,573)
+* Most common marker: circle (15,872), square (1,900), diamond (1,064)
 
-This means the slide plan spec can be **complete enough that deterministic rendering always produces correct output**. Renderers don't need to guess.
+**`pptx_utils` inventory confirmed at scale.** ~20 `lxml_helpers` functions cover 100% of observed OOXML needs. 15 `CHART_PATTERNS{}` entries cover all significant chart types. 102 `CLIENT{}` entries cover all active pharma clients.
 
-**`pptx_utils` inventory confirmed.** The OOXML properties that python-pptx does not expose — and that recur in real decks — are enumerable. A fixed list of ~20 `lxml_helpers` functions covers 100% of observed needs. See `pptx_utils/lxml_helpers.py` (branch `vijay-slidegen`) for the current implementation.
+**Per-project-type profiles** generated at `experiments/deck_analysis/outputs/project_type_profiles/`. Key differences: PET decks are heaviest on `bar_clustered` (31%) and `xy_scatter` (12.5%); ATU decks favor `column_stacked_100` (23%) for funnel analysis; HCP-Pt decks have more `doughnut` (13%) and `bar_stacked` (28%) for patient segment breakdowns.
 
 **Canonical templates approach confirmed rejected.** No evidence across 32 decks that project teams maintain canonical chart templates in hidden slides. Rendering defaults live in `pptx_utils`; brand-specific differentiation lives in `BRAND{}` alone.
 
-**BRAND{} and LAYOUTS{} populated from observation.** 17 client brand entries with series colors, fonts, and heading colors have been generated into `pptx_utils/brand.py`. 6 layout presets with median coordinates from signature clusters (145 slides for `1_chart_1_table`, 110 for `1_chart_2_table`, etc.) have been generated into `pptx_utils/layout.py`. Both live on branch `vijay-slidegen`.
+**BRAND{} and LAYOUTS{} populated from observation.** 102 client entries and 33 per-brand entries with series colors, fonts, and heading colors have been generated into `pptx_utils/brand.py`. 14 layout presets with median coordinates from signature clusters have been generated into `pptx_utils/layout.py`. Both live on branch `vijay-slidegen`.
 
 **Full-corpus regrounding via mass scan.** The 40-deck analysis established the initial baseline. `experiments/deck_analysis/mass_deck_scanner.py` runs the same analysis at 10x scale across 400-500 client decks from the SharePoint archive (organized as `client/project/deck.pptx`). It extracts chart types, layout coordinates, brand colors, headline patterns, and component compositions, then **directly regenerates** `BRAND{}`, `LAYOUTS{}`, and `CHART_PATTERNS{}` Python source from the full corpus — not a delta report, but a complete re-grounding. The generated files replace the current `pptx_utils` modules after review. Sriram (Apr 16): *"When you build bottom up, it will get closer to exhaustive."* The scanner is resumable (saves every 25 decks), classifies decks by project type (PET/ATU/HCP-Pt/Digital Tracker/PCA/etc.) for coverage analysis, and the `experiments/deck_analysis/visual_regression.py` harness measures fidelity after each update.
 
@@ -852,7 +857,7 @@ The 8 workflow orchestrators ship at ~2/week once primitives are solid. Ship ord
 
 |Date|Milestone|Definition of Done|
 |-|-|-|
-|**Apr 15 — DONE**|Deck analysis + `pptx_utils` foundation|32 PET decks + 8 ATU decks analyzed; 18 BRAND entries, 11 LAYOUTS, 10 CHART_PATTERNS, 9 new `lxml_helpers` landed|
+|**Apr 15-17 — DONE**|Deck analysis + `pptx_utils` foundation|905 decks analyzed (276 PET, 143 ATU, 83 HCP-Pt, 50 Qual, 27 PCA, 26 DT); 102 CLIENT + 33 BRAND entries, 14 LAYOUTS, 15 CHART_PATTERNS populated|
 |**Apr 16 — DONE**|Spec contract + slide-creator Python|`slidegen/slide_spec/` + `slidegen/slide_creator.py`; all 10 chart patterns render; 20 canonical example specs covering ~55% of real PET slide compositions|
 |**Apr 16 — DONE**|Edit-mode + spec-producer primitives|`deck-reader` (dual-mode), `slide-updater`, `slide-editor`, `deck-assembler`, `viz-selector`, `layout-selector`, `headline-writer`, `callout-writer`, all `slide-plan-generator-\*`, all 3 analysis skills (`segment-comparator`, `stat-sig-annotator`, `trend-analyzer`)|
 |**End of Apr**|Rendering fidelity complete + evals bootstrapped|Visual regression passing on top-6 chart patterns × representative brands. Line/doughnut Repair bug closed. Connector-tag integration tested on real tagged PET deck. **Evals harness started** (`tests/evals/`) with ≥1 refresh eval using prior JJ RYB deck.|
@@ -934,7 +939,7 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * **Original PPT Agent Brief (Sep 2025)** — source of several workflows (edit, add, segment analysis, executive summary) and architectural concepts (viz hierarchy, multi-element assembly, analysis traces). Superseded in modality (embedded-in-PPT → Claude Code terminal) but many ideas survive.
 * **Siva's SlideGen PRD (Mar 10, 2026)** — at `docs/SlideGen_PRD.md`. The implementation blueprint (four-track data layer, win32com live editing, shape registry reconciliation, audit chain). This PRD (v1.1) is strategic direction; Siva's is the technical blueprint. Complementary, not contradictory.
 * **Existing SlideGen Workflow** — at `galen-consulting-r3m-report/docs/slidegen_workflow.md`. Current 8-stage pipeline documentation.
-* **Deck Analysis** — at `experiments/deck_analysis/` on branch `vijay-slidegen`. Two rounds: (1) 32 PET decks across 17 clients (Apr 15) — produced ACTIONABLE_FINDINGS.md, deep_report.md, layout_clusters.md, plus JSON outputs. Source of the populated pptx_utils. (2) 8 ATU decks across 7 clients (Apr 16) — produced atu_analysis.md with ATU-vs-PET structural comparison. Source of the atu-deck project skill and atu-insight-writer.
+* **Deck Analysis** — at `experiments/deck_analysis/` on branch `vijay-slidegen`. Three rounds: (1) 32 PET decks across 17 clients (Apr 15) — initial ACTIONABLE_FINDINGS.md, deep_report.md. (2) 8 ATU decks (Apr 16) — ATU-vs-PET comparison. (3) **905-deck full corpus scan (Apr 17)** via `mass_deck_scanner.py` — 50,072 charts across 96 clients, producing the 102-client `CLIENT{}`, 15-pattern `CHART_PATTERNS{}`, per-project-type profiles (PET/ATU/HCP-Pt/DT/PCA/Qual), competitor detection, and position clusters. This is the definitive grounding for all pptx_utils.
 * **Agentic MR PRD** — broader client-facing platform vision. SlideGen is an internal capability toward that vision; this PRD scopes it to internal use for Q3.
 
 ### 11.2 Glossary
