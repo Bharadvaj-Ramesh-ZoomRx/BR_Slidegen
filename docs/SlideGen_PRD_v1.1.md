@@ -488,6 +488,8 @@ The slide plan is the contract between intelligent skills and deterministic skil
 * `formatting`: colors, fonts, layout positions, period labels
 * `extras`: chart-type-specific parameters
 * `data_source`: provenance (which question, which segment, which wave)
+* `spec_completeness`: "complete" | "layout_complete_data_missing" | "partial" (see §6.7 two-pass model)
+* `data_lineage_candidates`: proposed data sources when lineage is unresolved (see §6.7)
 
 The `spec-validator` skill enforces completeness before rendering. Renderers fail loudly on incomplete specs rather than inventing fallbacks.
 
@@ -574,6 +576,20 @@ The slide spec is a first-class artifact — the interface between intelligent p
 Tokens are resolved by `slide-creator` at render time, not at spec creation time — which means the same spec is portable across brands and refresh cycles without rewriting.
 
 **Why this matters.** Multiple skills can now produce a valid spec from different angles: `slide-plan-generator-hypothesis` from a hypothesis bank, `slide-plan-generator-refresh` from a deck-reader diff, `slide-plan-generator-single` from a single client question. Any valid spec is rendered identically by `slide-creator`. No bespoke glue. No workflow-specific renderer branches.
+
+**Two-pass spec model (v1.1).** When `deck-reader` creates specs from an existing PPTX, it works in two passes:
+
+* **Pass 1 (automatic):** Extracts everything the PPTX itself tells us — headline, chart type, chart data (categories, series values, colors), component positions, table content, layout classification, brand detection from series colors, section classification from headline text. This always completes. The spec is renderable after Pass 1.
+
+* **Pass 2 (data lineage):** Where did the numbers come from? For Synapse-connected shapes, Connector tags provide canonical IDs (`reporting_plan_id`, `analysis_ids`, etc.) and the spec is marked `spec_completeness="complete"`. For unconnected shapes, `deck-reader` cross-references chart categories against `source_data.json` to propose candidates — each with a confidence score and reason — stored in `data_lineage_candidates`. The spec is marked `spec_completeness="layout_complete_data_missing"`. The analyst reviews candidates, picks the right one (or provides their own), and the spec becomes "complete" — ready to freeze into `config.yaml`.
+
+`spec_completeness` values:
+
+* `"complete"` — layout + data lineage both resolved. Renderable AND refreshable.
+* `"layout_complete_data_missing"` — renderable (can re-create the slide from extracted data) but NOT refreshable (don't know where to get new data). Analyst must resolve data lineage before first refresh.
+* `"partial"` — some components could not be extracted. Render will be approximate.
+
+The pipeline never blocks on unresolved lineage. Specs with `"layout_complete_data_missing"` are saved alongside complete ones; the analyst fills gaps asynchronously. A spec with empty data lineage but full component data is still useful — it tells `slide-creator` exactly how to render the slide once someone provides the data source. See `slidegen/slide_spec/schema.py` `DataLineageCandidate` for the candidate structure.
 
 ### 6.8 Data Lineage: SlideSpec as the Long-Term Model
 
