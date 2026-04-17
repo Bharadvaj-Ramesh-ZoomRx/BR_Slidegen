@@ -112,14 +112,21 @@ def cmd_render_all(args):
     from slidegen.slide_creator import render_slide
     from pptx import Presentation
     from pptx.util import Inches
+    import copy
 
     specs, summary = read_deck(args.deck)
     out = Path(args.out or "deck_rerendered.pptx")
 
     print(f"Deck: {Path(args.deck).name} ({len(specs)} slides)")
-    prs = Presentation()
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Inches(7.500)
+
+    # Use the SOURCE deck as template — preserves slide masters, themes, fonts,
+    # backgrounds, logos. Delete all existing slides, then render fresh ones.
+    prs = Presentation(args.deck)
+    # Delete all existing slides (iterate in reverse to avoid index shifts)
+    for i in range(len(prs.slides) - 1, -1, -1):
+        rId = prs.slides._sldIdLst[i].get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+        prs.part.drop_rel(rId)
+        del prs.slides._sldIdLst[i]
 
     rendered = 0
     skipped = 0

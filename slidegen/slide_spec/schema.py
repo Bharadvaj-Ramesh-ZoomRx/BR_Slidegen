@@ -430,6 +430,7 @@ class SlideMetadata:
     tier: Optional[str] = None          # "1" (Connector tag) | "2" (structural inference)
     confidence: Optional[str] = None    # "high" | "medium" | "low"
     original_tag_lineage: Optional[dict] = None  # preserved tag JSON when tag fails health check
+    slide_layout_name: Optional[str] = None  # original slide layout name from source PPTX (for template matching)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

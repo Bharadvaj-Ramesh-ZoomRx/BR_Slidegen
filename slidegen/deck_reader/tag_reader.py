@@ -857,6 +857,12 @@ def read_tagged_shapes(
             n_tables = sum(1 for c in slide_components if c.type in ("label_table", "value_table"))
             layout_key = f"observed_{n_charts}_chart_{n_tables}_table"
 
+            # Extract the original slide layout name (for template matching)
+            try:
+                slide_layout_name = slide.slide_layout.name
+            except Exception:
+                slide_layout_name = None
+
             completeness = "complete" if slide_has_synapse else "layout_complete_data_missing"
 
             spec = SlideSpec(
@@ -870,6 +876,7 @@ def read_tagged_shapes(
                     created_by="deck-reader-tier1",
                     created_at=None,
                     tier="1",
+                    slide_layout_name=slide_layout_name,
                     confidence="high" if slide_has_synapse else "medium",
                 ),
                 spec_completeness=completeness,

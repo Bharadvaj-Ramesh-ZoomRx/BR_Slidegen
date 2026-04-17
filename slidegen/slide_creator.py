@@ -1384,9 +1384,18 @@ def render_slide(
         except KeyError:
             brand = None  # validator already surfaced a warning; spec may use only hex tokens
 
-    # 4. Add blank slide
-    blank_layout_idx = min(_BLANK_LAYOUT_IDX, len(prs.slide_layouts) - 1)
-    slide = prs.slides.add_slide(prs.slide_layouts[blank_layout_idx])
+    # 4. Add slide — match the original slide layout when available
+    target_layout = None
+    if spec.metadata and getattr(spec.metadata, 'slide_layout_name', None):
+        # Find matching layout by name in the presentation's slide layouts
+        for sl in prs.slide_layouts:
+            if sl.name == spec.metadata.slide_layout_name:
+                target_layout = sl
+                break
+    if target_layout is None:
+        blank_layout_idx = min(_BLANK_LAYOUT_IDX, len(prs.slide_layouts) - 1)
+        target_layout = prs.slide_layouts[blank_layout_idx]
+    slide = prs.slides.add_slide(target_layout)
     namer = ShapeNamer(spec.slide_index)
 
     # 5. Apply chrome — skip for deck-reader specs (they have their own headline
