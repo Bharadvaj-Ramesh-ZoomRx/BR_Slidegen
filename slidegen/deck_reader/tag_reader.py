@@ -736,6 +736,7 @@ def read_tagged_shapes(
 
             if not is_tagged:
                 slide_untagged += 1
+                # Still collect as untagged for Tier 2 (backward compat)
                 shape_type = _classify_shape(shape)
                 us = UntaggedShape(
                     slide_index=slide_idx,
@@ -751,6 +752,66 @@ def read_tagged_shapes(
                 if shape.has_text_frame:
                     us.text = shape.text_frame.text[:500]
                 untagged.append(us)
+
+                # ALSO extract untagged shapes as components for full-fidelity rebuild
+                position = _shape_to_position(shape)
+                if shape.has_chart:
+                    chart = shape.chart
+                    slide_components.append(ChartComponent(
+                        position=position,
+                        chart_pattern=_classify_chart_from_ooxml(chart),
+                        data=_extract_chart_data_from_ooxml(chart),
+                        chrome=_extract_chart_chrome_from_ooxml(chart),
+                    ))
+                elif shape.has_table:
+                    labels, rows, tbl_fmt = _extract_table_data_from_shape(shape)
+                    if rows:
+                        n_cols = len(rows[0]) if rows else 0
+                        if n_cols <= 1:
+                            slide_components.append(LabelTableComponent(
+                                position=position,
+                                labels=labels,
+                                font_size_pt=tbl_fmt.get("font_size_pt", 9.0),
+                                font_name=tbl_fmt.get("font_name"),
+                                alternating_rows=False,
+                            ))
+                        else:
+                            slide_components.append(ValueTableComponent(
+                                position=position,
+                                headers=[],
+                                rows=rows,
+                                alternating_rows=False,
+                            ))
+                elif shape.has_text_frame:
+                    text = shape.text_frame.text.strip()
+                    if text:
+                        # Extract font info
+                        font_size = 10.0
+                        font_color = None
+                        font_name = None
+                        bold = False
+                        try:
+                            for p in shape.text_frame.paragraphs:
+                                for r in p.runs:
+                                    if r.font.size:
+                                        font_size = round(r.font.size.pt, 1)
+                                    if r.font.color and r.font.color.rgb:
+                                        font_color = f"#{r.font.color.rgb}"
+                                    if r.font.name:
+                                        font_name = r.font.name
+                                    if r.font.bold:
+                                        bold = True
+                                    break
+                                break
+                        except Exception:
+                            pass
+                        slide_components.append(TextboxComponent(
+                            position=position,
+                            text=text[:500],
+                            font_size_pt=font_size,
+                            font_color=font_color,
+                            bold=bold,
+                        ))
                 continue
 
             # Tagged shape — extract config
