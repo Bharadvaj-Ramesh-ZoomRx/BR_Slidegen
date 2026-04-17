@@ -1,717 +1,36 @@
 {
-  "BONE_HCP_TRACKER": {
-    "brand": "BONE_HCP_TRACKER",
-    "client": "UNKNOWN",
+  "UNMAPPED": {
+    "brand": "UNMAPPED",
+    "client": "VIR_BIOTECH",
     "competitor": null,
-    "therapy_area": "Bone",
-    "deck_filenames": [
-      "03.12.2026_Q1'26 Bone HCP PET Full Report_v1.0.pptx"
-    ],
-    "top_series_colors_raw": {
-      "FF9933": 35,
-      "009201": 13,
-      "00B0F0": 13,
-      "58193D": 11,
-      "A6A6A6": 5,
-      "0063C3": 4,
-      "4BACC6": 4,
-      "E46C0A": 4,
-      "425563": 4,
-      "FFC285": 4,
-      "604A7B": 3,
-      "2C53A2": 3,
-      "F79646": 2,
-      "4F6228": 2,
-      "93CDDD": 2,
-      "57AC33": 2,
-      "FDC199": 2,
-      "8F77AD": 1,
-      "FFFFFF": 1,
-      "F48323": 1,
-      "AAA8AB": 1,
-      "5A82D2": 1,
-      "D1D1D1": 1
-    },
-    "palette_filtered": [
-      "FF9933",
-      "009201",
-      "00B0F0",
-      "58193D",
-      "0063C3",
-      "4BACC6",
-      "E46C0A",
-      "425563",
-      "FFC285",
-      "604A7B"
-    ],
-    "top_fonts": {
-      "Century Gothic": 61,
-      "+mn-lt": 12,
-      "Times New Roman": 5,
-      "Calibri": 3,
-      "Arial": 1
-    }
-  },
-  "BAVENCIO": {
-    "brand": "BAVENCIO",
-    "client": "EMD",
-    "competitor": null,
-    "therapy_area": "Oncology",
-    "deck_filenames": [
-      "05022026_Bavencio Promotional Effectiveness Tracking Wave 4 Q1'26 - Full Final Report V2.0.pptx"
-    ],
-    "top_series_colors_raw": {
-      "0000C9": 10,
-      "6D5A7A": 8,
-      "4060AF": 6,
-      "081E3D": 5,
-      "808080": 3,
-      "6FBF4A": 3,
-      "E4B77F": 3,
-      "43964A": 2,
-      "BA2A4C": 2,
-      "BFBFBF": 2,
-      "3B54AD": 2,
-      "816901": 1,
-      "00857C": 1,
-      "FDCE07": 1,
-      "00C7B2": 1,
-      "8F9CAA": 1,
-      "BF7A00": 1,
-      "672A76": 1,
-      "FFC866": 1,
-      "54468E": 1,
-      "008A00": 1,
-      "B7DEE8": 1,
-      "C00000": 1,
-      "B6CA20": 1,
-      "009E96": 1,
-      "BF2CBB": 1,
-      "C60F3F": 1,
-      "FF2929": 1,
-      "A9B8DF": 1,
-      "00A296": 1
-    },
-    "palette_filtered": [
-      "0000C9",
-      "6D5A7A",
-      "4060AF",
-      "081E3D",
-      "808080",
-      "6FBF4A",
-      "E4B77F",
-      "43964A",
-      "BA2A4C",
-      "3B54AD"
-    ],
-    "top_fonts": {
-      "Arial": 53,
-      "+mj-lt": 29,
-      "Calibri": 7,
-      "+mn-lt": 1,
-      "Tahoma": 1,
-      "Manrope": 1
-    }
-  },
-  "ABILIFY_MAINTENA": {
-    "brand": "ABILIFY_MAINTENA",
-    "client": "OTSUKA",
-    "competitor": null,
-    "therapy_area": "Psychiatry",
-    "deck_filenames": [
-      "[ZoomRx] Abilify LAI PET - Full Report.pptx"
-    ],
-    "top_series_colors_raw": {
-      "FFC000": 21,
-      "C00000": 15,
-      "2D5CA2": 15,
-      "7F47AA": 13,
-      "7D44A9": 11,
-      "3B5998": 11,
-      "7E97CD": 10,
-      "B3C9EA": 8,
-      "0000FF": 8,
-      "D8DDE5": 8,
-      "1C1755": 7,
-      "FFFFFF": 6,
-      "DA0072": 5,
-      "7AB2B2": 4,
-      "F1E9E9": 4,
-      "2D3250": 3,
-      "C1A5D6": 3,
-      "FEE598": 3,
-      "2A4C85": 3,
-      "8998B1": 3,
-      "3B5249": 2,
-      "A4B494": 2,
-      "6290D4": 2,
-      "9769BA": 2,
-      "D78C91": 2,
-      "D05E62": 2,
-      "574964": 2,
-      "352F44": 1,
-      "5C5470": 1,
-      "B9B4C7": 1
-    },
+    "therapy_area": "Unknown",
+    "deck_count": 463,
     "palette_filtered": [
       "FFC000",
-      "2D5CA2",
-      "7F47AA",
-      "7D44A9",
-      "3B5998",
-      "7E97CD",
-      "B3C9EA",
-      "0000FF",
-      "1C1755",
-      "DA0072"
-    ],
-    "top_fonts": {
-      "Arial": 54,
-      "Tahoma": 15,
-      "Calibri (Body)": 7,
-      "Johnson Text": 1,
-      "Gotham Book": 1,
-      "12": 1
-    }
-  },
-  "ULTOMIRIS": {
-    "brand": "ULTOMIRIS",
-    "client": "ALEXION",
-    "competitor": null,
-    "therapy_area": "Hematology/PNH",
-    "deck_filenames": [
-      "[ZoomRx] Alexion US PNH Q325 PET - v1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "0E8779": 29,
-      "7030A0": 28,
-      "E35105": 22,
-      "799A01": 21,
-      "FFA300": 21,
-      "FF8181": 10,
-      "CCCCCC": 10,
-      "84CA68": 8,
-      "009886": 6,
-      "D34D2F": 6,
-      "008DAB": 6,
-      "F8CF36": 6,
-      "003B75": 6,
-      "E47E19": 5,
-      "B2A4B6": 4,
-      "0072CE": 4,
-      "B52455": 4,
-      "BFBFBF": 4,
-      "FFC000": 4,
-      "FFC865": 3,
-      "B6B6B6": 3,
-      "F2F2F2": 3,
-      "9BBB59": 2,
-      "E9A697": 2,
-      "ED553B": 2,
-      "F6D55C": 2,
-      "D7E4BD": 2,
-      "173F5F": 2,
-      "FFDA99": 2,
-      "FFA80F": 2
-    },
-    "palette_filtered": [
-      "0E8779",
+      "92D050",
+      "D9D9D9",
       "7030A0",
-      "E35105",
-      "799A01",
-      "FFA300",
-      "FF8181",
-      "84CA68",
-      "009886",
-      "D34D2F",
-      "008DAB"
-    ],
-    "top_fonts": {
-      "Arial": 96,
-      "Arial(Body)": 21,
-      "Montserrat Regular": 4,
-      "Montserrat": 1
-    }
-  },
-  "LOKELMA": {
-    "brand": "LOKELMA",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Nephrology",
-    "deck_filenames": [
-      "[ZoomRx] AZN LOKELMA PET Quarterly Report Q4 2025_Synapse_connector.pptx"
-    ],
-    "top_series_colors_raw": {
-      "00947F": 32,
-      "8F2064": 29,
-      "4A2C8C": 21,
-      "00EAC9": 5,
-      "00B050": 4,
-      "B6FFF4": 4,
-      "003965": 4,
-      "7F7F7F": 3,
-      "00B0F0": 2,
-      "D1C5ED": 2,
-      "00E9C8": 2,
-      "9E84D8": 2,
-      "FF8E85": 2,
-      "FF2916": 2,
-      "00493E": 2,
-      "CDFFF8": 2,
-      "00AE9F": 2,
-      "B2E8E0": 2,
-      "430928": 1,
-      "E64299": 1,
-      "29629E": 1,
-      "AB162C": 1,
-      "0070C0": 1,
-      "333333": 1,
-      "594371": 1,
-      "0099B3": 1,
-      "A9401C": 1,
-      "9D7405": 1,
-      "FFFFFF": 1,
-      "FFB400": 1
-    },
-    "palette_filtered": [
-      "00947F",
-      "8F2064",
-      "4A2C8C",
-      "00EAC9",
-      "B6FFF4",
-      "003965",
+      "0070C0",
       "00B0F0",
-      "D1C5ED",
-      "00E9C8",
-      "9E84D8"
-    ],
-    "top_fonts": {
-      "Arial": 57,
-      "Century Gothic": 12,
-      "+mj-lt": 4,
-      "Times New Roman": 3,
-      "+mn-lt": 1
-    }
-  },
-  "MIEBO": {
-    "brand": "MIEBO",
-    "client": "BL",
-    "competitor": null,
-    "therapy_area": "Ophthalmology/DED",
-    "deck_filenames": [
-      "[ZoomRx] B+L DED PET Jul-Sep'25_Final Report v3.0.pptx"
-    ],
-    "top_series_colors_raw": {
-      "00A9EB": 38,
-      "400286": 37,
-      "A8109D": 29,
-      "00B050": 29,
-      "A6A6A6": 25,
-      "FF1119": 15,
-      "413A5F": 10,
-      "000F9F": 9,
-      "000000": 8,
-      "7F7F7F": 8,
-      "FFC000": 7,
-      "F78626": 7,
-      "8822FC": 7,
-      "BED32E": 6,
-      "04974F": 6,
-      "006EB9": 6,
-      "8497B0": 6,
-      "FFA7AA": 6,
-      "D9D9D9": 6,
-      "9A80B9": 5,
-      "7FD4F5": 5,
-      "007DAD": 4,
-      "FF0000": 4,
-      "595959": 3,
-      "D2E9D6": 3,
-      "297651": 3,
-      "AAE1C7": 3,
-      "90949A": 2,
-      "222A35": 2,
-      "99CC99": 2
-    },
-    "palette_filtered": [
-      "00A9EB",
-      "400286",
-      "A8109D",
-      "FF1119",
-      "413A5F",
-      "000F9F",
-      "FFC000",
-      "F78626",
-      "8822FC",
-      "BED32E"
-    ],
-    "top_fonts": {
-      "+mn-lt": 77,
-      "Century Gothic": 38,
-      "Avenir Next LT Pro": 4,
-      "+mj-lt": 1,
-      "Source Sans Pro": 1,
-      " century gothic": 1
-    }
-  },
-  "LIBTAYO": {
-    "brand": "LIBTAYO",
-    "client": "REGENERON",
-    "competitor": null,
-    "therapy_area": "Oncology/NMSC",
-    "deck_filenames": [
-      "[ZoomRx] Libtayo (Nov \u201925 - Feb \u201926) NMSC Message Recall & Effectiveness Report v3.0 - Synapse Migration.pptx"
-    ],
-    "top_series_colors_raw": {
-      "DC0077": 11,
-      "004F6F": 10,
-      "C83333": 8,
-      "96BBBB": 7,
-      "C19875": 7,
-      "338533": 7,
-      "D34D4D": 6,
-      "668998": 4,
-      "A4D271": 4,
-      "929442": 4,
-      "FFB469": 3,
-      "BFBFBF": 3,
-      "7F7F7F": 3,
-      "CCD9E3": 3,
-      "99B3C7": 3,
-      "4D7B9E": 3,
-      "004274": 3,
-      "7CBF33": 3,
-      "FF8205": 2,
-      "EFAC30": 1,
-      "7F841A": 1,
-      "A50059": 1,
-      "A6A6A6": 1,
-      "00B050": 1
-    },
-    "palette_filtered": [
-      "DC0077",
-      "004F6F",
-      "C83333",
-      "96BBBB",
-      "C19875",
-      "338533",
-      "D34D4D",
-      "668998",
-      "A4D271",
-      "929442"
-    ],
-    "top_fonts": {
-      "DM Sans 14pt": 83,
-      "Arial": 20,
-      "Calibri": 7
-    }
-  },
-  "RHAPSIDO": {
-    "brand": "RHAPSIDO",
-    "client": "NOVARTIS",
-    "competitor": null,
-    "therapy_area": "Immunology",
-    "deck_filenames": [
-      "[ZoomRx] NVS Rhapsido_PET_Wave 4 Full Report v1.0.pptx"
-    ],
-    "top_series_colors_raw": {
-      "018E86": 14,
-      "0070FE": 11,
-      "002068": 11,
-      "8F2DDE": 8,
-      "852065": 7,
-      "B56FA3": 7,
-      "61A8FF": 6,
-      "50E2D0": 6,
-      "A7A8AA": 6,
-      "C89ABA": 5,
-      "E7D2E0": 5,
-      "E4EECA": 4,
-      "A6C850": 4,
-      "830F66": 4,
-      "DAAB8D": 4,
-      "B45518": 4,
-      "ADAFBC": 4,
-      "B3DDDB": 4,
-      "842064": 3,
-      "001750": 3,
-      "9B9C66": 3,
-      "A4526B": 3,
-      "81C563": 3,
-      "4F8C34": 3,
-      "006600": 3,
-      "F96041": 3,
-      "1A8BFF": 3,
-      "4FA5FF": 3,
-      "86C0FF": 3,
-      "4EB0AB": 3
-    },
-    "palette_filtered": [
-      "018E86",
-      "0070FE",
-      "002068",
-      "8F2DDE",
-      "852065",
-      "B56FA3",
-      "61A8FF",
-      "50E2D0",
-      "A7A8AA",
-      "C89ABA"
-    ],
-    "top_fonts": {
-      "Arial": 136,
-      "+mn-lt": 120,
-      "+mj-lt": 76,
-      "Calibri (Body)": 73,
-      "Times New Roman": 6,
-      "Tahoma": 2,
-      "Roboto": 2,
-      "Calibri": 1
-    }
-  },
-  "OTEZLA": {
-    "brand": "OTEZLA",
-    "client": "AMGEN",
-    "competitor": null,
-    "therapy_area": "Dermatology/Psoriasis",
-    "deck_filenames": [
-      "[ZoomRx] Q1'26 Otezla Derm PET_Full Report v0.1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "1F497D": 48,
-      "6F8DB4": 9,
-      "00A3DF": 7,
-      "4C35DE": 7,
-      "A5A5A5": 4,
-      "2E75B6": 3,
-      "FFB81C": 3,
-      "C303D4": 3,
-      "0063C3": 3,
-      "11A1A2": 2,
-      "993366": 2,
-      "009900": 2,
-      "B3A2C7": 2,
-      "99DAF2": 2,
-      "4DBFE9": 2,
-      "9AADC4": 2,
-      "58828A": 1,
-      "E9C46A": 1,
-      "006C75": 1,
-      "612166": 1,
-      "C00000": 1,
-      "92D050": 1,
-      "C55A11": 1,
-      "FFCC99": 1,
-      "E65B7A": 1,
-      "448D96": 1,
-      "FAD960": 1,
-      "C40E12": 1,
-      "00717B": 1,
-      "2962A7": 1
-    },
-    "palette_filtered": [
-      "1F497D",
-      "6F8DB4",
-      "00A3DF",
-      "4C35DE",
-      "A5A5A5",
-      "2E75B6",
-      "FFB81C",
-      "C303D4",
+      "002060",
       "0063C3",
-      "11A1A2"
+      "002B48",
+      "071D49"
     ],
-    "top_fonts": {
-      "Century Gothic": 62,
-      "+mn-lt": 8,
-      "Calibri": 7,
-      "+mj-lt": 6,
-      "Arial": 2,
-      "Times New Roman": 1
-    }
-  },
-  "TEZSPIRE": {
-    "brand": "TEZSPIRE",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Respiratory",
-    "deck_filenames": [
-      "[ZoomRx] Tezspire SUA+CRSwNP PET Report Q1 '26_v1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "003865": 22,
-      "85BFFF": 14,
-      "FFD05D": 12,
-      "00B5E2": 12,
-      "00B050": 11,
-      "C688E8": 9,
-      "830051": 9,
-      "9B37FF": 5,
-      "EF426F": 4,
-      "6C5199": 4,
-      "0063C3": 4,
-      "7A6004": 4,
-      "B69106": 4,
-      "F5CD39": 4,
-      "BFBFBF": 4,
-      "F89C0D": 3,
-      "5D9D39": 3,
-      "C6C5C7": 3,
-      "D9D9D9": 3,
-      "F2F2F2": 3,
-      "FCE79B": 1,
-      "96E0E9": 1,
-      "68D2DF": 1,
-      "DCD828": 1,
-      "13DF22": 1,
-      "4EF05A": 1,
-      "92F699": 1,
-      "C2FAC6": 1,
-      "AE57DF": 1,
-      "C17EE6": 1
-    },
-    "palette_filtered": [
-      "003865",
-      "85BFFF",
-      "FFD05D",
-      "00B5E2",
-      "C688E8",
-      "830051",
-      "9B37FF",
-      "EF426F",
-      "6C5199",
-      "0063C3"
-    ],
-    "top_fonts": {
-      "Arial": 101,
-      "Arial(Body)": 27,
-      "Calibri": 1
-    }
-  },
-  "ALL_PET_KPI": {
-    "brand": "ALL_PET_KPI",
-    "client": "UNKNOWN",
-    "competitor": null,
-    "therapy_area": "Cross-brand",
-    "deck_filenames": [
-      "ALL PET Q1FY26 KPI Report 19DEC2025.pptx"
-    ],
-    "top_series_colors_raw": {
-      "294983": 2,
-      "5C84CC": 2,
-      "8FAADC": 2,
-      "F0406E": 1,
-      "82BC00": 1,
-      "133053": 1
-    },
-    "palette_filtered": [
-      "294983",
-      "5C84CC",
-      "8FAADC",
-      "F0406E",
-      "82BC00",
-      "133053"
-    ],
-    "top_fonts": {
-      "Century Gothic": 17,
-      "+mj-lt": 2
-    }
-  },
-  "DATROWAY": {
-    "brand": "DATROWAY",
-    "client": "DSI_AZN",
-    "competitor": null,
-    "therapy_area": "Oncology/mBC",
-    "deck_filenames": [
-      "AZ-DSI - DATROWAY mBC Promotional Effectiveness Tracking Q1 '26_TEST.pptx",
-      "DATROWAY EGFRm NSCLC Promotional Effectiveness Tracking (PET) Q1 '26 PP and NPP Final Report_v1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "1E22AA": 39,
-      "00B050": 18,
-      "EE7623": 17,
-      "643466": 11,
-      "FBCCB1": 10,
-      "018EAF": 8,
-      "00ABC7": 6,
-      "94A61F": 5,
-      "F5AD7B": 5,
-      "A6A6A6": 5,
-      "B253DE": 5,
-      "353236": 5,
-      "CC0066": 5,
-      "664993": 4,
-      "250E62": 4,
-      "B0E4FF": 4,
-      "3D95F6": 4,
-      "006937": 4,
-      "FFC807": 4,
-      "F73571": 4,
-      "CBB680": 4,
-      "E3E3E3": 4,
-      "9698EC": 4,
-      "005828": 3,
-      "033585": 3,
-      "75E6E9": 3,
-      "00AE9B": 3,
-      "7CD214": 3,
-      "A74109": 3,
-      "304B4C": 3
-    },
-    "palette_filtered": [
-      "1E22AA",
-      "EE7623",
-      "643466",
-      "FBCCB1",
-      "018EAF",
-      "00ABC7",
-      "94A61F",
-      "F5AD7B",
-      "B253DE",
-      "353236"
-    ],
-    "top_fonts": {
-      "Manrope": 47,
-      "Playfair Display": 44,
-      "+mj-lt": 42,
-      "Arial(Body)": 10,
-      "Arial": 7,
-      "Arial (Body)": 2,
-      "Playfair Display Black": 1
-    }
+    "deck_files": [
+      "AbbVie (ABV)\\(Unclassified)\\ZoomRx Requested Slides.pptx",
+      "AbbVie (ABV)\\02 AbbVie - HCV\\HCV PET Q1'26 Full Report.pptx",
+      "AbbVie (ABV)\\03 ABV_Creon\\CREON Share of Voice Study - W33.pptx",
+      "AbbVie (ABV)\\14 Rinvoq_Skyrizi PET\\Consolidated PET.pptx",
+      "AbbVie (ABV)\\22 ABV_MVD_UC UD Qual Quant study\\MVD Refinement Study UC Final Report.pptx"
+    ]
   },
   "CCA_PP_TRACKER": {
     "brand": "CCA_PP_TRACKER",
     "client": "CCA",
     "competitor": null,
     "therapy_area": "Cross-brand",
-    "deck_filenames": [
-      "CCA PET Q2FY26 Personal Promotion Synapse check.pptx"
-    ],
-    "top_series_colors_raw": {
-      "F28E2B": 5,
-      "FFFFFF": 4,
-      "A6A6A6": 4,
-      "8FAADC": 4,
-      "BDD7EE": 3,
-      "AFED5D": 3,
-      "FFABD5": 3,
-      "BFBFBF": 2,
-      "FF6700": 2,
-      "FF8F43": 2,
-      "FFBC8F": 2,
-      "002060": 2,
-      "2F5597": 2,
-      "B4C7E7": 2,
-      "F28E41": 1,
-      "F8696B": 1,
-      "FA9473": 1,
-      "FCBF7B": 1,
-      "FFEB84": 1,
-      "CCDD82": 1,
-      "98CE7F": 1,
-      "63BE7B": 1
-    },
+    "deck_count": 1,
     "palette_filtered": [
       "F28E2B",
       "8FAADC",
@@ -724,515 +43,160 @@
       "002060",
       "2F5597"
     ],
-    "top_fonts": {
-      "Century Gothic": 43,
-      "Arial": 31,
-      "Wingdings": 6,
-      "+mn-lt": 3,
-      "+mj-lt": 1,
-      "-apple-system": 1
-    }
+    "deck_files": [
+      "Agios _ Servier\\02 CCA PET\\CCA PET Q2FY26 Personal Promotion Final Report.pptx"
+    ]
   },
-  "BLENREP": {
-    "brand": "BLENREP",
-    "client": "GSK",
+  "ULTOMIRIS": {
+    "brand": "ULTOMIRIS",
+    "client": "ALEXION",
     "competitor": null,
-    "therapy_area": "Oncology/MM",
-    "deck_filenames": [
-      "GSK BLENREP MM PET Monthly Report February 2026_Migration Copy.pptx"
-    ],
-    "top_series_colors_raw": {
-      "3AB51D": 36,
-      "6658A6": 26,
-      "5C103B": 22,
-      "668EDD": 20,
-      "7030A0": 20,
-      "17B3AF": 17,
-      "1B3B7A": 16,
-      "E21860": 14,
-      "4F447D": 13,
-      "F25E29": 11,
-      "F36633": 8,
-      "244EA2": 7,
-      "4D427D": 7,
-      "21B6B2": 5,
-      "183978": 5,
-      "E53473": 5,
-      "00B050": 5,
-      "D9D9D9": 3,
-      "44D422": 2,
-      "6BE34F": 2,
-      "CBF5C1": 2,
-      "A6A6A6": 2,
-      "FFC000": 2,
-      "A4D48E": 2,
-      "C00000": 2,
-      "FAC2AD": 2,
-      "D51900": 1,
-      "0090FF": 1,
-      "F06A5D": 1,
-      "706352": 1
-    },
+    "therapy_area": "Hematology/PNH",
+    "deck_count": 1,
     "palette_filtered": [
-      "3AB51D",
-      "6658A6",
-      "5C103B",
-      "668EDD",
+      "0E8779",
       "7030A0",
-      "17B3AF",
-      "1B3B7A",
-      "E21860",
-      "4F447D",
-      "F25E29"
+      "E35105",
+      "799A01",
+      "FFA300",
+      "FF8181",
+      "84CA68",
+      "009886",
+      "D34D2F",
+      "008DAB"
     ],
-    "top_fonts": {
-      "Arial": 52,
-      "+mj-lt": 22,
-      "DM Sans 14pt": 5,
-      "Century Gothic": 4,
-      "+mn-lt": 1,
-      "Times New Roman": 1
-    }
-  },
-  "JEMPERLI-ZEJULA": {
-    "brand": "JEMPERLI-ZEJULA",
-    "client": "GSK",
-    "competitor": null,
-    "therapy_area": "Oncology/Endometrial",
-    "deck_filenames": [
-      "GSK Jemperli Zejula PET Full Report February '26 Syn Check.pptx"
-    ],
-    "top_series_colors_raw": {
-      "D51900": 17,
-      "00847C": 11,
-      "706352": 10,
-      "A9A197": 10,
-      "3F348E": 9,
-      "E7004E": 9,
-      "668EDD": 8,
-      "FFC000": 7,
-      "4F8734": 7,
-      "C69900": 6,
-      "333333": 4,
-      "0070C0": 4,
-      "A6A6A6": 4,
-      "F36633": 4,
-      "AB162C": 2,
-      "741C14": 2,
-      "C00000": 2,
-      "EA8D85": 1,
-      "F1B3AD": 1,
-      "F8D9D6": 1,
-      "7030A0": 1,
-      "ABC1EC": 1,
-      "D4E0F6": 1
-    },
-    "palette_filtered": [
-      "D51900",
-      "00847C",
-      "706352",
-      "A9A197",
-      "3F348E",
-      "E7004E",
-      "668EDD",
-      "FFC000",
-      "4F8734",
-      "C69900"
-    ],
-    "top_fonts": {
-      "Arial": 48,
-      "Century Gothic": 18,
-      "+mn-lt": 7,
-      "+mj-lt": 1
-    }
-  },
-  "DARZALEX": {
-    "brand": "DARZALEX",
-    "client": "JJ",
-    "competitor": null,
-    "therapy_area": "Oncology/MM",
-    "deck_filenames": [
-      "J&J MM SFEA Q1'26_Full_Report_V2_Migration.pptx"
-    ],
-    "top_series_colors_raw": {
-      "6FC6C1": 35,
-      "BD05ED": 30,
-      "2A41C1": 18,
-      "FF6A5A": 17,
-      "FFC000": 13,
-      "0302C8": 13,
-      "2D5BEF": 12,
-      "AC4069": 10,
-      "7D7E7D": 8,
-      "FF9C91": 7,
-      "FFA482": 5,
-      "D7D200": 5,
-      "404040": 5,
-      "0FB4FF": 4,
-      "000000": 3,
-      "7F7F7F": 3,
-      "1E566D": 3,
-      "EEB500": 3,
-      "FFFFFF": 3,
-      "F52B7D": 2,
-      "D81F1F": 2,
-      "E27E2E": 2,
-      "BFBFBF": 2,
-      "F75824": 2,
-      "9E4CDC": 2,
-      "237D26": 2,
-      "B3B4B6": 2,
-      "0070C0": 2,
-      "77BEE1": 2,
-      "69D0FF": 2
-    },
-    "palette_filtered": [
-      "6FC6C1",
-      "BD05ED",
-      "2A41C1",
-      "FF6A5A",
-      "FFC000",
-      "0302C8",
-      "2D5BEF",
-      "AC4069",
-      "7D7E7D",
-      "FF9C91"
-    ],
-    "top_fonts": {
-      "Johnson Text": 113,
-      "+mn-lt": 16,
-      "Johnson Display": 3
-    }
-  },
-  "RYBREVANT": {
-    "brand": "RYBREVANT",
-    "client": "JJ",
-    "competitor": "TAGRISSO",
-    "therapy_area": "Oncology/NSCLC",
-    "deck_filenames": [
-      "JJ PET RYBREVANT+LAZCLUZE Q1'26 Report_Migration.pptx"
-    ],
-    "top_series_colors_raw": {
-      "F75824": 14,
-      "FBAB91": 8,
-      "F95924": 4,
-      "7030A0": 4,
-      "BAB0AC": 4,
-      "1F698F": 3,
-      "77BEE3": 3,
-      "7F46AA": 3,
-      "92D050": 2,
-      "00B050": 2,
-      "25390F": 2,
-      "CC3399": 2,
-      "E085C2": 2,
-      "F5D6EB": 2,
-      "7638A4": 2,
-      "0B486B": 1,
-      "3B8686": 1,
-      "A8DBA8": 1,
-      "FF6A5A": 1,
-      "FFCDC8": 1,
-      "C4BDB6": 1,
-      "E1DEDA": 1,
-      "000000": 1,
-      "9EDC70": 1,
-      "77BEE1": 1,
-      "F084CC": 1,
-      "FFC000": 1,
-      "BF3119": 1,
-      "DC0086": 1,
-      "FF0000": 1
-    },
-    "palette_filtered": [
-      "F75824",
-      "FBAB91",
-      "F95924",
-      "7030A0",
-      "BAB0AC",
-      "1F698F",
-      "77BEE3",
-      "7F46AA",
-      "92D050",
-      "25390F"
-    ],
-    "top_fonts": {
-      "Johnson Text": 55,
-      "Johnson Display": 54,
-      "+mn-lt": 25,
-      "+mj-lt": 13
-    }
-  },
-  "LYNPARZA": {
-    "brand": "LYNPARZA",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Oncology",
-    "deck_filenames": [
-      "Lynparza aOC_PET_Q1 2026TEST.pptx"
-    ],
-    "top_series_colors_raw": {
-      "94D448": 53,
-      "00B050": 36,
-      "FFBA00": 30,
-      "00B3FF": 24,
-      "34A355": 13,
-      "D2CEC8": 13,
-      "F74548": 7,
-      "D5D5D5": 7,
-      "9FD448": 6,
-      "7F7F7F": 6,
-      "003A57": 5,
-      "00B0F0": 5,
-      "916CBC": 4,
-      "C00000": 4,
-      "382450": 3,
-      "3D94AA": 3,
-      "F8C53B": 3,
-      "39C0FA": 3,
-      "A8D971": 3,
-      "F2D076": 3,
-      "72CDF6": 3,
-      "C9E9A3": 3,
-      "FFEEBF": 3,
-      "ACDBF2": 3,
-      "D1E3C4": 3,
-      "F7931D": 3,
-      "CCFFCC": 3,
-      "D1E485": 3,
-      "F8E030": 2,
-      "E7E8E9": 2
-    },
-    "palette_filtered": [
-      "94D448",
-      "FFBA00",
-      "00B3FF",
-      "34A355",
-      "D2CEC8",
-      "F74548",
-      "D5D5D5",
-      "9FD448",
-      "003A57",
-      "00B0F0"
-    ],
-    "top_fonts": {
-      "Arial": 67,
-      "Calibri": 3,
-      "Calibri (Body)": 1
-    }
-  },
-  "ADBRY": {
-    "brand": "ADBRY",
-    "client": "LEO",
-    "competitor": null,
-    "therapy_area": "Dermatology/AD",
-    "deck_filenames": [
-      "OG Adbry PET SC Deck.pptx",
-      "V1_Adbry PET_W1'26 (Wave 22)_migrated deck.pptx"
-    ],
-    "top_series_colors_raw": {
-      "C014A3": 36,
-      "D5685F": 30,
-      "6F439A": 28,
-      "FED006": 14,
-      "EAAFE0": 14,
-      "009B77": 12,
-      "D561C1": 8,
-      "90117A": 8,
-      "946A2C": 6,
-      "2E8082": 6,
-      "1E41EB": 6,
-      "0047BB": 5,
-      "00609C": 5,
-      "4E7BA9": 4,
-      "00B050": 4,
-      "929292": 4,
-      "EAB3AF": 4,
-      "9A7CB8": 4,
-      "C017A2": 4,
-      "FF8C19": 3,
-      "FF0000": 2,
-      "7030A0": 2,
-      "68A17C": 2,
-      "EAAA00": 2,
-      "798D83": 2,
-      "3D624A": 2,
-      "B8E4FF": 2,
-      "F9CAF0": 2,
-      "D9D9D9": 1,
-      "97A79F": 1
-    },
-    "palette_filtered": [
-      "C014A3",
-      "D5685F",
-      "6F439A",
-      "FED006",
-      "EAAFE0",
-      "009B77",
-      "D561C1",
-      "90117A",
-      "946A2C",
-      "2E8082"
-    ],
-    "top_fonts": {
-      "Arial": 118,
-      "Franklin Gothic Book": 17
-    }
-  },
-  "ONIVYDE": {
-    "brand": "ONIVYDE",
-    "client": "IPSEN",
-    "competitor": null,
-    "therapy_area": "Oncology/Pancreatic",
-    "deck_filenames": [
-      "Onivyde SFE W3 Report.pptx"
-    ],
-    "top_series_colors_raw": {
-      "54AC65": 41,
-      "C84874": 13,
-      "8EC899": 11,
-      "595959": 9,
-      "BBDEC2": 9,
-      "D3D3D3": 7,
-      "D2E9D6": 6,
-      "A6A6A6": 6,
-      "A9D5B2": 6,
-      "00B039": 4,
-      "387343": 4,
-      "FA9F1A": 4,
-      "BFBFBF": 4,
-      "C2EAFF": 3,
-      "DE505E": 1,
-      "FF8813": 1,
-      "F4DAE3": 1,
-      "691F39": 1,
-      "7BA07B": 1,
-      "FFDAB9": 1,
-      "8AD79B": 1,
-      "ABE1B2": 1,
-      "00C9E8": 1,
-      "3FAE2A": 1,
-      "006600": 1,
-      "009900": 1
-    },
-    "palette_filtered": [
-      "54AC65",
-      "C84874",
-      "8EC899",
-      "BBDEC2",
-      "D2E9D6",
-      "A9D5B2",
-      "00B039",
-      "387343",
-      "FA9F1A",
-      "C2EAFF"
-    ],
-    "top_fonts": {
-      "+mn-lt": 17,
-      "+mj-lt": 8,
-      "Calibri": 1
-    }
+    "deck_files": [
+      "Alexion Pharmaceuticals\\ULTOMIRIS PNH\\[Migration] ZoomRx Alexion US PNH Q325 PET - v1.pptx"
+    ]
   },
   "PHYSICIANS_SFE_PET": {
     "brand": "PHYSICIANS_SFE_PET",
-    "client": "UNKNOWN",
+    "client": "ALNYLAM",
     "competitor": null,
     "therapy_area": "Cross-brand",
-    "deck_filenames": [
-      "Physicians SFE (PET)_Q3'25 Report_V1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "E7004C": 37,
-      "C7A013": 30,
-      "6BC9EF": 25,
-      "006838": 24,
-      "FF6969": 21,
-      "00607C": 20,
-      "4E79A7": 18,
-      "00A44A": 14,
-      "ED98C1": 13,
-      "E464A2": 12,
-      "00CC00": 12,
-      "D9D9D9": 8,
-      "33B66E": 7,
-      "FFC000": 6,
-      "B2B2B2": 5,
-      "FF9694": 4,
-      "FF2653": 3,
-      "DEA6DD": 3,
-      "FF79A6": 3,
-      "FFCBAA": 2,
-      "C7C9AF": 2,
-      "92D050": 2,
-      "F7B0C0": 2,
-      "6694AA": 1,
-      "00B050": 1,
-      "7F7F7F": 1,
-      "004D72": 1,
-      "6A6F6D": 1,
-      "C2C5C3": 1,
-      "F6CBE0": 1
-    },
+    "deck_count": 2,
     "palette_filtered": [
       "E7004C",
-      "C7A013",
+      "FF6969",
       "6BC9EF",
       "006838",
-      "FF6969",
       "00607C",
-      "4E79A7",
       "00A44A",
-      "ED98C1",
-      "E464A2"
+      "00CC00",
+      "D9D9D9",
+      "33B66E",
+      "B2B2B2"
     ],
-    "top_fonts": {
-      "Arial": 113,
-      "+mj-lt": 32,
-      "Arial(Body)": 14,
-      "+mn-lt": 2,
-      "Times New Roman": 1
-    }
+    "deck_files": [
+      "Alnylam (ALN)\\24 ALN AMVUTTRA PET 2025\\Physicians SFE (PET)_Q4'25 Report_V1.pptx",
+      "Alnylam (ALN)\\31 ALN AMVUTTRA PET 2026\\Physicians SFE (PET)_Q2'26 Report_V1.pptx"
+    ]
+  },
+  "OTEZLA": {
+    "brand": "OTEZLA",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Dermatology/Psoriasis",
+    "deck_count": 9,
+    "palette_filtered": [
+      "1F497D",
+      "00A3DF",
+      "C40E12",
+      "448D96",
+      "009900",
+      "F3C108",
+      "4C35DE",
+      "11A1A2",
+      "BF9761",
+      "AAA8AB"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\00 Amgen Otezla - all workstreams\\Q4'25 Otezla Rheum-PsA Dialogue - Sales Rep Training 2026.04.13.pptx",
+      "Amgen (AMG)\\076 AMG Otezla PET\\[ZoomRx] Q1'26 Otezla Derm PET_Full Report v1_Client version_15.04.2026.pptx",
+      "Amgen (AMG)\\CG Tracker - Wave 2\\[ZoomRx] Rheum Otezla CG Tracker - Wave 2 - v2.pptx",
+      "Amgen (AMG)\\CG Tracker Wave 1\\[ZoomRx] Rheum Otezla CG Tracker - Wave1 Report v1_Final.pptx",
+      "Amgen (AMG)\\Derm PET\\[ZoomRx] AMG Otezla Derm PET_Apr'25 KPIs_v1.pptx"
+    ]
+  },
+  "BONE_HCP_TRACKER": {
+    "brand": "BONE_HCP_TRACKER",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Bone",
+    "deck_count": 3,
+    "palette_filtered": [
+      "FF9933",
+      "009201",
+      "58193D",
+      "ADADAD",
+      "12437E",
+      "0070C0",
+      "FFC000",
+      "00B0F0",
+      "E46C0A",
+      "425563"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\01 AMG_Prolia_PET_2023\\10-04-26 AMG Bone HCP PET and ATU_Mar R3M.pptx",
+      "Amgen (AMG)\\084 Bone Health ATU\\3.12.2026_Q1'26 Bone HCP ATU Full Report_v1.0_AMG_SP_Version.pptx",
+      "Amgen (AMG)\\090 - Bone HCP-PT\\[ZoomRx] AMG Bone HCP-PT Dialogue Final Report Draft v0.3.pptx"
+    ]
+  },
+  "UPLIZNA": {
+    "brand": "UPLIZNA",
+    "client": "AMGEN",
+    "competitor": null,
+    "therapy_area": "Neurology/NMOSD",
+    "deck_count": 7,
+    "palette_filtered": [
+      "D6D2D0",
+      "76C269",
+      "0063C3",
+      "F2BFBF",
+      "2F6D5B",
+      "E57F7F",
+      "5B729B",
+      "813F97",
+      "007D6D",
+      "003C71"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\040 Amgen - UPLIZNA PET\\ZoomRx AMG Uplizna PET Q4'24 Final Report_01.10.25.pptx",
+      "Amgen (AMG)\\093 - UPLIZNA gMG Patient AAU\\ZoomRx UPLIZNA gMG Patient Experience and Switch Dynamics Full Report Q3 '25 v4.pptx",
+      "Amgen (AMG)\\Amgen - Uplizna IgG4 AAU\\Zoomrx Uplizna IgG4 AAU_Skeleton Deck.v0.1.pptx",
+      "Amgen (AMG)\\Amgen - UPLIZNA IgG4-RD PET\\ZoomRx AMG UPLIZNA IgG4 RD PET Q1 '26 Report v1.pptx",
+      "Amgen (AMG)\\Amgen - UPLIZNA NMOSD AAU\\ZoomRx UPLIZNA AAU Wave 6 Q4 2025 Final report Follow-up.pptx"
+    ]
+  },
+  "TEZSPIRE": {
+    "brand": "TEZSPIRE",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Respiratory",
+    "deck_count": 2,
+    "palette_filtered": [
+      "F89C0D",
+      "FFC600",
+      "6C5199",
+      "EF426F",
+      "9B37FF",
+      "0063C3",
+      "C688E8",
+      "5D9D39",
+      "0062C2",
+      "830051"
+    ],
+    "deck_files": [
+      "Amgen (AMG)\\056_AMG_AZ_Tezspire_PET\\ZoomRx Tezspire PET - 2026 Check-in Deck - 7th Apr 2026.pptx",
+      "Amgen (AMG)\\059 AMG_AZ_Tezspire_HCP_Pt\\2024-11-18_Tezspire HCP-Patient Dialogue Full Report_v3.pptx"
+    ]
   },
   "TEPEZZA": {
     "brand": "TEPEZZA",
     "client": "JJ",
     "competitor": null,
     "therapy_area": "Endocrinology/TED",
-    "deck_filenames": [
-      "TEPEZZA_PET_Q4 2025_Report_JJ_NS_TP1latest_UseThis.pptx"
-    ],
-    "top_series_colors_raw": {
-      "7FB1E1": 61,
-      "0063C3": 50,
-      "37CFCA": 34,
-      "228D8A": 29,
-      "A0D0FF": 19,
-      "CBF3F1": 18,
-      "00A3C4": 16,
-      "ADADAD": 13,
-      "FF6720": 12,
-      "31CDC9": 11,
-      "42A2FF": 9,
-      "9DE7E5": 8,
-      "00B050": 6,
-      "0062C2": 4,
-      "D9D9D9": 4,
-      "FF7C80": 4,
-      "7F7F7F": 4,
-      "FFB390": 4,
-      "98E6E4": 4,
-      "80D1E2": 4,
-      "605D75": 3,
-      "A6A6A6": 3,
-      "7EE0DD": 3,
-      "BEEFEE": 3,
-      "9D9BAF": 2,
-      "A07F70": 2,
-      "D9C5BB": 2,
-      "2E211B": 2,
-      "C86B2D": 2,
-      "FBEEBF": 2
-    },
+    "deck_count": 2,
     "palette_filtered": [
       "7FB1E1",
       "0063C3",
@@ -1245,459 +209,17 @@
       "FF6720",
       "31CDC9"
     ],
-    "top_fonts": {
-      "+mj-lt": 67,
-      "+mn-lt": 65,
-      "Century Gothic": 45,
-      "Arial": 18
-    }
-  },
-  "UPLIZNA": {
-    "brand": "UPLIZNA",
-    "client": "AMGEN",
-    "competitor": null,
-    "therapy_area": "Neurology/NMOSD",
-    "deck_filenames": [
-      "TEST [COPY] ZoomRx AMG UPLIZNA NMOSD PET Q4 '25 Final Report_cleaned.pptx"
-    ],
-    "top_series_colors_raw": {
-      "813F97": 30,
-      "007D6D": 14,
-      "003C71": 11,
-      "DA205F": 8,
-      "00B0F0": 7,
-      "E46C0A": 5,
-      "D9D9D9": 5,
-      "425563": 4,
-      "0063C3": 4,
-      "A6A6A6": 4,
-      "335E95": 4,
-      "ED7D31": 3,
-      "DB2764": 3,
-      "6F8DB4": 3,
-      "ABBDD4": 3,
-      "A03922": 2,
-      "7A6004": 2,
-      "FFC000": 2,
-      "082F64": 2,
-      "003161": 1,
-      "6683A0": 1,
-      "2DB9B6": 1,
-      "DDC4E6": 1,
-      "FFE699": 1,
-      "C55A11": 1,
-      "00B050": 1,
-      "0A3D80": 1
-    },
-    "palette_filtered": [
-      "813F97",
-      "007D6D",
-      "003C71",
-      "DA205F",
-      "00B0F0",
-      "E46C0A",
-      "D9D9D9",
-      "425563",
-      "0063C3",
-      "335E95"
-    ],
-    "top_fonts": {
-      "Century Gothic": 86,
-      "Calibri": 40,
-      "+mn-lt": 25,
-      "+mj-lt": 13
-    }
-  },
-  "TRUQAP": {
-    "brand": "TRUQAP",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Oncology/Breast",
-    "deck_filenames": [
-      "TRUQAP PET Quarterly Report Q4 '25 v2 (Sandbox v2).pptx"
-    ],
-    "top_series_colors_raw": {
-      "250E62": 38,
-      "656681": 27,
-      "006937": 27,
-      "FFCB05": 23,
-      "F5A899": 19,
-      "EE7623": 16,
-      "05CDCD": 15,
-      "006680": 10,
-      "664993": 10,
-      "0988CA": 9,
-      "7F7F7F": 8,
-      "000000": 7,
-      "34CA8B": 6,
-      "800000": 5,
-      "B48000": 5,
-      "92D050": 5,
-      "B0E4FF": 4,
-      "FCE7E3": 4,
-      "461BBF": 3,
-      "E22B00": 3,
-      "F3BD35": 3,
-      "719743": 3,
-      "DBDBDB": 2,
-      "D9D9D9": 2,
-      "338599": 2,
-      "FFD537": 2,
-      "D6BC22": 2,
-      "1E22AA": 2,
-      "F8C8A7": 2,
-      "99C3AF": 2
-    },
-    "palette_filtered": [
-      "250E62",
-      "656681",
-      "006937",
-      "FFCB05",
-      "F5A899",
-      "EE7623",
-      "05CDCD",
-      "006680",
-      "664993",
-      "0988CA"
-    ],
-    "top_fonts": {
-      "Calibri": 84,
-      "Arial": 57,
-      "Arial (Headings)": 11
-    }
-  },
-  "ABRYSVO": {
-    "brand": "ABRYSVO",
-    "client": "PFIZER",
-    "competitor": null,
-    "therapy_area": "Vaccines/Maternal",
-    "deck_filenames": [
-      "US Abrysvo Maternal HCP CFC Promotional Effectiveness Tracking (ZoomRx)_Q4 \u201825 - Full Report V3.0.pptx"
-    ],
-    "top_series_colors_raw": {
-      "0000C9": 20,
-      "E356DC": 12,
-      "43964A": 12,
-      "F49C34": 10,
-      "C00000": 8,
-      "BA2A4C": 7,
-      "7F7F7F": 5,
-      "0095FF": 5,
-      "00B050": 4,
-      "D3770B": 3,
-      "0070BF": 3,
-      "A4D6A8": 3,
-      "67BB6E": 3,
-      "92D050": 2,
-      "FFC000": 2,
-      "008A00": 2,
-      "F3CE0A": 2,
-      "FF0000": 2,
-      "E89AAD": 2,
-      "024A34": 1,
-      "4060AF": 1,
-      "D95776": 1,
-      "99D5FF": 1
-    },
-    "palette_filtered": [
-      "0000C9",
-      "E356DC",
-      "43964A",
-      "F49C34",
-      "BA2A4C",
-      "0095FF",
-      "D3770B",
-      "0070BF",
-      "A4D6A8",
-      "67BB6E"
-    ],
-    "top_fonts": {
-      "Arial": 63,
-      "+mj-lt": 37,
-      "Calibri (Body)": 10,
-      "Johnson Text": 4,
-      "+mn-lt": 3,
-      "Invention(Body)": 2,
-      "Europa-Regular": 1,
-      "Trebuchet MS": 1
-    }
-  },
-  "ENHERTU": {
-    "brand": "ENHERTU",
-    "client": "DSI_AZN",
-    "competitor": null,
-    "therapy_area": "Oncology/HER2",
-    "deck_filenames": [
-      "ZoomRx - AZ - DSI ENHERTU NSCLC HER2 ERBB2mu Post Launch Wave 6 Report 3.1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "FF8813": 73,
-      "E15759": 50,
-      "33A4FF": 42,
-      "59A14F": 40,
-      "9467BD": 40,
-      "1D7B87": 40,
-      "91C3D5": 37,
-      "F0FF4D": 26,
-      "CC0099": 25,
-      "676767": 25,
-      "4EBB57": 24,
-      "696CC2": 24,
-      "004F8E": 22,
-      "FFB061": 19,
-      "D3D4D6": 13,
-      "397AA7": 12,
-      "489F33": 8,
-      "D9D9D9": 8,
-      "D99694": 8,
-      "595959": 8,
-      "FF7500": 7,
-      "FCE4D3": 6,
-      "BFBFBF": 6,
-      "B3B7B8": 6,
-      "A6A6A6": 6,
-      "003865": 5,
-      "7F7F7F": 5,
-      "C72327": 5,
-      "EB8D8F": 5,
-      "FF7D7D": 5
-    },
-    "palette_filtered": [
-      "FF8813",
-      "E15759",
-      "33A4FF",
-      "59A14F",
-      "9467BD",
-      "1D7B87",
-      "91C3D5",
-      "F0FF4D",
-      "CC0099",
-      "676767"
-    ],
-    "top_fonts": {
-      "Arial": 62,
-      "Arial(Body)": 4
-    }
-  },
-  "CALQUENCE": {
-    "brand": "CALQUENCE",
-    "client": "AZN",
-    "competitor": null,
-    "therapy_area": "Oncology/CLL",
-    "deck_filenames": [
-      "ZoomRx - AZN Calquence PET Q4 '25 Report v1 - Sandbox Copy.pptx"
-    ],
-    "top_series_colors_raw": {
-      "00A2E0": 25,
-      "002060": 22,
-      "DC4405": 22,
-      "FFC72C": 20,
-      "EE3EDD": 20,
-      "E44405": 19,
-      "001F58": 16,
-      "E97142": 10,
-      "EF9F80": 10,
-      "D9D9D9": 10,
-      "7F7F7F": 8,
-      "00B050": 8,
-      "E8D9F3": 7,
-      "C93535": 7,
-      "8EB1B5": 4,
-      "1D9A78": 3,
-      "FFC000": 3,
-      "FFDD80": 3,
-      "FFE9AB": 2,
-      "BABBBB": 2,
-      "7C0041": 2,
-      "EDA182": 2,
-      "F4C7B4": 2,
-      "FBECE6": 2,
-      "6E2202": 1,
-      "FABE00": 1,
-      "3FADFF": 1,
-      "DCDDDD": 1,
-      "00B0F0": 1,
-      "006600": 1
-    },
-    "palette_filtered": [
-      "00A2E0",
-      "002060",
-      "DC4405",
-      "FFC72C",
-      "EE3EDD",
-      "E44405",
-      "001F58",
-      "E97142",
-      "EF9F80",
-      "D9D9D9"
-    ],
-    "top_fonts": {
-      "Arial": 75,
-      "+mn-lt": 15,
-      "Verdana": 2
-    }
-  },
-  "OJJAARA": {
-    "brand": "OJJAARA",
-    "client": "GSK",
-    "competitor": null,
-    "therapy_area": "Hematology/MF",
-    "deck_filenames": [
-      "ZoomRx - GSK OJJAARA MF PET Research - February '26 Full Monthly Report v1 Migration Test.pptx"
-    ],
-    "top_series_colors_raw": {
-      "6BB23E": 13,
-      "6114FF": 13,
-      "EE5340": 11,
-      "3A5C6D": 7,
-      "6014FF": 7,
-      "DDDDDD": 7,
-      "00B050": 4,
-      "FC6666": 4,
-      "AB162C": 2,
-      "0070C0": 2,
-      "333333": 2,
-      "A3CF87": 2,
-      "C4E0B2": 2,
-      "F0F7EB": 2,
-      "4DBC32": 2,
-      "894FFF": 1,
-      "9BBB59": 1,
-      "706352": 1,
-      "A9A197": 1,
-      "9C6DFF": 1,
-      "BFA1FF": 1,
-      "EFE7FF": 1,
-      "7C3BFF": 1,
-      "AB81FF": 1,
-      "D3BDFF": 1,
-      "7F7F7F": 1,
-      "F49489": 1,
-      "F8BAB3": 1,
-      "FDEDEC": 1,
-      "5F269E": 1
-    },
-    "palette_filtered": [
-      "6BB23E",
-      "6114FF",
-      "EE5340",
-      "3A5C6D",
-      "6014FF",
-      "DDDDDD",
-      "FC6666",
-      "AB162C",
-      "0070C0",
-      "333333"
-    ],
-    "top_fonts": {
-      "Arial": 37,
-      "+mj-lt": 23,
-      "Century Gothic": 6,
-      "+mn-lt": 3,
-      "Raleway": 1
-    }
-  },
-  "DUPIXENT_EoE": {
-    "brand": "DUPIXENT_EoE",
-    "client": "REGENERON_SANOFI",
-    "competitor": null,
-    "therapy_area": "Immunology/EoE",
-    "deck_filenames": [
-      "ZoomRx Dupixent EoE PET Q4 '25_v3.pptx"
-    ],
-    "top_series_colors_raw": {
-      "219491": 62,
-      "F79646": 18,
-      "E46C0A": 16,
-      "8EB4E3": 11,
-      "00745A": 11,
-      "7030A0": 11,
-      "B370A4": 10,
-      "7ABFBD": 9,
-      "558ED5": 9,
-      "BFBFBF": 5,
-      "17375E": 5,
-      "1BA2DA": 4,
-      "A6A6A6": 4,
-      "59AFAD": 3,
-      "90CAC8": 3,
-      "DFDFDF": 3,
-      "A6D4D3": 3,
-      "90C9C8": 3,
-      "D99694": 2,
-      "E6B9B8": 2,
-      "BDBDBD": 2,
-      "999999": 2,
-      "FAC396": 2,
-      "0070C0": 2,
-      "4F6228": 2,
-      "953735": 2,
-      "7F7F7F": 1,
-      "ED553B": 1,
-      "93CDDD": 1,
-      "8064A2": 1
-    },
-    "palette_filtered": [
-      "219491",
-      "F79646",
-      "E46C0A",
-      "8EB4E3",
-      "00745A",
-      "7030A0",
-      "B370A4",
-      "7ABFBD",
-      "558ED5",
-      "17375E"
-    ],
-    "top_fonts": {
-      "Arial": 96,
-      "+mj-lt": 51,
-      "+mn-lt": 37,
-      "Arial(Body)": 25,
-      "Wingdings": 18,
-      "Trebuschet MS Body": 1,
-      "Helvetica Neue": 1,
-      "Calibri": 1
-    }
+    "deck_files": [
+      "Amgen (AMG)\\079 AMG Tepezza\\AMG Tepezza HCP-PT KO.pptx",
+      "Amgen (AMG)\\TEPEZZA PET\\TEPEZZA_PET_Q4 2025_Report_Migration test.pptx"
+    ]
   },
   "EMPAVELI": {
     "brand": "EMPAVELI",
     "client": "APELLIS",
     "competitor": null,
     "therapy_area": "Hematology",
-    "deck_filenames": [
-      "ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx"
-    ],
-    "top_series_colors_raw": {
-      "FC3B6E": 37,
-      "E7E6E6": 33,
-      "30CFD0": 32,
-      "81E3E3": 9,
-      "5A4986": 8,
-      "FD7FA0": 8,
-      "FEB0C4": 8,
-      "FFC000": 7,
-      "163A6B": 6,
-      "5E6C85": 5,
-      "C6F3F2": 4,
-      "00B0F0": 4,
-      "9A9A9A": 3,
-      "0070C0": 3,
-      "666666": 2,
-      "C02C57": 2,
-      "F16464": 2,
-      "D36B8A": 2,
-      "E6ABBC": 2,
-      "7F7F7F": 2,
-      "00628B": 2,
-      "4CC3E9": 2,
-      "E8E8E8": 2,
-      "E3E2E2": 1,
-      "FF671B": 1,
-      "0059A6": 1,
-      "B72600": 1,
-      "219491": 1
-    },
+    "deck_count": 1,
     "palette_filtered": [
       "FC3B6E",
       "30CFD0",
@@ -1710,13 +232,406 @@
       "5E6C85",
       "C6F3F2"
     ],
-    "top_fonts": {
-      "+mn-lt": 61,
-      "Calibri": 53,
-      "Calibri (Body)": 32,
-      "Wingdings": 8,
-      "Arial": 6,
-      "+mj-lt": 3
-    }
+    "deck_files": [
+      "Apellis (APL)\\01_APL_Empaveli_Nephrology_PET_2025\\ZoomRx_Apellis EMPAVELI PET_Wave 2 PET_v1.pptx"
+    ]
+  },
+  "ENHERTU": {
+    "brand": "ENHERTU",
+    "client": "DSI_AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/HER2",
+    "deck_count": 23,
+    "palette_filtered": [
+      "FF8813",
+      "34A355",
+      "EE7623",
+      "F5AD7B",
+      "8F66A9",
+      "33A4FF",
+      "0070C0",
+      "F6BC94",
+      "D9D9D9",
+      "FFBFFF"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\01 AZN_DS-8201_IntegratedTracking_2020\\ZoomRx AZ-DSI ENHERTU mBC QBR Report - Q1 '26 v1.0.pptx",
+      "AstraZeneca (AZN)\\PET - Monthly\\ZoomRx - ENHERTU mBC PET - Feb '26 Monthly WIP Report v1.0.pptx",
+      "AstraZeneca (AZN)\\PET - Quarterly\\ZoomRx AZ-DSI ENHERTU mBC Full PP PET Report - Q1 '26_WIP_skeleton.pptx",
+      "daiichi sankyo\\(Unclassified)\\ZoomRx - ENHERTU Brand Planning - 03-27.pptx",
+      "daiichi sankyo\\00 Client Access SharePoint Files\\ZoomRx - AZ-DSI ENHERTU NPP Report - NSCLC - Tumor-Agnostic - Nov \u201925 - Feb \u201926 - Final Report v1.pptx"
+    ]
+  },
+  "CALQUENCE": {
+    "brand": "CALQUENCE",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/CLL",
+    "deck_count": 3,
+    "palette_filtered": [
+      "002060",
+      "EE3EDD",
+      "00A2E0",
+      "DC4405",
+      "FFC72C",
+      "E44405",
+      "001F58",
+      "E97142",
+      "EF9F80",
+      "D9D9D9"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\02 AZN_Calquence_PET_2020\\ZoomRx - AZN Calquence PET Q1 '26 Skeleton Deck.pptx",
+      "AstraZeneca (AZN)\\39 AZN Calquence Perxcept Study\\ZoomRx - Calquence Digital Tracker - Q1 2026.pptx",
+      "AstraZeneca (AZN)\\March KPI Report\\ZoomRx - AZN Calquence CLL PET March Data Read_v2.pptx"
+    ]
+  },
+  "DATROWAY": {
+    "brand": "DATROWAY",
+    "client": "DSI",
+    "competitor": null,
+    "therapy_area": "Oncology/NSCLC",
+    "deck_count": 2,
+    "palette_filtered": [
+      "1E22AA",
+      "EE7623",
+      "00ABC7",
+      "018EAF",
+      "F5AD7B",
+      "664993",
+      "250E62",
+      "B0E4FF",
+      "3D95F6",
+      "006937"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\03 AZN_Datroway_mBC_PET\\AZ-DSI - DATROWAY mBC Promotional Effectiveness Tracking Q1 '26_v1.0.pptx",
+      "AstraZeneca (AZN)\\46 AZN_Datroway_NSCLC PET\\DATROWAY EGFRm NSCLC Promotional Effectiveness Tracking (PET) Q1 '26 PP and NPP Final Report_v1.pptx"
+    ]
+  },
+  "LYNPARZA": {
+    "brand": "LYNPARZA",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology",
+    "deck_count": 4,
+    "palette_filtered": [
+      "006680",
+      "B2D234",
+      "33CCCC",
+      "D9D9D9",
+      "675F53",
+      "92D050",
+      "94D448",
+      "FFBA00",
+      "00B3FF",
+      "D2CEC8"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\04 AZN_Lynparza_Ovarian_PET\\Lynparza aOC_PET_Q1 2026_v1.0.pptx",
+      "AstraZeneca (AZN)\\21 AZN_Lynparza_mBC_PET_2022\\ZoomRx_Lynparza eBC PET Q1 '26 Report_v1.pptx",
+      "AstraZeneca (AZN)\\47 AZN Lynparza eBC Digital Tracker 2025\\ZoomRx_Lynparza eBC Digital Tracker - Q4 '24 to Q4 '25.pptx",
+      "Merck (MER)\\32 MER_Lynparza_mCRPC_PET_2025\\Lynparza mCRPC PET_Q4 25 Full Report_Readout V4.1.pptx"
+    ]
+  },
+  "TRUQAP": {
+    "brand": "TRUQAP",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Oncology/Breast",
+    "deck_count": 1,
+    "palette_filtered": [
+      "250E62",
+      "656681",
+      "006937",
+      "FFCB05",
+      "F5A899",
+      "05CDCD",
+      "006680",
+      "664993",
+      "0988CA",
+      "FCE7E3"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\38 AZN Capivasertib PET\\TRUQAP PET Quarterly Report Q1 '26 v2.pptx"
+    ]
+  },
+  "LOKELMA": {
+    "brand": "LOKELMA",
+    "client": "AZN",
+    "competitor": null,
+    "therapy_area": "Nephrology",
+    "deck_count": 1,
+    "palette_filtered": [
+      "00947F",
+      "B2B2B2",
+      "4A2C8C",
+      "AB162C",
+      "00B0F0",
+      "FF2916",
+      "003965",
+      "00EAC9",
+      "B6FFF4",
+      "FF8E85"
+    ],
+    "deck_files": [
+      "AstraZeneca (AZN)\\40 AZN Lokelma PET\\AZN LOKELMA PET Quarterly Report Q1 2026.pptx"
+    ]
+  },
+  "MIEBO": {
+    "brand": "MIEBO",
+    "client": "BL",
+    "competitor": null,
+    "therapy_area": "Ophthalmology/DED",
+    "deck_count": 1,
+    "palette_filtered": [
+      "00A9EB",
+      "4B34A2",
+      "222A35",
+      "400286",
+      "D9D9D9",
+      "FFC000",
+      "003865",
+      "993366",
+      "660066",
+      "000F9F"
+    ],
+    "deck_files": [
+      "Bausch (BAU)\\04 BAU Integrated Report (PET + ECP-Pt)\\[ZoomRx] B+L DED Integrated Report - Wave 1 v1.0.pptx"
+    ]
+  },
+  "BAVENCIO": {
+    "brand": "BAVENCIO",
+    "client": "EMD",
+    "competitor": null,
+    "therapy_area": "Oncology",
+    "deck_count": 1,
+    "palette_filtered": [],
+    "deck_files": [
+      "EMD Serono\\Bavencio PET\\Q2'26_ZRx EMD Serono Bavencio Kick-Off - Wave 5 - V1.pptx"
+    ]
+  },
+  "OJJAARA": {
+    "brand": "OJJAARA",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Hematology/MF",
+    "deck_count": 3,
+    "palette_filtered": [
+      "EE5340",
+      "6BB23E",
+      "6014FF",
+      "6CB33E",
+      "6114FF",
+      "92D050",
+      "DFD0FF",
+      "1DC2E7",
+      "FFC000",
+      "70A525"
+    ],
+    "deck_files": [
+      "GSK\\08 GSK OJJAARA HCP-Pt\\ZoomRx - GSK OJJAARA HCP Patient Interaction Research - Dec 2025 - v3.pptx",
+      "GSK\\09 GSK OJJAARA DT\\ZoomRx - GSK OJJAARA HCP Digital Tracker - Q2'25 - Full Report - v3.0.pptx",
+      "GSK\\12 GSK PETxDTxHCP_PT Common Files\\ZoomRx - GSK OJJAARA DT Interim Report v3 - Q4' 25.pptx"
+    ]
+  },
+  "BLENREP": {
+    "brand": "BLENREP",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Oncology/MM",
+    "deck_count": 1,
+    "palette_filtered": [
+      "3AB51D",
+      "5C103B",
+      "6658A6",
+      "7030A0",
+      "668EDD",
+      "21B6B2",
+      "F25E29",
+      "183978",
+      "E53473",
+      "4F447D"
+    ],
+    "deck_files": [
+      "GSK\\10 GSK BLENREP MM PET\\GSK BLENREP MM PET NPP Full Report Dec-March 2026.pptx"
+    ]
+  },
+  "JEMPERLI-ZEJULA": {
+    "brand": "JEMPERLI-ZEJULA",
+    "client": "GSK",
+    "competitor": null,
+    "therapy_area": "Oncology/Endometrial",
+    "deck_count": 1,
+    "palette_filtered": [
+      "00847C",
+      "D51900",
+      "FFC000",
+      "4F8734",
+      "C69900",
+      "668EDD",
+      "706352",
+      "A9A197",
+      "4A4A4A",
+      "F36633"
+    ],
+    "deck_files": [
+      "GSK\\11 GSK JEMPERLI & ZEJULA (EC & OC) - PET\\GSK Jemperli Zejula PET Full Report March '26 v1.0.pptx"
+    ]
+  },
+  "ONIVYDE": {
+    "brand": "ONIVYDE",
+    "client": "IPSEN",
+    "competitor": null,
+    "therapy_area": "Oncology/Pancreatic",
+    "deck_count": 2,
+    "palette_filtered": [
+      "54AC65",
+      "C84874",
+      "387343",
+      "FA9F1A",
+      "C2EAFF",
+      "8EC899",
+      "BBDEC2",
+      "D2E9D6",
+      "A9D5B2",
+      "00B039"
+    ],
+    "deck_files": [
+      "Ipsen\\04 Onivyde PET\\Onivyde SFE W3 Report.pptx",
+      "Ipsen\\ATU-PET Cross Tab Analysis\\ZoomRx IPSEN Onivyde -  SFE-ATU Analysis Final Report - SFE W2 & KPI W8.pptx"
+    ]
+  },
+  "ADBRY": {
+    "brand": "ADBRY",
+    "client": "LEO",
+    "competitor": null,
+    "therapy_area": "Dermatology/AD",
+    "deck_count": 2,
+    "palette_filtered": [
+      "D5685F",
+      "6F439A",
+      "009B77",
+      "C014A3",
+      "FED006",
+      "EAAFE0",
+      "90117A",
+      "D561C1",
+      "946A2C",
+      "2E8082"
+    ],
+    "deck_files": [
+      "LEO Pharma\\2021 Message Tracking - Adbry PET\\V1_Adbry PET_W1'26 (Wave 22)_migrated deck.pptx",
+      "LEO Pharma\\2025 Tralokinumab HCP-P\\V1_Adbry_HCP-Pt Conversations_Oct'25.pptx"
+    ]
+  },
+  "RHAPSIDO": {
+    "brand": "RHAPSIDO",
+    "client": "NOVARTIS",
+    "competitor": null,
+    "therapy_area": "Immunology",
+    "deck_count": 5,
+    "palette_filtered": [
+      "830F66",
+      "0070FE",
+      "018E86",
+      "002068",
+      "8F2DDE",
+      "852065",
+      "B56FA3",
+      "50E2D0",
+      "A7A8AA",
+      "61A8FF"
+    ],
+    "deck_files": [
+      "Novartis (NVS)\\07 Qual Study\\ZoomRx NVS RHAPSIDO Follow Up Qualitative Interviews Report v1.pptx",
+      "Novartis (NVS)\\12 NVS CSU PET + Digital Tracking Study\\[ZoomRx] NVS Rhapsido_PET_Wave 5 Full Report v1.1.pptx",
+      "Novartis (NVS)\\13 NVS_CSU_remibrutinib_HCP_Pt Study\\ZoomRx NVS RHAPSIDO Follow Up - CHRONIC.pptx",
+      "Novartis (NVS)\\Digital\\[ZoomRx] NVS_Rhapsido_CSU_Digital Tracker_Wave 4 Final Report v1.0.pptx",
+      "Novartis (NVS)\\POP20250084_NVS remibrutinib PET\\2025_RHAPSIDO_PET (Allergists Dermatologists) CSU_Wave 4 Topline Report_POP20250084.pptx"
+    ]
+  },
+  "ABILIFY_MAINTENA": {
+    "brand": "ABILIFY_MAINTENA",
+    "client": "OTSUKA",
+    "competitor": null,
+    "therapy_area": "Psychiatry",
+    "deck_count": 1,
+    "palette_filtered": [
+      "FFC000",
+      "7F47AA",
+      "3B5998",
+      "7D44A9",
+      "7E97CD",
+      "2D5CA2",
+      "B3C9EA",
+      "0000FF",
+      "1C1755",
+      "F1E9E9"
+    ],
+    "deck_files": [
+      "Otsuka\\01 Otsuka - Abilify\\[ZoomRx] Abilify LAI PET - Full Report.pptx"
+    ]
+  },
+  "ABRYSVO": {
+    "brand": "ABRYSVO",
+    "client": "PFIZER",
+    "competitor": null,
+    "therapy_area": "Vaccines/Maternal",
+    "deck_count": 5,
+    "palette_filtered": [
+      "0000C9",
+      "0095FF",
+      "602A81",
+      "F49C34",
+      "67BB6E",
+      "43964A",
+      "B9B9B9",
+      "D95776",
+      "9D73F7",
+      "0DBDBA"
+    ],
+    "deck_files": [
+      "Pfizer\\05 PFZ_ABRYSVO_PET\\Pfizer_Abrysvo_PET _2023_Final_Report_v1.pptx",
+      "Pfizer\\06 PFZ_ABRYSVO_Maternal_PET\\US Abrysvo Maternal HCP CFC Promotional Effectiveness Tracking (ZoomRx)_Q4 \u201825 - Full Report V3.0.pptx",
+      "Pfizer\\08 PFZ_ABRYSVO_Maternal_Digital Tracking\\ZoomRx_Abrysvo Digital Tracker_Full Report_V1.pptx",
+      "Pfizer\\12 PFZ_ABRYSVO_Maternal_HCP-Pt Study\\ZoomRx - Pfizer - Abrysvo MAT - HCP-Patient Conversations - KO - v2.pptx",
+      "Pfizer\\17 PFZ_Pharms Quant\\ZoomRx - Pfizer_Abrysvo_Pharmacist_Quant_Full Report.pptx"
+    ]
+  },
+  "LIBTAYO": {
+    "brand": "LIBTAYO",
+    "client": "REGENERON",
+    "competitor": null,
+    "therapy_area": "Oncology/NMSC",
+    "deck_count": 3,
+    "palette_filtered": [
+      "DC0077",
+      "004F6F",
+      "C83333",
+      "338533",
+      "96BBBB",
+      "C19875",
+      "D34D4D",
+      "DE0D7E",
+      "A4D271",
+      "929442"
+    ],
+    "deck_files": [
+      "Regeneron (RGN)\\04 Libtayo PET\\[ZoomRx] Libtayo (Mar \u201926 - May \u201926) NMSC Message Recall & Effectiveness Report - Adjuvant CSCC Focused _ Synapse connected v1.0.pptx",
+      "Regeneron (RGN)\\Qual One-Pager\\ZoomRx - RGN - Libtayo NMSC Q4 '25 Qual One-Pager Summaries.pptx",
+      "Regeneron (RGN)\\Recruitment Tracker\\Libtayo Skin SFE [May - Jun'26] Recruitment Tracker.pptx"
+    ]
+  },
+  "DUPIXENT_EoE": {
+    "brand": "DUPIXENT_EoE",
+    "client": "REGENERON_SANOFI",
+    "competitor": null,
+    "therapy_area": "Immunology/EoE",
+    "deck_count": 1,
+    "palette_filtered": [],
+    "deck_files": [
+      "Sanofi - Genzyme (SAN)\\10 SAN_Dupixent_EoE_HCP-PT+Qual_2025\\ZoomRx_SAN RGN_Dupixent_EoE PROJECT FISHBOWL_Additional Analysis.pptx"
+    ]
   }
 }

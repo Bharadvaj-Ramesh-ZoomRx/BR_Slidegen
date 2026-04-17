@@ -1270,6 +1270,30 @@ def find_pptx_files(base_dir: Path) -> list[Path]:
     return sorted(p for p in base_dir.rglob("*.pptx") if not p.name.startswith("~$"))
 
 
+def _write_competitor_summary(competitor_map: dict, out_path: Path) -> None:
+    """Write a simple competitor map markdown."""
+    lines = ["# Competitor Detection Summary", ""]
+    for brand in sorted(competitor_map.keys()):
+        info = competitor_map[brand]
+        lines.append(f"## {brand}")
+        lines.append(f"- **Client:** {info.get('client', '?')}")
+        lines.append(f"- **Therapy area:** {info.get('therapy_area', '?')}")
+        lines.append("")
+        cands = info.get("candidates", [])
+        if not cands:
+            lines.append("_No candidates._")
+        else:
+            lines.append("| Candidate | Client | Score | Reason |")
+            lines.append("|---|---|---|---|")
+            for c in cands[:5]:
+                lines.append(
+                    f"| **{c['candidate_brand']}** | {c.get('candidate_client', '?')} | "
+                    f"{c['score']:.2f} | {c.get('reason', '')} |"
+                )
+        lines.append("")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def main():
     import argparse
 
@@ -1389,7 +1413,7 @@ Examples:
         comp_path = OUTPUTS_DIR / "competitor_map.json"
         comp_path.write_text(json.dumps(competitor_map, indent=2, default=str), encoding="utf-8")
         comp_md_path = OUTPUTS_DIR / "competitor_map.md"
-        write_competitor_md(competitor_map, comp_md_path)
+        _write_competitor_summary(competitor_map, comp_md_path)
         print(f"  {comp_path} ({len(competitor_map)} brands with competitors)")
 
     # Brand-by-brand JSON (for downstream tools)

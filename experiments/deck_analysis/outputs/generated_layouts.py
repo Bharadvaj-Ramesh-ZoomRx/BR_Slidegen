@@ -1,121 +1,151 @@
 """
 Layout presets for slide compositions.
 
-Generated from real-deck analysis — coordinate clusters of 410 distinct chart
-positions and 490 table positions across 2,333 slides.
-
-Each LAYOUTS entry is a dict of (left, top, width, height) in inches. Use in
-renderers as the source of truth for coordinate placement.
-
-Conventions:
-  - chart_rect: main chart position
-  - table_rect: main label/data table position
-  - delta_col_rect: narrow delta column (typically ~0.5" wide)
-  - headline_rect: top-of-slide headline text box
+Generated from deck analysis of 551 decks (24,740 slides).
+Coordinate medians from observed chart + table positions across the full corpus.
 """
 from __future__ import annotations
 
 
-# Slide canvas (widescreen 16:9)
 SLIDE_WIDTH = 13.333
 SLIDE_HEIGHT = 7.5
 
-# Universal headline position (from headline analysis — median top 0.3",
-# median width 11.94", median char count 72)
 HEADLINE_RECT = {"left": 0.2, "top": 0.3, "width": 12.8, "height": 0.9}
-
-# Universal footer position (used for source + footnotes)
 FOOTER_RECT = {"left": 0.2, "top": 7.0, "width": 12.8, "height": 0.4}
 
 
-# ============================================================================
-# LAYOUT PRESETS — by slide signature
-# ============================================================================
-
 LAYOUTS = {
 
-    # ---- single_bar_with_delta (1 chart + 1 table, 145 slides) ----
-    # Most common pattern — label table + bar chart side by side
-    "single_bar_with_delta": {
-        "chart_rect": {"left": 1.62, "top": 2.02, "width": 5.41, "height": 4.29},
-        "table_rect": {"left": 1.48, "top": 1.82, "width": 6.79, "height": 4.55},
-        "delta_col_rect": {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.5},  # from 40-occurrence cluster
-        "_source": "1_chart_1_table signature, 145 slides",
+    # ---- 0_chart_0_table (7606 slides, 30.7%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_0_chart_0_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 7606,
     },
 
-    # ---- clustered_compare (1 chart + 2 tables, 110 slides) ----
-    # Label table + delta table side by side with chart on right
-    "clustered_compare": {
-        "chart_rect": {"left": 6.75, "top": 2.04, "width": 3.81, "height": 4.3},
-        "primary_table_rect": {"left": 3.11, "top": 1.98, "width": 3.88, "height": 4.17},
-        "secondary_table_rect": {"left": 7.09, "top": 1.98, "width": 3.88, "height": 4.17},
-        "_source": "1_chart_2_table signature, 110 slides",
+    # ---- 0_chart_1_table (2576 slides, 10.4%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_0_chart_1_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 2576,
     },
 
-    # ---- dual_bar_with_delta (2 charts + 2 tables, 68 slides) ----
-    # Two brand comparison — two bars + two tables side by side
-    "dual_bar_with_delta": {
-        "left_chart_rect": {"left": 2.6, "top": 2.25, "width": 3.0, "height": 3.69},
-        "right_chart_rect": {"left": 6.84, "top": 2.42, "width": 3.0, "height": 3.69},
-        "left_table_rect": {"left": 2.6, "top": 2.25, "width": 2.92, "height": 3.66},
-        "right_table_rect": {"left": 3.82, "top": 2.25, "width": 2.92, "height": 3.66},
-        "_source": "2_chart_2_table signature, 68 slides",
+    # ---- 1_chart_1_table (2056 slides, 8.3%) ----
+    #   chart positions: 1291, table positions: 1335
+    "observed_1_chart_1_table": {
+        "chart_rect": {"left": 4.97, "top": 2.01, "width": 4.96, "height": 4.3},
+        "table_rect": {"left": 1.59, "top": 1.89, "width": 6.22, "height": 4.33},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 2056,
     },
 
-    # ---- full_width_table (1 table only, 139 slides) ----
-    # Large single table — Executive Summary, Recommendations
-    "full_width_table": {
-        "table_rect": {"left": 0.91, "top": 1.52, "width": 11.11, "height": 4.92},
-        "_source": "1_table signature, 139 slides",
+    # ---- 1_chart_2_table (1175 slides, 4.7%) ----
+    #   chart positions: 839, table positions: 1687
+    "observed_1_chart_2_table": {
+        "chart_rect": {"left": 5.89, "top": 2.04, "width": 4.28, "height": 4.13},
+        "table_rect": {"left": 4.22, "top": 1.99, "width": 3.65, "height": 3.98},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 1175,
     },
 
-    # ---- three_metric_scorecard (3 charts + 1 table, 45 slides) ----
-    # Three-panel scorecard comparing metrics side by side
-    "three_metric_scorecard": {
-        "label_table_rect": {"left": 0.39, "top": 2.17, "width": 3.85, "height": 3.76},
-        "chart_panel_template": {"left": 7.02, "top": 2.36, "width": 2.57, "height": 3.87},
-        "chart_panel_count": 3,
-        "chart_panel_gap": 0.1,
-        "_source": "3_chart_1_table signature, 45 slides",
+    # ---- 2_chart_2_table (859 slides, 3.5%) ----
+    #   chart positions: 1165, table positions: 1214
+    "observed_2_chart_2_table": {
+        "chart_rect": {"left": 5.95, "top": 2.37, "width": 2.87, "height": 3.77},
+        "table_rect": {"left": 2.52, "top": 2.33, "width": 3.15, "height": 3.47},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 859,
     },
 
-    # ---- dual_chart_no_table (2 charts, 44 slides) ----
-    # Two charts only — comparison without label tables
-    "dual_chart_no_table": {
-        "left_chart_rect": {"left": 2.4, "top": 2.33, "width": 4.19, "height": 3.67},
-        "right_chart_rect": {"left": 6.89, "top": 2.33, "width": 4.19, "height": 3.67},
-        "_source": "2_chart signature, 44 slides",
+    # ---- 2_chart_1_table (775 slides, 3.1%) ----
+    #   chart positions: 995, table positions: 538
+    "observed_2_chart_1_table": {
+        "chart_rect": {"left": 6.25, "top": 2.23, "width": 3.03, "height": 3.74},
+        "table_rect": {"left": 0.88, "top": 2.08, "width": 4.27, "height": 3.87},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 775,
+    },
+
+    # ---- 0_chart_2_table (624 slides, 2.5%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_0_chart_2_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 624,
+    },
+
+    # ---- 1_chart_0_table (609 slides, 2.5%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_1_chart_0_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 609,
+    },
+
+    # ---- 2_chart_0_table (541 slides, 2.2%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_2_chart_0_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 541,
+    },
+
+    # ---- 1_chart_3_table (527 slides, 2.1%) ----
+    #   chart positions: 384, table positions: 1170
+    "observed_1_chart_3_table": {
+        "chart_rect": {"left": 5.49, "top": 2.0, "width": 4.08, "height": 4.3},
+        "table_rect": {"left": 6.07, "top": 2.0, "width": 2.62, "height": 3.87},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 527,
+    },
+
+    # ---- 3_chart_1_table (526 slides, 2.1%) ----
+    #   chart positions: 1148, table positions: 414
+    "observed_3_chart_1_table": {
+        "chart_rect": {"left": 6.95, "top": 2.34, "width": 2.47, "height": 3.7},
+        "table_rect": {"left": 0.56, "top": 2.16, "width": 4.34, "height": 3.87},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 526,
+    },
+
+    # ---- 3_chart_0_table (445 slides, 1.8%) ----
+    #   chart positions: 0, table positions: 0
+    "observed_3_chart_0_table": {
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 445,
+    },
+
+    # ---- 2_chart_3_table (406 slides, 1.6%) ----
+    #   chart positions: 550, table positions: 852
+    "observed_2_chart_3_table": {
+        "chart_rect": {"left": 5.79, "top": 2.34, "width": 2.89, "height": 3.78},
+        "table_rect": {"left": 5.2, "top": 2.27, "width": 2.05, "height": 3.05},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 406,
+    },
+
+    # ---- 3_chart_3_table (373 slides, 1.5%) ----
+    #   chart positions: 697, table positions: 715
+    "observed_3_chart_3_table": {
+        "chart_rect": {"left": 6.11, "top": 2.41, "width": 2.59, "height": 3.41},
+        "table_rect": {"left": 3.65, "top": 2.48, "width": 2.86, "height": 1.16},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 373,
+    },
+
+    # ---- 3_chart_2_table (342 slides, 1.4%) ----
+    #   chart positions: 716, table positions: 511
+    "observed_3_chart_2_table": {
+        "chart_rect": {"left": 7.64, "top": 2.31, "width": 1.9, "height": 3.9},
+        "table_rect": {"left": 2.97, "top": 2.19, "width": 3.14, "height": 3.64},
+        "delta_col_rect": {"left": 9.24, "top": 2.19, "width": 0.63, "height": 4.09},
+        "_slides": 342,
     },
 
 }
 
 
-# ============================================================================
-# NARROW DELTA COLUMN POSITIONS — top 10 observed positions
-# ============================================================================
-#
-# These are recurring "narrow column" positions observed in real decks.
-# Typically ~0.5" wide × ~4.5" tall at specific left positions, used as
-# standalone delta columns adjacent to charts.
-
-DELTA_COL_POSITIONS = [
-    {"left": 12.52, "top": 2.17, "width": 0.58, "height": 4.5, "_occurrences": 40},
-    {"left": 11.46, "top": 2.08, "width": 0.47, "height": 4.58, "_occurrences": 22},
-    {"left": 7.96, "top": 2.07, "width": 0.49, "height": 4.58, "_occurrences": 19},
-    {"left": 10.59, "top": 2.06, "width": 0.53, "height": 4.52, "_occurrences": 18},
-    {"left": 12.07, "top": 2.03, "width": 0.64, "height": 4.47, "_occurrences": 17},
-    {"left": 9.6, "top": 1.94, "width": 0.44, "height": 4.54, "_occurrences": 16},
-    {"left": 11.98, "top": 2.0, "width": 0.88, "height": 4.54, "_occurrences": 15},
-    {"left": 5.99, "top": 2.39, "width": 0.63, "height": 4.01, "_occurrences": 15},
-    {"left": 7.51, "top": 1.88, "width": 0.44, "height": 4.51, "_occurrences": 13},
-    {"left": 12.0, "top": 2.38, "width": 0.63, "height": 4.38, "_occurrences": 12},
-]
-
-
-def get_layout(slide_type: str) -> dict:
-    """Look up a layout preset by slide type."""
-    if slide_type not in LAYOUTS:
+def get_layout(layout_key: str) -> dict:
+    """Look up a layout preset by key."""
+    if layout_key not in LAYOUTS:
         raise KeyError(
-            f"Unknown slide_type {slide_type!r}. Available: {sorted(LAYOUTS.keys())}"
+            f"Unknown layout {layout_key!r}. Available: {sorted(LAYOUTS.keys())}"
         )
-    return LAYOUTS[slide_type]
+    return LAYOUTS[layout_key]
