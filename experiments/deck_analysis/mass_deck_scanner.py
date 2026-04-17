@@ -47,6 +47,10 @@ from pptx.util import Emu
 
 HERE = Path(__file__).parent
 REPO = HERE.parents[1]
+
+# Import deep OOXML extraction from the existing deep_analyzer (same directory)
+sys.path.insert(0, str(HERE))
+from deep_analyzer import analyze_chart_xml, extract_chart_xmls
 OUTPUTS_DIR = HERE / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
@@ -162,11 +166,29 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
         "chart_positions": [],            # (left, top, width, height)
         "table_positions": [],
         "table_dimensions": Counter(),
+        # Per-slide positions grouped by composition signature (for LAYOUTS{})
+        "positions_by_sig": defaultdict(lambda: {"chart": [], "table": []}),
+        # OOXML properties (from deep_analyzer.analyze_chart_xml)
+        "ooxml": {
+            "gap_widths": Counter(),
+            "overlaps": Counter(),
+            "data_label_positions": Counter(),
+            "axis_orientations": Counter(),
+            "tick_lbl_positions": Counter(),
+            "num_formats": Counter(),
+            "marker_types": Counter(),
+            "line_widths": Counter(),
+            "charts_with_legend": 0,
+            "charts_with_gridlines": 0,
+            "charts_with_title": 0,
+        },
     }
 
     for slide_idx, slide in enumerate(prs.slides):
         chart_count = 0
         table_count = 0
+        slide_chart_positions = []
+        slide_table_positions = []
 
         for shape in slide.shapes:
             if shape.has_chart:
@@ -185,12 +207,14 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
                 deck["chart_types"][ct_str] += 1
                 deck["chart_patterns"][pattern] += 1
 
-                deck["chart_positions"].append((
+                pos = (
                     _emu_to_inches(shape.left or 0),
                     _emu_to_inches(shape.top or 0),
                     _emu_to_inches(shape.width or 0),
                     _emu_to_inches(shape.height or 0),
-                ))
+                )
+                deck["chart_positions"].append(pos)
+                slide_chart_positions.append(pos)
 
                 try:
                     for s in chart.plots[0].series:
@@ -209,12 +233,14 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
                 deck["total_tables"] += 1
                 tbl = shape.table
                 deck["table_dimensions"][f"{len(tbl.rows)}x{len(tbl.columns)}"] += 1
-                deck["table_positions"].append((
+                pos = (
                     _emu_to_inches(shape.left or 0),
                     _emu_to_inches(shape.top or 0),
                     _emu_to_inches(shape.width or 0),
                     _emu_to_inches(shape.height or 0),
-                ))
+                )
+                deck["table_positions"].append(pos)
+                slide_table_positions.append(pos)
 
             elif shape.has_text_frame:
                 text = shape.text_frame.text.strip()
@@ -244,11 +270,57 @@ def analyze_deck(pptx_path: Path, base_dir: Path) -> dict:
 
         sig = f"{chart_count}_chart_{table_count}_table"
         deck["composition_signatures"][sig] += 1
+        # Track positions per composition signature (for LAYOUTS{})
+        deck["positions_by_sig"][sig]["chart"].extend(slide_chart_positions)
+        deck["positions_by_sig"][sig]["table"].extend(slide_table_positions)
 
-    # Serialize Counters
+    # Deep OOXML extraction (gapWidth, overlap, dLblPos, axis orientation, etc.)
+    try:
+        chart_xmls = extract_chart_xmls(pptx_path)
+        for _name, xml_bytes in chart_xmls:
+            info = analyze_chart_xml(xml_bytes)
+            if "error" in info:
+                continue
+            ox = deck["ooxml"]
+            for gw in info.get("gap_widths", []):
+                ox["gap_widths"][str(gw)] += 1
+            for ov in info.get("overlaps", []):
+                ox["overlaps"][str(ov)] += 1
+            for dlp in info.get("data_label_positions", []):
+                ox["data_label_positions"][str(dlp)] += 1
+            for ao in info.get("axis_orientations", []):
+                key = f"{ao['axis']}:{ao['orientation']}"
+                ox["axis_orientations"][key] += 1
+            for tlp in info.get("tick_lbl_pos", []):
+                key = f"{tlp['axis']}:{tlp['val']}"
+                ox["tick_lbl_positions"][key] += 1
+            for nf in info.get("num_formats_used", []):
+                ox["num_formats"][str(nf)] += 1
+            for nf in info.get("val_axis_number_formats", []):
+                ox["num_formats"][str(nf)] += 1
+            for mt in info.get("series_marker_types", []):
+                ox["marker_types"][str(mt)] += 1
+            for lw in info.get("series_line_widths", []):
+                if lw:
+                    ox["line_widths"][str(lw)] += 1
+            if info.get("has_legend"):
+                ox["charts_with_legend"] += 1
+            if info.get("major_gridlines_present"):
+                ox["charts_with_gridlines"] += 1
+            if info.get("has_title"):
+                ox["charts_with_title"] += 1
+    except Exception:
+        pass  # OOXML extraction is best-effort; don't fail the deck scan
+
+    # Serialize Counters and defaultdicts for JSON
     for key in ["chart_types", "chart_patterns", "series_colors", "heading_colors",
                 "fonts", "font_sizes", "composition_signatures", "table_dimensions"]:
         deck[key] = dict(Counter(deck[key]).most_common(50))
+    deck["positions_by_sig"] = {k: dict(v) for k, v in deck["positions_by_sig"].items()}
+    # Serialize OOXML counters
+    for key in ["gap_widths", "overlaps", "data_label_positions", "axis_orientations",
+                "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
+        deck["ooxml"][key] = dict(Counter(deck["ooxml"][key]).most_common(30))
 
     return deck
 
@@ -315,12 +387,38 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
         project_types[d["project_type"]] += 1
         clients[d["client"]] += 1
 
-        # Assign positions to their slide's composition signature
-        # We need per-slide info for this, which we have from the slides array
-        # For now, add all chart/table positions globally per sig
-        for sig, count in d["composition_signatures"].items():
-            positions_by_sig[sig]["chart_positions"].extend(d.get("chart_positions", []))
-            positions_by_sig[sig]["table_positions"].extend(d.get("table_positions", []))
+        # Per-signature positions (tracked per-slide in analyze_deck)
+        for sig, pos_data in d.get("positions_by_sig", {}).items():
+            positions_by_sig[sig]["chart_positions"].extend(pos_data.get("chart", []))
+            positions_by_sig[sig]["table_positions"].extend(pos_data.get("table", []))
+
+    # ── OOXML aggregation ──
+    ooxml_agg = {
+        "gap_widths": Counter(),
+        "overlaps": Counter(),
+        "data_label_positions": Counter(),
+        "axis_orientations": Counter(),
+        "tick_lbl_positions": Counter(),
+        "num_formats": Counter(),
+        "marker_types": Counter(),
+        "line_widths": Counter(),
+        "charts_with_legend": 0,
+        "charts_with_gridlines": 0,
+        "charts_with_title": 0,
+    }
+    for d in inventories:
+        ox = d.get("ooxml", {})
+        for key in ["gap_widths", "overlaps", "data_label_positions", "axis_orientations",
+                     "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
+            for k, v in ox.get(key, {}).items():
+                ooxml_agg[key][k] += v
+        for key in ["charts_with_legend", "charts_with_gridlines", "charts_with_title"]:
+            ooxml_agg[key] += ox.get(key, 0)
+
+    # Serialize OOXML counters
+    for key in ["gap_widths", "overlaps", "data_label_positions", "axis_orientations",
+                "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
+        ooxml_agg[key] = dict(ooxml_agg[key].most_common(30))
 
     return {
         "by_client": dict(by_client),
@@ -339,6 +437,7 @@ def aggregate_for_codegen(inventories: list[dict]) -> dict:
         "total_slides": sum(d["total_slides"] for d in inventories),
         "total_charts": sum(d["total_charts"] for d in inventories),
         "total_tables": sum(d["total_tables"] for d in inventories),
+        "ooxml": ooxml_agg,
     }
 
 
@@ -370,26 +469,32 @@ def _hex_to_rgb_tuple(hex_str: str) -> tuple[int, int, int]:
 
 
 def generate_brand_py(agg: dict) -> str:
-    """Generate BRAND{} Python source from aggregated per-client data."""
+    """Generate CLIENT{} Python source from aggregated per-client data.
+
+    This produces client-level entries (fonts, heading colors, observed palettes).
+    Per-brand entries (RYBREVANT, TAGRISSO, etc.) remain hand-curated in the
+    existing BRAND{} — they require per-product color knowledge that can't be
+    reliably auto-extracted from client-level aggregation.
+    """
     by_client = agg["by_client"]
     n_decks = agg["total_decks"]
 
     lines = [
         '"""',
-        "Brand definitions per pharmaceutical client.",
+        "Client-level brand defaults — fonts, heading colors, observed palettes.",
         "",
         f"Generated from deck analysis of {n_decks} decks across {len(by_client)} clients.",
-        "See experiments/deck_analysis/mass_deck_scanner.py for the analysis that produced this.",
+        "See experiments/deck_analysis/mass_deck_scanner.py for the analysis.",
         "",
-        "Each BRAND entry provides:",
-        "  - primary:       main series color (current wave bars)",
-        "  - secondary:     secondary accent for comparisons",
-        "  - prior:         tint color (prior wave bars)",
-        "  - positive:      delta positive (universal green)",
-        "  - negative:      delta negative (universal red)",
-        "  - heading_color: headline text color",
-        "  - font_heading:  headline font",
-        "  - font_body:     body text font",
+        "CLIENT{} provides client-level defaults (shared across all brands for that client).",
+        "Per-brand entries (product-level colors) live in BRAND{} and are hand-curated.",
+        "",
+        "Each CLIENT entry provides:",
+        "  - font_heading:        headline font",
+        "  - font_body:           body text font",
+        "  - heading_color:       headline text color",
+        "  - observed_palette:    top 8 series colors observed across all decks for this client",
+        "  - deck_count:          number of decks analyzed",
         '"""',
         "from __future__ import annotations",
         "",
@@ -408,7 +513,7 @@ def generate_brand_py(agg: dict) -> str:
         "GREY_ALT_ROW = RGBColor(0xF2, 0xF2, 0xF2)",
         "",
         "",
-        "BRAND = {",
+        "CLIENT = {",
     ]
 
     # Sort clients by deck count descending
@@ -423,14 +528,6 @@ def generate_brand_py(agg: dict) -> str:
         top_colors = [c for c, _ in Counter(info["series_colors"]).most_common(10)]
         top_fonts = [f for f, _ in Counter(info["fonts"]).most_common(5)]
         top_heading = [c for c, _ in Counter(info["heading_colors"]).most_common(3)]
-
-        if not top_colors:
-            continue
-
-        # Primary: override if known, else top observed series color
-        primary = _BRAND_PRIMARY_OVERRIDES.get(ck, top_colors[0].lstrip("#"))
-        secondary = top_colors[1].lstrip("#") if len(top_colors) > 1 else "808080"
-        prior = top_colors[2].lstrip("#") if len(top_colors) > 2 else "BFBFBF"
 
         # Fonts: skip theme placeholders
         real_fonts = [f for f in top_fonts if not f.startswith("+")]
@@ -447,17 +544,12 @@ def generate_brand_py(agg: dict) -> str:
         lines.append(f'    # --- {raw} ({dc} deck{"s" if dc != 1 else ""}) ---')
         lines.append(f'    "{ck}": {{')
 
-        for role, hex_val in [("primary", primary), ("secondary", secondary), ("prior", prior)]:
-            r, g, b = _hex_to_rgb_tuple(hex_val)
-            lines.append(f'        "{role}": RGBColor(0x{r:02X}, 0x{g:02X}, 0x{b:02X}),')
-
-        lines.append('        "positive": POSITIVE_GREEN,')
-        lines.append('        "negative": NEGATIVE_RED,')
-
         r, g, b = _hex_to_rgb_tuple(heading_hex)
         lines.append(f'        "heading_color": RGBColor(0x{r:02X}, 0x{g:02X}, 0x{b:02X}),')
         lines.append(f'        "font_heading": "{font_heading}",')
         lines.append(f'        "font_body": "{font_body}",')
+        lines.append(f'        "template_path": None,')
+        lines.append(f'        "deck_count": {dc},')
 
         palette = ", ".join(f'"{c}"' for c in top_colors[:8])
         lines.append(f'        "_observed_palette": [{palette}],')
@@ -468,19 +560,14 @@ def generate_brand_py(agg: dict) -> str:
         "}",
         "",
         "",
-        "def get_brand(client_key_or_alias: str) -> dict:",
-        '    """Look up brand config by client key. Raises KeyError with available keys."""',
-        "    key = client_key_or_alias.upper().replace(' ', '_').replace('-', '_')",
-        "    if key not in BRAND:",
+        "def get_client(client_key: str) -> dict:",
+        '    """Look up client defaults by key. Raises KeyError with available keys."""',
+        "    key = client_key.upper().replace(' ', '_').replace('-', '_')",
+        "    if key not in CLIENT:",
         "        raise KeyError(",
-        '            f"Unknown client {client_key_or_alias!r}. Available: {sorted(BRAND.keys())}"',
+        '            f"Unknown client {client_key!r}. Available: {sorted(CLIENT.keys())}"',
         "        )",
-        "    return BRAND[key]",
-        "",
-        "",
-        "def get_color(client: str, role: str) -> 'RGBColor':",
-        '    """Shortcut: get_color("JJ", "primary") -> RGBColor."""',
-        "    return get_brand(client)[role]",
+        "    return CLIENT[key]",
         "",
     ]
 
@@ -492,19 +579,53 @@ def generate_brand_py(agg: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def generate_chart_patterns_py(agg: dict) -> str:
-    """Generate CHART_PATTERNS{} Python source from chart type frequencies."""
+    """Generate CHART_PATTERNS{} Python source from chart type frequencies + OOXML defaults."""
     patterns = agg["chart_patterns"]
     total = sum(patterns.values())
     n_decks = agg["total_decks"]
+    ox = agg.get("ooxml", {})
+
+    # Most common OOXML defaults (mode values across the full corpus)
+    def mode_val(counter_dict):
+        if not counter_dict:
+            return None
+        return max(counter_dict, key=counter_dict.get)
+
+    default_gap = mode_val(ox.get("gap_widths", {}))
+    default_overlap = mode_val(ox.get("overlaps", {}))
+    default_dlbl = mode_val(ox.get("data_label_positions", {}))
+    default_numfmt = mode_val(ox.get("num_formats", {}))
+    default_marker = mode_val(ox.get("marker_types", {}))
 
     lines = [
         '"""',
         "Chart pattern definitions — deterministic rendering configs per chart type.",
         "",
         f"Generated from deck analysis of {n_decks} decks ({total:,} charts total).",
-        "Frequency-ranked. Top patterns cover the vast majority of real charts.",
+        "Frequency-ranked. OOXML defaults from corpus-wide mode values.",
+        "",
+        "OOXML property summary (corpus-wide):",
+        f"  gapWidth modes:     {dict(sorted(ox.get('gap_widths', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  overlap modes:      {dict(sorted(ox.get('overlaps', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  dLblPos modes:      {dict(sorted(ox.get('data_label_positions', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  numFmt modes:       {dict(sorted(ox.get('num_formats', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  axis orientations:  {dict(sorted(ox.get('axis_orientations', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  tickLblPos modes:   {dict(sorted(ox.get('tick_lbl_positions', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  marker types:       {dict(sorted(ox.get('marker_types', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  line widths (EMU):  {dict(sorted(ox.get('line_widths', {}).items(), key=lambda x: -x[1])[:5])}",
+        f"  charts w/ legend:   {ox.get('charts_with_legend', 0)}/{total}",
+        f"  charts w/ gridlines:{ox.get('charts_with_gridlines', 0)}/{total}",
+        f"  charts w/ title:    {ox.get('charts_with_title', 0)}/{total}",
         '"""',
         "from __future__ import annotations",
+        "",
+        "",
+        "# Corpus-wide OOXML defaults (mode values)",
+        f"DEFAULT_GAP_WIDTH = {default_gap}" if default_gap else "DEFAULT_GAP_WIDTH = 80",
+        f"DEFAULT_OVERLAP = {default_overlap}" if default_overlap else "DEFAULT_OVERLAP = 100",
+        f'DEFAULT_DLBL_POS = "{default_dlbl}"' if default_dlbl else 'DEFAULT_DLBL_POS = "ctr"',
+        f'DEFAULT_NUM_FORMAT = "{default_numfmt}"' if default_numfmt else 'DEFAULT_NUM_FORMAT = "0%"',
+        f'DEFAULT_MARKER_TYPE = "{default_marker}"' if default_marker else 'DEFAULT_MARKER_TYPE = "circle"',
         "",
         "",
         "CHART_PATTERNS = {",
@@ -515,7 +636,10 @@ def generate_chart_patterns_py(agg: dict) -> str:
         lines.append(f'    "{pattern}": {{')
         lines.append(f'        "occurrences": {count},')
         lines.append(f'        "pct": {pct},')
-        lines.append(f'        # TODO: Add OOXML defaults (gapWidth, overlap, dLblPos, etc.)')
+        lines.append(f'        "gap_width": DEFAULT_GAP_WIDTH,')
+        lines.append(f'        "overlap": DEFAULT_OVERLAP,')
+        lines.append(f'        "dlbl_pos": DEFAULT_DLBL_POS,')
+        lines.append(f'        "num_format": DEFAULT_NUM_FORMAT,')
         lines.append("    },")
 
     lines += [
@@ -568,24 +692,9 @@ def generate_layouts_py(agg: dict) -> str:
     def rect_str(left, top, width, height):
         return f'{{"left": {left}, "top": {top}, "width": {width}, "height": {height}}}'
 
-    # Global chart position medians
-    if all_cp:
-        chart_left = _median([p[0] for p in all_cp])
-        chart_top = _median([p[1] for p in all_cp])
-        chart_w = _median([p[2] for p in all_cp])
-        chart_h = _median([p[3] for p in all_cp])
-    else:
-        chart_left, chart_top, chart_w, chart_h = 3.5, 2.0, 6.0, 4.5
+    pos_by_sig = agg.get("positions_by_sig", {})
 
-    if all_tp:
-        table_left = _median([p[0] for p in all_tp])
-        table_top = _median([p[1] for p in all_tp])
-        table_w = _median([p[2] for p in all_tp])
-        table_h = _median([p[3] for p in all_tp])
-    else:
-        table_left, table_top, table_w, table_h = 0.5, 2.0, 2.5, 4.5
-
-    # Narrow delta columns: filter tables that are narrow (<=1") and tall (>=3")
+    # Global delta column medians (narrow tables: <=1" wide, >=3" tall)
     delta_cols = [(l, t, w, h) for l, t, w, h in all_tp if w <= 1.0 and h >= 3.0]
     if delta_cols:
         dc_left = _median([p[0] for p in delta_cols])
@@ -595,7 +704,7 @@ def generate_layouts_py(agg: dict) -> str:
     else:
         dc_left, dc_top, dc_w, dc_h = 12.5, 2.0, 0.55, 4.5
 
-    # Generate entries for top composition signatures
+    # Generate entries for top composition signatures using PER-SIGNATURE medians
     top_sigs = sorted(sigs.items(), key=lambda x: -x[1])
 
     for sig, count in top_sigs[:15]:
@@ -603,14 +712,37 @@ def generate_layouts_py(agg: dict) -> str:
             continue
         pct = round(count * 100 / total_slides, 1) if total_slides else 0
 
-        lines.append(f'    # ---- {sig} ({count} slides, {pct}%) ----')
+        sig_data = pos_by_sig.get(sig, {"chart_positions": [], "table_positions": []})
+        sig_cp = sig_data.get("chart_positions", [])
+        sig_tp = sig_data.get("table_positions", [])
 
-        # Determine layout key name
+        # Per-signature chart medians
+        if sig_cp:
+            cl = _median([p[0] for p in sig_cp])
+            ct = _median([p[1] for p in sig_cp])
+            cw = _median([p[2] for p in sig_cp])
+            ch = _median([p[3] for p in sig_cp])
+        else:
+            cl, ct, cw, ch = 3.5, 2.0, 6.0, 4.5
+
+        # Per-signature table medians
+        if sig_tp:
+            tl = _median([p[0] for p in sig_tp])
+            tt = _median([p[1] for p in sig_tp])
+            tw = _median([p[2] for p in sig_tp])
+            th = _median([p[3] for p in sig_tp])
+        else:
+            tl, tt, tw, th = 0.5, 2.0, 2.5, 4.5
+
         layout_key = f"observed_{sig}"
 
+        lines.append(f'    # ---- {sig} ({count} slides, {pct}%) ----')
+        lines.append(f'    #   chart positions: {len(sig_cp)}, table positions: {len(sig_tp)}')
         lines.append(f'    "{layout_key}": {{')
-        lines.append(f'        "chart_rect": {rect_str(chart_left, chart_top, chart_w, chart_h)},')
-        lines.append(f'        "table_rect": {rect_str(table_left, table_top, table_w, table_h)},')
+        if sig_cp:
+            lines.append(f'        "chart_rect": {rect_str(cl, ct, cw, ch)},')
+        if sig_tp:
+            lines.append(f'        "table_rect": {rect_str(tl, tt, tw, th)},')
         lines.append(f'        "delta_col_rect": {rect_str(dc_left, dc_top, dc_w, dc_h)},')
         lines.append(f'        "_slides": {count},')
         lines.append("    },")
@@ -700,6 +832,23 @@ def write_summary(agg: dict, output_path: Path) -> None:
     ]
     for dim, count in sorted(agg["table_dimensions"].items(), key=lambda x: -x[1])[:15]:
         lines.append(f"| {dim} | {count:,} |")
+
+    ox = agg.get("ooxml", {})
+    lines += [
+        "",
+        "## OOXML Properties (across all charts)",
+        "",
+        "| Property | Top values |",
+        "|---|---|",
+    ]
+    for prop in ["gap_widths", "overlaps", "data_label_positions", "axis_orientations",
+                 "tick_lbl_positions", "num_formats", "marker_types", "line_widths"]:
+        vals = ox.get(prop, {})
+        top = ", ".join(f"{k}={v}" for k, v in sorted(vals.items(), key=lambda x: -x[1])[:5])
+        lines.append(f"| {prop} | {top} |")
+    lines.append(f"| charts_with_legend | {ox.get('charts_with_legend', 0)} |")
+    lines.append(f"| charts_with_gridlines | {ox.get('charts_with_gridlines', 0)} |")
+    lines.append(f"| charts_with_title | {ox.get('charts_with_title', 0)} |")
 
     hl = agg["headline_lengths"]
     hfs = agg["headline_font_sizes"]
