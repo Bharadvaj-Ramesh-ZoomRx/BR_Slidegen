@@ -199,9 +199,10 @@ galen-consulting-r3m-report/
 │
 ├── .claude/skills/                  # 40 SKILL.md files across 7 folders
 ├── experiments/
-│   └── deck_analysis/               # Apr 15 analysis of 32 real PET decks
+│   └── deck_analysis/               # Apr 15 analysis of 32 PET + 8 ATU decks
 │       ├── decks/                   # source PPTXs (gitignored)
 │       ├── outputs/                 # cluster data, headlines, chart positions
+│       ├── mass_deck_scanner.py     # 400-500 deck bottom-up grounding (§6.6)
 │       └── *.py                     # parser, analyzer, brand_mapper, detectors
 ├── docs/                            # PRDs + setup guides
 ├── tests/                           # Track 1-3 tests (40+ passing)
@@ -242,6 +243,13 @@ python -m slidegen fetch-raw-first projects/{name}/config.yaml
 
 # deck-reader CLI (extracts specs from existing PPTX)
 python -m slidegen.deck_reader path/to/deck.pptx [--config config.yaml] [--out specs/]
+
+# Mass deck scanner (bottom-up pptx_utils grounding from 400+ decks)
+python experiments/deck_analysis/mass_deck_scanner.py \
+  --decks-dir "path/to/sharepoint-pptx-scanner/downloads" \
+  --skip-errors                   # continue past corrupt files
+  # --max-decks 10                # test with first N decks
+  # --resume                      # skip already-scanned decks
 ```
 
 ---

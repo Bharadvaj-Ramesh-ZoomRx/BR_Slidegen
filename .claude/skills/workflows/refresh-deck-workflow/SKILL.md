@@ -25,6 +25,18 @@ Prior-wave deck + new wave data → next wave deck. Primary Q3 demo workflow.
 5. **User review gate on low-confidence Tier 2 inferences only.** If `deck-reader` Tier 2 can't confidently reconstruct a slide's lineage (low match score), surface for confirmation before refreshing. This keeps human-in-the-loop narrow — only the genuinely ambiguous cases.
 6. **Deletes are explicit.** Slides removed from the diff plan must have a rationale — never silently drop a slide.
 
+## Pre-condition: Retroactive Spec Generation (first run only)
+
+For decks not previously processed by SlideGen, run `deck-reader` on the prior wave PPTX before the first refresh. This one-time step produces slide specs for every slide and bootstraps `config.yaml`. On subsequent refreshes, the saved specs are the starting point — no re-bootstrapping needed.
+
+```
+deck-reader("prior_wave.pptx", config_path)
+→ saves list[SlideSpec] to projects/{name}/context/{wave}/slide_specs/
+→ creates/updates config.yaml with extracted extraction params
+```
+
+If slide specs already exist (in `context/{wave}/slide_specs/`), skip this step and proceed directly to the orchestration below.
+
 ## Inputs
 
 - `config_path`: project config.yaml (identifies brand, wave, source paths)

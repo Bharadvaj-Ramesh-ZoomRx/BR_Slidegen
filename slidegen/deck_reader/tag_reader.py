@@ -474,6 +474,104 @@ def _report_config_to_lineage(report_config: dict, tags: dict) -> DataLineage:
     return lineage
 
 
+# ── OOXML data extraction for tagged shapes ────────────────────────────────────
+# Tags carry Synapse config (what analysis to fetch); chart XML carries the
+# actual rendered data. We need both for a complete spec.
+
+from pptx.enum.chart import XL_CHART_TYPE
+
+_CHART_TYPE_MAP = {
+    XL_CHART_TYPE.BAR_CLUSTERED: "bar_clustered_horizontal",
+    XL_CHART_TYPE.BAR_STACKED: "bar_stacked_100_horizontal",
+    XL_CHART_TYPE.BAR_STACKED_100: "bar_stacked_100_horizontal",
+    XL_CHART_TYPE.COLUMN_CLUSTERED: "column_clustered_vertical",
+    XL_CHART_TYPE.COLUMN_STACKED: "column_stacked_100_vertical",
+    XL_CHART_TYPE.COLUMN_STACKED_100: "column_stacked_100_vertical",
+    XL_CHART_TYPE.LINE: "line_markers_trended",
+    XL_CHART_TYPE.LINE_MARKERS: "line_markers_trended",
+    XL_CHART_TYPE.LINE_STACKED: "line_markers_trended",
+    XL_CHART_TYPE.XY_SCATTER: "xy_scatter_abacus",
+    XL_CHART_TYPE.XY_SCATTER_LINES: "xy_scatter_abacus",
+    XL_CHART_TYPE.DOUGHNUT: "doughnut_default",
+    XL_CHART_TYPE.PIE: "doughnut_default",
+}
+
+
+def _classify_chart_from_ooxml(chart) -> str:
+    """Classify a python-pptx chart object → chart_pattern key."""
+    try:
+        return _CHART_TYPE_MAP.get(chart.chart_type, "bar_clustered_horizontal")
+    except Exception:
+        return "bar_clustered_horizontal"
+
+
+def _extract_chart_data_from_ooxml(chart) -> ChartData:
+    """Extract actual chart data (categories + series) from OOXML."""
+    categories = []
+    series_list = []
+    try:
+        plot = chart.plots[0]
+        try:
+            cats = plot.categories
+            if cats is not None:
+                categories = [str(c) for c in cats]
+        except Exception:
+            pass
+
+        for idx, s in enumerate(plot.series):
+            name = str(s.name) if s.name else f"Series {idx}"
+            values = []
+            try:
+                for v in s.values:
+                    values.append(float(v) if v is not None else 0.0)
+            except Exception:
+                values = [0.0] * max(len(categories), 1)
+
+            color = "#999999"
+            try:
+                fill = s.format.fill
+                if fill.type is not None:
+                    rgb = fill.fore_color.rgb
+                    color = f"#{rgb}"
+            except Exception:
+                pass
+
+            series_list.append(Series(name=name, values=values, color=color))
+    except Exception:
+        pass
+
+    if not categories:
+        categories = ["unknown"]
+    if not series_list:
+        series_list = [Series(name="unknown", values=[0.0], color="#999999")]
+
+    return ChartData(categories=categories, series=series_list)
+
+
+def _extract_table_data_from_shape(shape) -> tuple[list[str], list[list[str]]]:
+    """Extract labels and rows from a table shape."""
+    labels = []
+    rows = []
+    try:
+        table = shape.table
+        n_rows = len(table.rows)
+        n_cols = len(table.columns)
+        if n_rows == 0 or n_cols == 0:
+            return [], []
+
+        for row_idx in range(n_rows):
+            row = []
+            for col_idx in range(n_cols):
+                row.append(table.cell(row_idx, col_idx).text.strip())
+            rows.append(row)
+
+        # First column as labels (most common pattern in PET decks)
+        labels = [row[0] for row in rows if row]
+    except Exception:
+        pass
+    return labels, rows
+
+
 def read_tagged_shapes(
     pptx_path: str | Path,
 ) -> tuple[list[SlideSpec], TagReaderSummary, list[UntaggedShape]]:
@@ -581,28 +679,30 @@ def read_tagged_shapes(
             # Extract headline
             headline_text = _extract_headline_from_slide(slide)
 
-            # Build a minimal SlideSpec
-            # NOTE: We can't fully reconstruct chart data from tags alone.
-            # Tags carry config (what to fetch), not data (what was fetched).
-            # The spec will have the DataLineage but components are placeholders.
+            # Build SlideSpec with REAL chart/table data extracted from OOXML.
+            # Tags carry config (what Synapse analysis to fetch); the chart XML
+            # carries the actual data that was rendered. We extract both.
             position = _shape_to_position(shape)
 
             components = []
             shape_type = _classify_shape(shape)
-            if shape_type == "chart":
+            if shape_type == "chart" and shape.has_chart:
+                chart = shape.chart
+                chart_pattern = _classify_chart_from_ooxml(chart)
+                chart_data = _extract_chart_data_from_ooxml(chart)
                 components.append(ChartComponent(
                     position=position,
-                    chart_pattern="bar_clustered_horizontal",  # placeholder
-                    data=ChartData(categories=["placeholder"], series=[
-                        Series(name="placeholder", values=[0.0], color="#999999")
-                    ]),
+                    chart_pattern=chart_pattern,
+                    data=chart_data,
                     chrome=ChartChrome(),
                 ))
-            elif shape_type == "table":
-                components.append(LabelTableComponent(
-                    position=position,
-                    labels=["placeholder"],
-                ))
+            elif shape_type == "table" and shape.has_table:
+                labels, rows = _extract_table_data_from_shape(shape)
+                if labels:
+                    components.append(LabelTableComponent(
+                        position=position,
+                        labels=labels,
+                    ))
             else:
                 components.append(TextboxComponent(
                     position=position,

@@ -2,12 +2,25 @@
 name: deck-reader
 effort: high
 paths: ["slidegen/deck_reader/**/*.py"]
-description: "Parse an existing PPTX into a list of SlideSpec. Dual-mode: Tier 1 reads Galen-PowerPoint Connector tags (ReportConfigHash → Custom XML Part) for canonical Synapse lineage (ProjectId, ReportingPlanId, AnalysisIds, SegmentIds, deliverables). Tier 2 falls back to structural inference from headline + chart pattern + table content with user-confirmation flow. Trigger when any workflow starts from an existing deck (wave refresh, single-slide regen, slide update, client followup, executive summary, segment analysis). The primary way to bootstrap a spec for an existing slide."
+description: "Parse an existing PPTX into a list of SlideSpec. Primary use: retroactive spec generation — the one-time bootstrapping step that makes any existing deck legible to all SlideGen workflows. Dual-mode: Tier 1 reads Galen-PowerPoint Connector tags (ReportConfigHash → Custom XML Part) for canonical Synapse lineage; Tier 2 falls back to structural inference. Trigger when any workflow starts from an existing deck, or explicitly to create the SlideSpec bundle for an existing project (see Pre-condition in refresh-deck-workflow)."
 ---
 
 # deck-reader
 
 Existing deck → `list[SlideSpec]`. Powers every workflow that starts from a deck (Refresh, Edit, Add, Annotate, Restructure, Audit, Executive Summary).
+
+## Primary Use Case: Retroactive Spec Generation
+
+Before any SlideGen workflow can run on an existing deck, `deck-reader` must be run once to produce the slide specs. The resulting specs + updated `config.yaml` are saved to `projects/{name}/context/{wave}/slide_specs/` and become the persistent representation of the deck in the SlideGen system. This is not a preprocessing step — it's the one-time "register this deck with SlideGen" action.
+
+```
+deck-reader("prior_wave.pptx")
+→ list[SlideSpec] saved to projects/{name}/context/{wave}/slide_specs/
+→ config.yaml updated with extracted extraction params
+→ deck is now legible to all 8 SlideGen workflows
+```
+
+Run once per deck per wave. Subsequent waves bootstrap from the saved specs, not from re-running deck-reader on the new PPTX.
 
 ## Cardinal Rules
 
