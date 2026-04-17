@@ -68,11 +68,11 @@ def _validate_position(pos: Position, path: str, errors: list[str],
     elif not explicit and not preset:
         errors.append(f"{path}: position has neither explicit bbox nor preset")
     elif explicit:
-        # Bounds sanity
-        if pos.left is not None and (pos.left < 0 or pos.left > 13.333):
-            errors.append(f"{path}: position.left={pos.left} outside slide bounds [0, 13.333]")
-        if pos.top is not None and (pos.top < 0 or pos.top > 7.5):
-            errors.append(f"{path}: position.top={pos.top} outside slide bounds [0, 7.5]")
+        # Bounds sanity (allow small negative bleed — real decks have shapes at -0.03")
+        if pos.left is not None and (pos.left < -0.5 or pos.left > 14.0):
+            errors.append(f"{path}: position.left={pos.left} outside slide bounds [-0.5, 14.0]")
+        if pos.top is not None and (pos.top < -0.5 or pos.top > 8.0):
+            errors.append(f"{path}: position.top={pos.top} outside slide bounds [-0.5, 8.0]")
         if pos.width is not None and pos.width <= 0:
             errors.append(f"{path}: position.width={pos.width} must be positive")
         if pos.height is not None and pos.height <= 0:
@@ -117,7 +117,10 @@ def _validate_chart_component(c: ChartComponent, path: str, errors: list[str]) -
         if not series.values:
             errors.append(f"{s_path}.values is empty")
         # Length check (skip for scatter — values are [x, y] pairs with different semantics)
-        if not is_scatter and n_cats and len(series.values) != n_cats:
+        # Also skip when categories is a fallback placeholder from deck-reader extraction
+        cats_are_placeholder = (c.data.categories == ["unknown"] or
+                                c.data.categories == ["placeholder"])
+        if not is_scatter and n_cats and not cats_are_placeholder and len(series.values) != n_cats:
             errors.append(
                 f"{s_path}.values has {len(series.values)} entries; "
                 f"expected {n_cats} to match categories"
