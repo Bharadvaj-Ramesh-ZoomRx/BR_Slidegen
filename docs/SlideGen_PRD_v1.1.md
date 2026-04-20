@@ -591,7 +591,26 @@ Tokens are resolved by `slide-creator` at render time, not at spec creation time
 
 The pipeline never blocks on unresolved lineage. Specs with `"layout_complete_data_missing"` are saved alongside complete ones; the analyst fills gaps asynchronously. A spec with empty data lineage but full component data is still useful — it tells `slide-creator` exactly how to render the slide once someone provides the data source. See `slidegen/slide_spec/schema.py` `DataLineageCandidate` for the candidate structure.
 
-### 6.8 Data Lineage: SlideSpec as the Long-Term Model
+### 6.8 Spec v1.2: Spec as CONFIG, Not DATA
+
+**SlideSpec v1.2** (Apr 18) introduces the spec-as-config model. The spec stores INSTRUCTIONS for fetching and rendering — no data values. Chart categories, series values, table cell text are all fetched fresh from Synapse at refresh time.
+
+**New schema types:**
+* `DataFilter`, `DataTransform`, `SeriesConfig` — source-agnostic data mapping (works for Synapse, Excel, or any tabular source)
+* `ChartDataMapping` — per-chart: transform + series_config + raw Connector configs (raw\_pivot\_config, raw\_mapping\_config)
+* `TableDataMapping` — per-table: column configs with source\_field and header\_template
+* `SegmentRule` — structured segment: rule\_id (API parameter) + rule\_name + values + data\_column
+* Split visualization: `split_order`, `rows_per_object`, `top_n_rows` on ChartDataMapping
+
+**Two resolution paths for chart refresh:**
+1. **Connected slides** (have Connector tags): raw\_pivot\_config + raw\_mapping\_config passed directly to `pivot_records_to_chart_data()` which faithfully replicates the Connector's pivot, column selection, selectedRows filtering, transpose, and sort logic.
+2. **Non-connected slides** (no tags): `infer_data_transform()` in `data_inference.py` matches series names from OOXML against Synapse column values to generate a `DataTransform`. Same refresh pipeline from there.
+
+Both paths produce the same output: a complete spec that drives refresh independently. The Connector becomes a spec-generation accelerator, not a runtime dependency.
+
+**Test pipeline** (`tests/test_spec_refresh_pipeline.py`): 3-stage test — source → dummy deck (zeroed data) → refreshed deck (from Synapse via spec). Verified on 27-slide UAT deck: 25/27 slides visually correct, 60/60 tables, 27/27 headlines.
+
+### 6.8b Data Lineage: SlideSpec as the Long-Term Model
 
 **Long-term vision:** Every deck travels with its slide specs + config.yaml (§6.3). The spec is the authoritative source of data lineage — what analysis, what wave, what segments produced every chart on every slide. This does not depend on the Galen-PowerPoint Connector.
 

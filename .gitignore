@@ -65,3 +65,5 @@ projects/*
 
 # synapse data loader (auto-generated, not manually authored)
 slidegen/pipeline/synapse_data_loader.py
+experiments/deck_analysis/outputs/
+output.pptx

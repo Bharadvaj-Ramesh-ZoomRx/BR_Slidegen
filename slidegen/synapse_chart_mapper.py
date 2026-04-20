@@ -109,20 +109,100 @@ def fetch_synapse_report(
         return []
 
 
+def _resolve_value_field(val_field: str, df_columns: list[str]) -> str | None:
+    """Find a value field in the DataFrame, case-insensitive."""
+    if val_field in df_columns:
+        return val_field
+    lc = val_field.lower()
+    for col in df_columns:
+        if col.lower() == lc:
+            return col
+    return None
+
+
+def _normalize_key(k: str) -> str:
+    """Normalize compound column key: @:@ -> ' - '. Preserves aggregation suffixes."""
+    return k.replace(" @:@ ", " - ").replace("@:@", " - ")
+
+
+def _match_pivot_col(sc_norm: str, pivot_columns) -> str | None:
+    """Find pivot column matching a normalized selectedColumn key.
+
+    The Connector's selectedColumns use full segment paths like:
+        "Q1'26 - Specialty (C/PCPs) - Overall - CARD - L - Average of decimal"
+    But pivot columns use short values from the API:
+        "Q1'26 - CARD - L"
+
+    The key insight: every PART of the pivot column name (split by " - ") must
+    appear SOMEWHERE in the selectedColumn string. "CARD" appears inside
+    "Specialty (C/PCPs) - Overall - CARD". "Overall" appears inside "Overall Data".
+    """
+    # Pass 1: exact match
+    for pc_col in pivot_columns:
+        pc_norm = _normalize_key(str(pc_col))
+        if sc_norm == pc_norm:
+            return pc_col
+
+    # Pass 2: each pivot part must be a substring of the selectedColumn.
+    # When multiple pivot columns match, prefer the one whose LAST part
+    # matches the LAST segment of the selectedColumn (prevents "Overall"
+    # matching PCP's path "...Overall - PCP").
+    sc_parts = [p.strip() for p in sc_norm.split(" - ")]
+    sc_last = sc_parts[-1] if sc_parts else ""
+
+    best_match = None
+    best_score = 0
+    best_last_match = False
+    for pc_col in pivot_columns:
+        pc_norm = _normalize_key(str(pc_col))
+        pc_parts = [p.strip() for p in pc_norm.split(" - ")]
+
+        if not pc_parts:
+            continue
+
+        matched_parts = sum(1 for pp in pc_parts if pp in sc_norm)
+        if matched_parts < len(pc_parts):
+            continue  # not all parts found
+
+        # Check if last parts match (stronger signal)
+        pc_last = pc_parts[-1]
+        last_match = (pc_last == sc_last) or (pc_last in sc_last) or (sc_last in pc_last)
+
+        # Prefer: (1) last-part match, (2) higher part count
+        if last_match and not best_last_match:
+            best_match = pc_col
+            best_score = matched_parts
+            best_last_match = True
+        elif last_match == best_last_match and matched_parts > best_score:
+            best_match = pc_col
+            best_score = matched_parts
+
+    return best_match
+
+
 def pivot_records_to_chart_data(
     records: list[dict],
     pivot_config: dict,
     mapping_config: dict,
     static_time_period_names: list[str] | None = None,
+    chart_pattern: str = "",
+    split_order: int | None = None,
+    rows_per_object: int | None = None,
+    top_n_rows: int | None = None,
 ) -> ChartRefreshData:
     """Transform flat Synapse records into chart categories + series.
 
-    Args:
-        records: Flat records from Synapse API
-        pivot_config: PivotConfig from DataFrameConfigHash tag
-        mapping_config: MappingConfig from shape tag
-        static_time_period_names: If provided, filter to these time periods
-            (from ReportConfig.StaticTimePeriodNames — the exact periods the chart shows)
+    Faithfully replicates the Connector's transformation logic using the raw
+    PivotConfig and MappingConfig from the shape tags.
+
+    Key Connector behaviors replicated:
+      1. Compound row index (multiple RowFields) with selectedColumns[0] as display field
+      2. @:@ separator normalization in selectedColumns compound keys
+      3. applyTranspose from MappingConfig (explicit transpose for trended charts)
+      4. selectedRows for row filtering + ordering
+      5. columnDefinitions.sortCriteria.CustomList for explicit sort
+      6. PivotConfig.Filters with filterCriteria (1=include, 2=exclude)
+      7. Case-insensitive ValueField resolution with fallbacks
     """
     if not records:
         return ChartRefreshData(categories=[], series=[], success=False,
@@ -130,93 +210,319 @@ def pivot_records_to_chart_data(
 
     df = pd.DataFrame(records)
 
-    row_fields = [_remap_field(f) for f in pivot_config.get("RowFields", [])]
-    col_fields = [_remap_field(f) for f in pivot_config.get("ColumnFields", [])]
-    val_fields = [_remap_field(f) for f in pivot_config.get("ValueFields", [])]
+    raw_row_fields = pivot_config.get("RowFields", [])
+    raw_col_fields = pivot_config.get("ColumnFields", [])
+    raw_val_fields = pivot_config.get("ValueFields", [])
+    row_fields = [_remap_field(f) for f in raw_row_fields]
+    col_fields = [_remap_field(f) for f in raw_col_fields]
+    val_fields = [_remap_field(f) for f in raw_val_fields]
 
     if not row_fields or not val_fields:
         return ChartRefreshData(categories=[], series=[], success=False,
-                                error=f"Missing RowFields or ValueFields in PivotConfig")
+                                error="Missing RowFields or ValueFields")
 
-    # Verify required columns exist; for compound fields like "n - value",
-    # split and check each part
-    for f in row_fields + val_fields:
-        if f not in df.columns:
-            # Try splitting compound field (e.g., "n - value" → check "base" and "y_label")
-            parts = [_remap_field(p.strip()) for p in f.split(" - ")]
-            if all(p in df.columns for p in parts):
-                continue  # compound field — parts exist, will handle in pivot
-            return ChartRefreshData(categories=[], series=[], success=False,
-                                    error=f"Field '{f}' not in records")
+    # ── Resolve value field (case-insensitive + fallbacks) ──
+    primary_val = None
+    for vf in val_fields:
+        resolved = _resolve_value_field(vf, list(df.columns))
+        if resolved:
+            primary_val = resolved
+            break
+    if not primary_val:
+        for fallback in ["percentage", "decimal", "value"]:
+            if fallback in df.columns:
+                primary_val = fallback
+                break
+    if not primary_val:
+        return ChartRefreshData(categories=[], series=[], success=False,
+                                error=f"ValueField '{val_fields}' not in records")
 
-    # Apply filters
+    # ── Resolve row fields — support compound index ──
+    valid_row_fields = [rf for rf in row_fields if rf in df.columns]
+    if not valid_row_fields:
+        return ChartRefreshData(categories=[], series=[], success=False,
+                                error=f"RowFields '{row_fields}' not in records")
+    primary_row = valid_row_fields[0]
+
+    # ── Apply PivotConfig.Filters ──
     for filt in pivot_config.get("Filters", []):
         col_key = _remap_field(filt.get("ColumnKey", ""))
-        val = filt.get("Value", "")
-        if col_key and val and col_key in df.columns:
-            if val in df[col_key].values:
-                df = df[df[col_key] == val]
+        fval = filt.get("Value", "")
+        criteria = filt.get("filterCriteria", 1)
+        if col_key and fval and col_key in df.columns:
+            if criteria == 2:
+                df = df[df[col_key] != fval]
             else:
-                # Fuzzy: try contains
-                mask = df[col_key].str.contains(val.split()[0], case=False, na=False)
-                if mask.any():
-                    df = df[mask]
+                if fval in df[col_key].values:
+                    df = df[df[col_key] == fval]
+                else:
+                    mask = df[col_key].astype(str).str.contains(
+                        fval.split()[0], case=False, na=False)
+                    if mask.any():
+                        df = df[mask]
 
     if df.empty:
         df = pd.DataFrame(records)
 
-    # Filter to static time periods if provided
+    # ── Filter to static time periods ──
     if static_time_period_names and "time_period_name" in df.columns:
-        df = df[df["time_period_name"].isin(static_time_period_names)]
+        filtered = df[df["time_period_name"].isin(static_time_period_names)]
+        if not filtered.empty:
+            df = filtered
 
-    # Build pivot column key
+    # ── Build compound column key from ColumnFields ──
+    # Connector format: "{col_field_values joined by ' @:@ '}"
+    # With multiple ValueFields: creates separate columns per value field:
+    #   "{col_prefix} @:@ Average of reach", "{col_prefix} @:@ Average of sov", etc.
     valid_col_fields = [f for f in col_fields if f in df.columns]
-    if len(valid_col_fields) >= 2:
-        df = df.copy()
-        df["_col_key"] = df[valid_col_fields[0]].astype(str)
-        for cf in valid_col_fields[1:]:
-            df["_col_key"] = df["_col_key"] + " - " + df[cf].astype(str)
-    elif len(valid_col_fields) == 1:
-        df = df.copy()
-        df["_col_key"] = df[valid_col_fields[0]].astype(str)
-    else:
-        df = df.copy()
-        df["_col_key"] = "value"
+    df = df.copy()
+    # Replace NaN with "(blank)" in column fields (Connector displays null as "(blank)")
+    for cf in valid_col_fields:
+        df[cf] = df[cf].fillna("(blank)")
+    # Connector always uses "Average of" in column NAMES regardless of AggregationType.
+    # (AggregationType controls the aggregation function, not the display prefix.)
+    # Column alias may override display but Names are always "Average of {field}".
+    agg_prefix = "Average of"
 
-    # Pivot
+    # Resolve ALL available value fields (for multi-value pivots)
+    resolved_val_fields = []
+    for vf in val_fields:
+        resolved = _resolve_value_field(vf, list(df.columns))
+        if resolved:
+            resolved_val_fields.append((vf, resolved))  # (original_name, df_column)
+    if not resolved_val_fields:
+        resolved_val_fields = [(primary_val, primary_val)]
+    has_multi_vals = len(resolved_val_fields) > 1
+
+    # Build column prefix from ColumnFields
+    if len(valid_col_fields) >= 2:
+        df["_col_prefix"] = df[valid_col_fields[0]].astype(str)
+        for cf in valid_col_fields[1:]:
+            df["_col_prefix"] = df["_col_prefix"] + " @:@ " + df[cf].astype(str)
+    elif len(valid_col_fields) == 1:
+        df["_col_prefix"] = df[valid_col_fields[0]].astype(str)
+    else:
+        df["_col_prefix"] = "value"
+
+    if not has_multi_vals:
+        # Single value field — column key = prefix only
+        df["_col_key"] = df["_col_prefix"]
+    else:
+        # Multi-value: key includes aggregation suffix (pivot separately below)
+        df["_col_key"] = df["_col_prefix"] + " @:@ " + agg_prefix + " " + primary_val
+
+    # ── Determine display field for categories ──
+    # For compound RowFields (e.g. ['y_label','alias5540','alias3486']),
+    # selectedColumns lists the row fields to include, then series columns.
+    # The LAST RowField in selectedColumns is the display field for categories.
+    # E.g. selectedCols=['y_label','alias5540','Q1 2026'] → display alias5540 values.
+    selected = mapping_config.get("selectedColumns", [])
+    display_row_field = primary_row  # default: first RowField
+
+    if selected and len(valid_row_fields) > 1:
+        # Find which selectedColumns entries match RowFields
+        row_fields_in_sel = []
+        for sc in selected:
+            sc_remapped = _remap_field(sc)
+            if sc_remapped in valid_row_fields:
+                row_fields_in_sel.append(sc_remapped)
+            elif sc in raw_row_fields:
+                mapped = _remap_field(sc)
+                if mapped in df.columns:
+                    row_fields_in_sel.append(mapped)
+        # Use the LAST matching RowField as display field
+        if row_fields_in_sel:
+            display_row_field = row_fields_in_sel[-1]
+    elif selected and len(valid_row_fields) == 1:
+        # Single RowField — check if selectedColumns[0] matches
+        sc0_remapped = _remap_field(selected[0])
+        if sc0_remapped in valid_row_fields:
+            display_row_field = sc0_remapped
+
+    # ── Pivot ──
+    # Use compound row index when multiple RowFields exist (preserves duplicates
+    # where display_field has repeated values but other row fields differ).
+    # After pivot, extract display_field values as category labels.
+    use_compound = len(valid_row_fields) > 1 and display_row_field != valid_row_fields[0]
+    pivot_index = valid_row_fields if use_compound else display_row_field
+
     try:
-        pivot = df.pivot_table(
-            index=row_fields[0],
-            columns="_col_key",
-            values=val_fields[0],
-            aggfunc="first",
-        )
+        if has_multi_vals:
+            pivot_frames = []
+            for orig_name, df_col in resolved_val_fields:
+                col_key = df["_col_prefix"] + " @:@ " + agg_prefix + " " + df_col
+                sub = df.copy()
+                sub["_col_key"] = col_key
+                sub_pivot = sub.pivot_table(
+                    index=pivot_index,
+                    columns="_col_key",
+                    values=df_col,
+                    aggfunc="first",
+                )
+                pivot_frames.append(sub_pivot)
+            pivot = pd.concat(pivot_frames, axis=1)
+        else:
+            pivot = df.pivot_table(
+                index=pivot_index,
+                columns="_col_key",
+                values=primary_val,
+                aggfunc="first",
+            )
     except Exception as e:
         return ChartRefreshData(categories=[], series=[], success=False,
                                 error=f"Pivot failed: {e}")
 
-    # Apply MappingConfig to select series
-    selected = mapping_config.get("selectedColumns", [])
-    categories = list(pivot.index)
+    # Extract display labels from compound index
+    if use_compound and isinstance(pivot.index, pd.MultiIndex):
+        display_idx = valid_row_fields.index(display_row_field)
+        pivot.index = [idx[display_idx] if isinstance(idx, tuple) else idx
+                       for idx in pivot.index]
 
-    if selected and len(selected) > 1:
-        # First = category label, rest = series
-        series = []
-        for sc in selected[1:]:
-            matched_col = None
-            for pc_col in pivot.columns:
-                if sc == str(pc_col) or sc in str(pc_col) or str(pc_col) in sc:
-                    matched_col = pc_col
+    # ── Step 1: Filter COLUMNS by selectedColumns (Connector: GetSelectedColumnsInOrder) ──
+    # This happens BEFORE transpose. Removes columns not in selectedColumns.
+    row_field_names = set(_remap_field(f) for f in raw_row_fields) | set(raw_row_fields)
+    series_columns = []  # non-row, non-blank selectedColumns entries
+    for sc in selected:
+        if sc.startswith("<blank:"):
+            continue
+        sc_remapped = _remap_field(sc)
+        if sc_remapped in row_field_names or sc in row_field_names:
+            continue
+        series_columns.append(sc)
+
+    if series_columns:
+        # Keep only columns that match selectedColumns entries
+        cols_to_keep = []
+        for sc in series_columns:
+            sc_norm = _normalize_key(sc)
+            matched = _match_pivot_col(sc_norm, pivot.columns)
+            if matched is not None:
+                cols_to_keep.append(matched)
+        if cols_to_keep:
+            pivot = pivot[cols_to_keep]
+
+    # ── Step 1b: Apply topNRows + rowsPerObject/splitOrder (split visualization) ──
+    # Connector's SplitVisualizationService splits pivot rows across chart shapes.
+    # topNRows: limit total rows. rowsPerObject=1 + splitOrder=K: take row K only.
+    if top_n_rows and top_n_rows > 0 and len(pivot) > top_n_rows:
+        pivot = pivot.iloc[:top_n_rows]
+
+    if rows_per_object and rows_per_object > 0 and split_order is not None:
+        start = split_order * rows_per_object
+        end = start + rows_per_object
+        if start < len(pivot):
+            pivot = pivot.iloc[start:min(end, len(pivot))]
+
+    # ── Step 2: Apply transpose (Connector: VisualizationService at render time) ──
+    # After transpose, column names become categories.
+    # Connector applies columnAliasMap: default alias replaces @:@ with -.
+    # Then explicit columnDefinitions[].Alias overrides if set.
+    apply_transpose = mapping_config.get("applyTranspose", False)
+    if apply_transpose:
+        # Build alias map: {raw_name: display_alias}
+        col_alias_map = {}
+        for cd in pivot_config.get("columnDefinitions", []):
+            name = cd.get("Name", "")
+            alias = cd.get("Alias")
+            if name and alias:
+                col_alias_map[name] = alias
+
+        pivot = pivot.T
+
+        # Apply aliases: explicit alias if available, else default (replace @:@ with -)
+        new_index = []
+        for idx in pivot.index:
+            idx_str = str(idx)
+            if idx_str in col_alias_map:
+                new_index.append(col_alias_map[idx_str])
+            else:
+                # Default alias: @:@ -> -
+                new_index.append(idx_str.replace(" @:@ ", " - "))
+        pivot.index = new_index
+
+    # ── Step 3: Extract categories + series from the (possibly transposed) pivot ──
+    # Deduplicate columns (multi-value pivot can produce duplicates)
+    pivot = pivot.loc[:, ~pivot.columns.duplicated()]
+    categories = list(pivot.index.astype(str))
+    series: list[tuple[str, list[float]]] = []
+
+    for ci in range(len(pivot.columns)):
+        col_name = str(pivot.columns[ci])
+        col_data = pivot.iloc[:, ci]
+        vals = [0.0 if pd.isna(v) else float(v) for v in col_data]
+        display_name = col_name.replace(" @:@ ", " - ").replace("@:@", " - ")
+        series.append((display_name, vals))
+
+    # ── Apply selectedRows (filter + explicit order) ──
+    select_all = mapping_config.get("selectAllRows", True)
+    selected_rows_raw = mapping_config.get("selectedRows", [])
+    rows_ordered = False
+
+    if not select_all and selected_rows_raw:
+        # selectedRows may use @:@ separator for compound keys
+        row_order = []
+        for sr in selected_rows_raw:
+            sr_norm = _normalize_key(sr)
+            sr_parts = [p.strip() for p in sr_norm.split(" - ")]
+            for ci, cat in enumerate(categories):
+                # Match: exact, or last part matches, or cat is in any part
+                if (cat == sr_norm or cat in sr_parts or
+                        any(cat == p or p in cat or cat in p for p in sr_parts)):
+                    if ci not in row_order:
+                        row_order.append(ci)
                     break
-            if matched_col is not None:
-                vals = [0.0 if pd.isna(v) else float(v) for v in pivot[matched_col].tolist()]
-                series.append((sc, vals))
-    else:
-        # No mapping — use all columns
-        series = []
-        for col in pivot.columns:
-            vals = [0.0 if pd.isna(v) else float(v) for v in pivot[col].tolist()]
-            series.append((str(col), vals))
+        if row_order:
+            categories = [categories[i] for i in row_order]
+            series = [(name, [vals[i] for i in row_order if i < len(vals)])
+                      for name, vals in series]
+            rows_ordered = True
+
+    # ── Apply moveRowsToFirst / moveRowsToLast ──
+    move_first = mapping_config.get("moveRowsToFirst", [])
+    move_last = mapping_config.get("moveRowsToLast", [])
+    if move_first or move_last:
+        fi, li, mi = [], [], []
+        for ci, cat in enumerate(categories):
+            if any(cat == m or m in cat for m in move_first):
+                fi.append(ci)
+            elif any(cat == m or m in cat for m in move_last):
+                li.append(ci)
+            else:
+                mi.append(ci)
+        new_order = fi + mi + li
+        if new_order:
+            categories = [categories[i] for i in new_order]
+            series = [(n, [v[i] for i in new_order if i < len(v)])
+                      for n, v in series]
+            rows_ordered = True
+
+    # ── Sort (only when explicit CustomList exists) ──
+    # Don't apply default value-based sort — preserve data order.
+    # Only sort when columnDefinitions has a CustomList (explicit category order).
+    if not rows_ordered and series and series[0][1] and len(series[0][1]) == len(categories):
+        col_defs = pivot_config.get("columnDefinitions", [])
+        custom_list = None
+        for cd in col_defs:
+            sc = cd.get("sortCriteria", {})
+            if sc:
+                cl = sc.get("CustomList", [])
+                if cl:
+                    custom_list = cl
+                break
+
+        if custom_list:
+            order = []
+            for cl_item in custom_list:
+                for ci, cat in enumerate(categories):
+                    if cat == cl_item or cl_item in cat or cat in cl_item:
+                        if ci not in order:
+                            order.append(ci)
+                        break
+            for ci in range(len(categories)):
+                if ci not in order:
+                    order.append(ci)
+            categories = [categories[i] for i in order]
+            series = [(n, [v[i] for i in order]) for n, v in series]
 
     return ChartRefreshData(categories=categories, series=series)
 

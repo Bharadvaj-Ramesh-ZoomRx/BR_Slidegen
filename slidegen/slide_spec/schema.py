@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 
-SPEC_VERSION = "1.1"  # v1.1: added spec_completeness, data_lineage_candidates, metadata.tier/confidence
+SPEC_VERSION = "1.2"  # v1.2: spec-as-config — data_mapping on components, no data values in config specs
 
 
 # Top 6 chart patterns by real-deck frequency (88% coverage) — Apr 15 analysis.
@@ -137,10 +137,14 @@ ColorToken = str
 
 @dataclass
 class Series:
-    """One data series in a chart."""
+    """One data series in a chart.
+
+    In populated specs (at render time), values contains the actual data.
+    In config-only specs, values is empty — data is fetched at refresh time.
+    """
     name: str                           # legend label
-    values: list[float]                 # one per category (or [x, y] pairs for scatter)
-    color: ColorToken                   # see ColorToken grammar above
+    values: list[float] = field(default_factory=list)  # one per category; empty in config specs
+    color: ColorToken = ""              # see ColorToken grammar above
     # Optional per-series overrides
     line_style: Optional[str] = None    # "solid" | "dashed" | "dotted"
     marker: Optional[str] = None        # "circle" | "square" | "none"
@@ -152,6 +156,124 @@ class ChartData:
     """Category-oriented chart data (bar/column/line)."""
     categories: list[str]               # e.g. row labels, message codes, quarters
     series: list[Series]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data mapping (spec-as-config: fetch instructions per component)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# These types tell the refresh pipeline HOW to transform tabular data into each
+# component's structure. They are SOURCE-AGNOSTIC — the same mapping works
+# whether data comes from Synapse API, Excel files, or any other tabular source.
+#
+# The slide-level DataLineage says WHERE to get data.
+# The per-component data_mapping says HOW to shape it for this component.
+#
+# In config-only specs (stored on disk), components have data_mapping but no
+# data values. At refresh time, the pipeline reads data_mapping, fetches data
+# per DataLineage, transforms it, and populates the data fields for rendering.
+
+
+@dataclass
+class DataFilter:
+    """A predicate applied before mapping data to a component.
+
+    Source-agnostic: field names are the column names in whatever tabular data
+    the pipeline fetched (Synapse records, Excel columns, etc.).
+    """
+    field: str = ""              # column name: "segment_1", "category", "source"
+    value: str = ""              # match value: "CARD", "Repatha", "Q1 2026"
+    operator: str = "eq"         # "eq" | "in" | "contains" | "ne"
+
+
+@dataclass
+class DataTransform:
+    """Source-agnostic instructions for shaping tabular data into a component.
+
+    Given a flat table of records, this says:
+      - row_field → becomes categories / row labels
+      - column_field → becomes series names (for charts) or column groups
+      - value_field → becomes cell values
+      - filters → applied before transformation
+    """
+    row_field: str = ""                              # → categories/row labels: "y_label"
+    column_field: Optional[str] = None               # → series names: "measure", "segment"
+    value_field: str = ""                            # → cell values: "percentage", "value"
+    filters: list[DataFilter] = field(default_factory=list)
+    sort_by: Optional[str] = None                    # "value_desc" | "alphabetical" | None
+
+
+@dataclass
+class SeriesConfig:
+    """Render config for one chart series — defines role and color, not values.
+
+    The `role` identifies which data group this series represents (e.g. "High",
+    "Low", "Q1 2026"). At refresh time, the pipeline matches pivoted columns
+    to roles and applies the color config.
+    """
+    role: str = ""                   # data group: "Low", "Neutral", "High", "IDK"
+    color: ColorToken = ""           # render color: "#D34D2F"
+    order: Optional[int] = None      # stacking/display order (0-based)
+
+
+@dataclass
+class ChartDataMapping:
+    """How to populate a chart from the slide's fetched data.
+
+    Two resolution paths:
+      1. **Raw Connector configs** (raw_pivot_config + raw_mapping_config):
+         When available, the refresh pipeline passes these directly to
+         pivot_records_to_chart_data() which handles compound column keys,
+         selectedColumns, and all Connector transformation logic faithfully.
+
+      2. **Source-agnostic transform** (transform + series_config):
+         Human-readable fallback for non-Connector slides. Used when no
+         raw configs are available.
+
+    For Connector-tagged slides, BOTH are populated: raw configs for machine
+    execution, transform + series_config for human readability.
+    """
+    transform: DataTransform = field(default_factory=DataTransform)
+    series_config: list[SeriesConfig] = field(default_factory=list)
+    # Raw Connector configs — when present, used for exact refresh fidelity
+    raw_pivot_config: Optional[dict] = None      # DataFrameConfigHash JSON
+    raw_mapping_config: Optional[dict] = None    # MappingConfig JSON
+    raw_column_key_label_map: Optional[dict] = None  # ColumnKeyLabelMap JSON
+    # Split visualization — rowsPerObject splits pivot rows across chart shapes
+    split_order: Optional[int] = None            # SPLITORDER tag (0-based index)
+    rows_per_object: Optional[int] = None        # MappingConfig.rowsPerObject
+    top_n_rows: Optional[int] = None             # MappingConfig.topNRows
+
+
+@dataclass
+class TableColumnConfig:
+    """One table column's data source and display format.
+
+    source_field names the column in the tabular data. header_template is the
+    display header — may contain {{}} template vars resolved at render time.
+    format controls value display (e.g. "(n = {})" wraps base sizes).
+    """
+    source_field: str = ""           # "y_label", "base", "percentage"
+    header_template: str = ""        # "Products", "Base", "{{period_current}} Easy"
+    format: Optional[str] = None     # "(n = {})", "0%", None=raw value
+    filter: Optional[DataFilter] = None  # extra filter for just this column's values
+
+
+@dataclass
+class TableDataMapping:
+    """How to populate a table from the slide's fetched data.
+
+    filters apply to all columns; each column can add its own filter
+    (e.g. metric column filters to measure="High").
+
+    Like ChartDataMapping, can carry raw Connector configs for exact fidelity.
+    """
+    filters: list[DataFilter] = field(default_factory=list)
+    columns: list[TableColumnConfig] = field(default_factory=list)
+    # Raw Connector configs
+    raw_pivot_config: Optional[dict] = None
+    raw_mapping_config: Optional[dict] = None
+    raw_column_key_label_map: Optional[dict] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -225,10 +347,18 @@ class ComponentSpec:
 
 @dataclass
 class ChartComponent(ComponentSpec):
-    """A native PPT chart (python-pptx + lxml_helpers)."""
+    """A native PPT chart (python-pptx + lxml_helpers).
+
+    Two modes:
+      - **Config mode** (spec on disk): data=None, data_mapping populated.
+        The refresh pipeline reads data_mapping to fetch + transform data.
+      - **Populated mode** (at render time): data has categories/series/values.
+        The renderer reads data to create the chart.
+    """
     chart_pattern: str = ""             # key into CHART_PATTERNS (see SUPPORTED_CHART_PATTERNS)
-    data: ChartData = field(default_factory=lambda: ChartData(categories=[], series=[]))
+    data: Optional[ChartData] = None    # None in config specs; populated at runtime by refresh pipeline
     chrome: ChartChrome = field(default_factory=ChartChrome)
+    data_mapping: Optional[ChartDataMapping] = None  # config: how to derive chart data from fetched records
 
     def __post_init__(self) -> None:
         self.type = "chart"
@@ -240,15 +370,15 @@ class LabelTableComponent(ComponentSpec):
 
     Rows match the chart's categories 1:1. Used when chart.hide_category_labels=True.
 
-    Defaults (9.0pt regular) match real-deck observations: label cells and delta
-    cells are rendered at similar sizes so neither visually dominates. Drop to
-    7.5pt only for dense decks where labels would otherwise wrap past 2 lines.
+    Config mode: labels empty, data_mapping tells pipeline what to populate.
+    Populated mode: labels filled, ready for rendering.
     """
     labels: list[str] = field(default_factory=list)
     alternating_rows: bool = True       # grey first, then white (matches real decks)
     font_size_pt: float = 9.0           # was 7.5 — looked too small beside 10-11pt delta cells
     font_name: Optional[str] = None     # None = inherit brand.font_body
     wrap: bool = True
+    data_mapping: Optional[TableDataMapping] = None  # config: how to derive label values
 
     def __post_init__(self) -> None:
         self.type = "label_table"
@@ -256,10 +386,17 @@ class LabelTableComponent(ComponentSpec):
 
 @dataclass
 class ValueTableComponent(ComponentSpec):
-    """Multi-column numeric table (e.g. abacus value columns)."""
+    """Multi-column numeric table (e.g. abacus value columns).
+
+    Config mode: headers/rows empty, data_mapping tells pipeline how to populate.
+    Populated mode: headers/rows filled by pipeline, ready for rendering.
+    """
     headers: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)  # cells are already formatted strings
     alternating_rows: bool = True
+    row_count: Optional[int] = None      # expected row count (config hint for layout)
+    col_count: Optional[int] = None      # expected column count (config hint for layout)
+    data_mapping: Optional[TableDataMapping] = None  # config: how to derive table data
 
     def __post_init__(self) -> None:
         self.type = "value_table"
@@ -282,6 +419,7 @@ class DeltaColumnComponent(ComponentSpec):
     font_size_pt: float = 10.0          # was hardcoded 11pt in add_delta_col
     header_font_size_pt: Optional[float] = None   # defaults to font_size_pt
     font_name: Optional[str] = None     # None = inherit brand.font_body
+    data_mapping: Optional[TableDataMapping] = None  # config: how to derive delta values
 
     def __post_init__(self) -> None:
         self.type = "delta_column"
@@ -343,54 +481,74 @@ class FooterSpec:
 
 
 @dataclass
+class SegmentRule:
+    """One segmentation rule applied to the data fetch.
+
+    Models the three-level structure:
+      - rule_id → sent to API in segment_ids parameter
+      - rule_name → human-readable name of the segmentation rule
+      - values → the segment values that appear in the returned data column
+
+    Example:
+        SegmentRule(rule_id=14633, rule_name="Specialty Type",
+                    values=["CARD", "Overall", "PCP"], data_column="segment_1")
+
+    At fetch time, rule_id goes into the API call. The returned data has a
+    column named data_column (e.g. "segment_1") with the segment values.
+    Component-level data_mapping filters reference these values.
+    """
+    rule_id: int = 0                     # sent to API: segment_ids=[14633, ...]
+    rule_name: str = ""                  # human-readable: "Specialty Type", "HCP Type"
+    values: list[str] = field(default_factory=list)  # data values: ["CARD", "Overall", "PCP"]
+    data_column: str = "segment_1"       # column in returned data: "segment_1", "segment_2"
+
+
+@dataclass
 class DataLineage:
     """Data provenance for audit + refresh workflows.
 
-    Mirrors the Galen-PowerPoint Synapse Connector ReportConfig fields so that
-    specs produced by SlideGen and specs reconstructed by deck-reader from
-    existing decks are interchangeable.
+    Source-agnostic: works for Synapse-connected slides, Excel-sourced slides,
+    and any other tabular data source. The pipeline reads these fields to know
+    WHERE to fetch data. Per-component data_mapping says HOW to shape it.
 
-    **Primary identifiers (Synapse-canonical)** — populated when the slide was
-    authored through galen-powerpoint or through SlideGen's synapse tracks:
-      - project_id, reporting_plan_id, analysis_ids — uniquely identify the
-        data source in Synapse
-      - survey_id — respondent-level fetches
-      - segment_ids — segmentation applied at query time
-      - static_time_period_ids OR dynamic_latest_n / include_live_wave — deliverables
-      - analysis_type — e.g. "Question Analysis"
+    **Synapse identifiers** — populated when data comes from Synapse API:
+      - project_id, reporting_plan_id, analysis_ids, survey_id
+      - segments — list of SegmentRule (rule_id sent to API, values appear in data)
+      - time period config (static IDs or dynamic latest N)
 
-    **Legacy / Excel-path identifiers** — populated for decks built from local
-    Excel files (Track B without Synapse):
-      - data_source, extraction_method, question_codes, segment_codes, source_file
+    **Excel-path identifiers** — populated when data comes from local Excel:
+      - data_source, extraction_method, question_codes, source_file
 
     **Audit fields** — updated on every refresh:
-      - last_data_pull (ISO 8601), last_refresh_error (if non-empty, the last
-        refresh failed), config_hash (invalidation key)
-
-    deck-reader populates the Synapse fields from the shape tags
-    (ReportConfigHash → Custom XML Part lookup). slide-updater writes back
-    last_data_pull + last_refresh_error after re-fetch.
+      - last_data_pull, last_refresh_error, config_hash
     """
-    # Synapse-canonical identifiers (preferred when available)
+    # Synapse identifiers
     project_id: Optional[int] = None
-    project_name: Optional[str] = None               # e.g. "AMG [ATU]: Repatha"
+    project_name: Optional[str] = None               # e.g. "Amgen [ATU]: Repatha"
     reporting_plan_id: Optional[int] = None
-    reporting_plan_name: Optional[str] = None         # e.g. "Quarterly"
+    reporting_plan_name: Optional[str] = None         # e.g. "Quarterly Deliverable"
     analysis_ids: list[int] = field(default_factory=list)
     analysis_names: list[str] = field(default_factory=list)  # human-readable per analysis
     survey_id: Optional[int] = None
+
+    # Segments — structured (v1.2+). Each rule has ID (API), name, values, data column.
+    segments: list[SegmentRule] = field(default_factory=list)
+    # Legacy flat fields (v1.1 compat — superseded by segments[])
     segment_ids: list[int] = field(default_factory=list)
-    segment_names: list[str] = field(default_factory=list)   # human-readable per segment
-    # Deliverables — either static list or dynamic "latest N + live"
+    segment_names: list[str] = field(default_factory=list)
+
+    # Time period config
     static_time_period_ids: list[int] = field(default_factory=list)
-    static_time_period_names: list[str] = field(default_factory=list)  # e.g. ["Q2 2026", "Q1 2026"]
+    static_time_period_names: list[str] = field(default_factory=list)
     dynamic_latest_n: Optional[int] = None
     include_live_wave: Optional[bool] = None
+
+    # Analysis metadata
     analysis_type: Optional[str] = None              # e.g. "SINGLE_QUESTION"
     question_text: Optional[str] = None              # full question text from survey
-    column_key_label_map: Optional[dict[str, str]] = None  # from ColumnKeyLabelMap shape tag
+    column_key_label_map: Optional[dict[str, str]] = None
 
-    # Legacy / Excel-path identifiers (used when no Synapse connection)
+    # Excel-path identifiers (used when no Synapse connection)
     data_source: str = ""                            # e.g. "Rybrevant/Q2_10"
     extraction_method: str = ""                      # "question_code" | "synapse_raw" | ...
     question_codes: list[str] = field(default_factory=list)
@@ -511,6 +669,30 @@ _COMPONENT_CLASSES: dict[str, type] = {
 }
 
 
+def _parse_data_filter(d: dict) -> DataFilter:
+    return DataFilter(field=d.get("field", ""), value=d.get("value", ""),
+                      operator=d.get("operator", "eq"))
+
+
+def _parse_table_data_mapping(d: dict) -> TableDataMapping:
+    filters = [_parse_data_filter(f) for f in d.get("filters", [])]
+    columns = []
+    for col_d in d.get("columns", []):
+        filt = _parse_data_filter(col_d["filter"]) if col_d.get("filter") else None
+        columns.append(TableColumnConfig(
+            source_field=col_d.get("source_field", ""),
+            header_template=col_d.get("header_template", ""),
+            format=col_d.get("format"),
+            filter=filt,
+        ))
+    return TableDataMapping(
+        filters=filters, columns=columns,
+        raw_pivot_config=d.get("raw_pivot_config"),
+        raw_mapping_config=d.get("raw_mapping_config"),
+        raw_column_key_label_map=d.get("raw_column_key_label_map"),
+    )
+
+
 def _component_from_dict(d: dict) -> ComponentSpec:
     ctype = d.get("type")
     cls = _COMPONENT_CLASSES.get(ctype)
@@ -519,11 +701,16 @@ def _component_from_dict(d: dict) -> ComponentSpec:
     # Extract position
     pos = d.get("position", {})
     position = Position(**pos) if pos else Position()
-    # Chart needs nested deserialization
+
+    # ── Chart: nested deserialization for data, chrome, data_mapping ──
     if ctype == "chart":
-        data_d = d.get("data", {})
-        series_list = [Series(**s) for s in data_d.get("series", [])]
-        data = ChartData(categories=data_d.get("categories", []), series=series_list)
+        # data: None in config specs, populated in runtime specs
+        data_d = d.get("data")
+        data = None
+        if data_d:
+            series_list = [Series(**s) for s in data_d.get("series", [])]
+            data = ChartData(categories=data_d.get("categories", []), series=series_list)
+
         chrome_d = d.get("chrome", {})
         chrome = ChartChrome(
             title=chrome_d.get("title"),
@@ -532,15 +719,79 @@ def _component_from_dict(d: dict) -> ComponentSpec:
             data_labels=DataLabelsSpec(**chrome_d["data_labels"]) if "data_labels" in chrome_d else DataLabelsSpec(),
             value_axis=AxisSpec(**chrome_d["value_axis"]) if "value_axis" in chrome_d else AxisSpec(),
             hide_category_labels=chrome_d.get("hide_category_labels", True),
+            gap_width=chrome_d.get("gap_width"),
+            overlap=chrome_d.get("overlap"),
         )
+
+        # data_mapping: config-only field
+        dm_d = d.get("data_mapping")
+        data_mapping = None
+        if dm_d:
+            tx_d = dm_d.get("transform", {})
+            transform = DataTransform(
+                row_field=tx_d.get("row_field", ""),
+                column_field=tx_d.get("column_field"),
+                value_field=tx_d.get("value_field", ""),
+                filters=[_parse_data_filter(f) for f in tx_d.get("filters", [])],
+                sort_by=tx_d.get("sort_by"),
+            )
+            sc_list = [SeriesConfig(role=sc.get("role", ""), color=sc.get("color", ""),
+                                    order=sc.get("order"))
+                       for sc in dm_d.get("series_config", [])]
+            data_mapping = ChartDataMapping(
+                transform=transform, series_config=sc_list,
+                raw_pivot_config=dm_d.get("raw_pivot_config"),
+                raw_mapping_config=dm_d.get("raw_mapping_config"),
+                raw_column_key_label_map=dm_d.get("raw_column_key_label_map"),
+                split_order=dm_d.get("split_order"),
+                rows_per_object=dm_d.get("rows_per_object"),
+                top_n_rows=dm_d.get("top_n_rows"),
+            )
+
         return ChartComponent(
-            type="chart",
-            position=position,
+            type="chart", position=position,
             chart_pattern=d.get("chart_pattern", ""),
-            data=data,
-            chrome=chrome,
+            data=data, chrome=chrome, data_mapping=data_mapping,
         )
-    # Other component types — pass through plain fields
+
+    # ── Value table: parse data_mapping, map header_row → headers ──
+    if ctype == "value_table":
+        dm_d = d.get("data_mapping")
+        data_mapping = _parse_table_data_mapping(dm_d) if dm_d else None
+        return ValueTableComponent(
+            type="value_table", position=position, data_mapping=data_mapping,
+            headers=d.get("headers", d.get("header_row", [])),
+            rows=d.get("rows", []),
+            alternating_rows=d.get("alternating_rows", True),
+            row_count=d.get("row_count"),
+            col_count=d.get("col_count"),
+        )
+
+    # ── Label table: parse data_mapping, ignore label_count ──
+    if ctype == "label_table":
+        dm_d = d.get("data_mapping")
+        data_mapping = _parse_table_data_mapping(dm_d) if dm_d else None
+        return LabelTableComponent(
+            type="label_table", position=position, data_mapping=data_mapping,
+            labels=d.get("labels", []),
+            alternating_rows=d.get("alternating_rows", True),
+            font_size_pt=d.get("font_size_pt", 9.0),
+            font_name=d.get("font_name"),
+            wrap=d.get("wrap", True),
+        )
+
+    # ── Delta column: parse data_mapping ──
+    if ctype == "delta_column":
+        dm_d = d.get("data_mapping")
+        data_mapping = _parse_table_data_mapping(dm_d) if dm_d else None
+        kwargs = {k: v for k, v in d.items()
+                  if k not in ("type", "position", "data_mapping")}
+        return DeltaColumnComponent(
+            type="delta_column", position=position, data_mapping=data_mapping,
+            **kwargs,
+        )
+
+    # ── Other component types — pass through plain fields ──
     kwargs = {k: v for k, v in d.items() if k not in ("type", "position")}
     return cls(type=ctype, position=position, **kwargs)
 
@@ -590,8 +841,15 @@ def load_spec(source: Union[str, Path, dict]) -> SlideSpec:
     # Components
     components = [_component_from_dict(c) for c in data.get("components", [])]
 
-    # Lineage + metadata
-    lineage = DataLineage(**data["data_lineage"]) if data.get("data_lineage") else None
+    # Lineage — parse segments[] as SegmentRule objects
+    lineage = None
+    if data.get("data_lineage"):
+        lin_d = dict(data["data_lineage"])
+        seg_dicts = lin_d.pop("segments", [])
+        lineage = DataLineage(
+            **lin_d,
+            segments=[SegmentRule(**s) for s in seg_dicts],
+        )
     metadata = SlideMetadata(**data["metadata"]) if data.get("metadata") else None
 
     # Data lineage candidates (two-pass model)
