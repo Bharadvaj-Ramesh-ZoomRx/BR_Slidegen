@@ -66,6 +66,7 @@ def get_synapse_token(force_interactive: bool = False) -> str:
     """Get a valid Synapse API access token.
 
     Resolution order:
+    0. SYNAPSE_API_KEY env var (API key — no expiry, preferred)
     1. SYNAPSE_API_TOKEN env var (from .env — check if still valid)
     2. MSAL cache (silent refresh from prior login)
     3. Device code flow (prompts user once, then cached)
@@ -73,6 +74,11 @@ def get_synapse_token(force_interactive: bool = False) -> str:
     Returns the access_token string (without "Bearer " prefix).
     """
     import time
+
+    # 0. Try API key first (no expiry, no user interaction)
+    api_key = os.environ.get("SYNAPSE_API_KEY", "")
+    if api_key and not force_interactive:
+        return api_key
 
     # 1. Try env var first
     env_token = os.environ.get("SYNAPSE_API_TOKEN", "")

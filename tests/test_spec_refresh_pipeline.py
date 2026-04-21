@@ -545,21 +545,24 @@ def stage2_refresh_from_specs():
 
     base_url = os.environ.get("SYNAPSE_API_BASE_URL", "https://synapse-api.zoomrx.com")
 
-    # Check token validity (decode JWT exp)
-    try:
-        import base64, time
-        raw = token.replace("Bearer ", "").strip()
-        payload_b64 = raw.split(".")[1]
-        payload_b64 += "=" * (4 - len(payload_b64) % 4)
-        claims = json.loads(base64.urlsafe_b64decode(payload_b64))
-        exp = claims.get("exp", 0)
-        remaining = exp - time.time()
-        if remaining < 60:
-            print(f"  ERROR: Token expired {abs(remaining)/60:.0f} minutes ago")
-            print("  Run: python -m slidegen.synapse_auth --update 'Bearer eyJ...'")
-            return False
-        print(f"  Token valid for {remaining/60:.0f} more minutes")
-    except Exception:
+    # Check token validity — skip expiry check for API keys (sk_*)
+    raw = token.replace("Bearer ", "").strip()
+    if raw.startswith("sk_"):
+        print(f"  Using API key (no expiry)")
+    else:
+        try:
+            import base64, time
+            payload_b64 = raw.split(".")[1]
+            payload_b64 += "=" * (4 - len(payload_b64) % 4)
+            claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+            exp = claims.get("exp", 0)
+            remaining = exp - time.time()
+            if remaining < 60:
+                print(f"  ERROR: Token expired {abs(remaining)/60:.0f} minutes ago")
+                print("  Run: python -m slidegen.synapse_auth --update 'Bearer eyJ...'")
+                return False
+            print(f"  Token valid for {remaining/60:.0f} more minutes")
+        except Exception:
         print("  Warning: could not decode token expiry, proceeding anyway")
 
     # Clone dummy -> refreshed
