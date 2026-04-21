@@ -380,6 +380,125 @@ def fetch_synapse_records(data_lineage, token: str, base_url: str) -> list[dict]
 # Table refresh from Connector configs
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _detect_column_format(
+    selected_col: str,
+    col_index: int,
+    pivot_config: dict,
+    source_patterns: list[str] | None,
+) -> str:
+    """Determine how to format values for a given selectedColumn.
+
+    Returns one of:
+      "integer"      — base sizes, sample counts: display as "123"
+      "integer_n"    — base sizes wrapped as "(n = 123)"
+      "percentage"   — metric values: display as "37%"
+      "string"       — labels: display as-is
+    """
+    blank_label = ""
+    if selected_col.startswith("<blank:"):
+        blank_label = selected_col.replace("<blank:", "").rstrip(">")
+    else:
+        return "string"  # non-blank columns are data field labels
+
+    # Check blank label for base/n indicators
+    bl_lower = blank_label.lower()
+    if bl_lower in ("base", "n") or bl_lower.startswith("n "):
+        # Check source patterns for "(n = X)" wrapping
+        if source_patterns:
+            for pat in source_patterns:
+                if pat and "(n" in pat.lower():
+                    return "integer_n"
+        return "integer"
+
+    # Check PivotConfig ValueFields for hints
+    val_fields = pivot_config.get("ValueFields", [])
+    for vf in val_fields:
+        vf_lower = vf.lower()
+        if "base" in vf_lower or vf_lower == "n" or "n - " in vf_lower:
+            # If ALL blank columns map to base-like value fields, use integer
+            # But only if the blank label itself doesn't suggest a metric
+            if not any(kw in bl_lower for kw in ("easy", "hard", "high", "low",
+                                                   "agree", "disagree", "likely",
+                                                   "unlikely", "positive", "negative",
+                                                   "percentage", "decimal", "pct")):
+                # Check source patterns
+                if source_patterns:
+                    for pat in source_patterns:
+                        if pat and "(n" in pat.lower():
+                            return "integer_n"
+                return "integer"
+
+    # Check if value fields suggest percentage
+    for vf in val_fields:
+        vf_lower = vf.lower()
+        if vf_lower in ("percentage", "decimal"):
+            return "percentage"
+
+    # Check source patterns for percentage formatting
+    if source_patterns:
+        for pat in source_patterns:
+            if pat and "%" in pat:
+                return "percentage"
+            if pat:
+                # Try to parse: if it looks like a small decimal or int
+                try:
+                    pv = float(pat.replace("%", "").replace(",", "").strip())
+                    if 0 < abs(pv) <= 1.0:
+                        return "percentage"
+                    elif abs(pv) > 2:
+                        return "integer"
+                except (ValueError, TypeError):
+                    pass
+
+    # Default: check blank label for metric-sounding names
+    if any(kw in bl_lower for kw in ("easy", "hard", "high", "low", "agree",
+                                      "disagree", "likely", "unlikely",
+                                      "positive", "negative", "overall",
+                                      "card", "pcp", "comm", "acad")):
+        return "percentage"
+
+    return "percentage"  # safe default for data cells
+
+
+def _format_table_value(v: float, fmt: str) -> str:
+    """Format a numeric value according to the detected column format."""
+    if fmt == "integer":
+        return str(int(round(v))) if v != 0 else ""
+    elif fmt == "integer_n":
+        return f"(n = {int(round(v))})" if v != 0 else ""
+    elif fmt == "percentage":
+        if v == 0:
+            return ""
+        # Values from Synapse are typically 0-1 decimals
+        if abs(v) <= 1.0:
+            return f"{v:.0%}"
+        else:
+            # Already in percentage form (e.g. 37.0 means 37%)
+            return f"{int(round(v))}%"
+    else:
+        return str(v) if v != 0 else ""
+
+
+def _read_source_table_patterns(source_table) -> list[list[str]]:
+    """Read the first few data rows from a source table to detect formatting patterns.
+
+    Returns a list of rows, each row being a list of cell text strings.
+    Skips the header row (row 0) and reads up to 3 data rows.
+    """
+    patterns = []
+    try:
+        n_rows = min(len(source_table.rows), 4)  # header + up to 3 data rows
+        n_cols = len(source_table.columns)
+        for r in range(1, n_rows):  # skip header row
+            row = []
+            for c in range(n_cols):
+                row.append(source_table.cell(r, c).text.strip())
+            patterns.append(row)
+    except Exception:
+        pass
+    return patterns
+
+
 def _refresh_table_from_connector(
     records: list[dict],
     pivot_config: dict,
@@ -387,6 +506,7 @@ def _refresh_table_from_connector(
     column_key_label_map: dict | None,
     static_time_period_names: list[str] | None,
     table,
+    source_table=None,
 ) -> RefreshTableData:
     """Refresh a table using raw Connector configs.
 
@@ -395,6 +515,11 @@ def _refresh_table_from_connector(
     - <blank:X> columns have header X but data comes from pivoted values
     - Regular columns show raw field values (product names, codes, etc.)
     - The table retains its original row/column count
+
+    Formatting is determined by:
+    1. Column semantics from selectedColumns (<blank:Base> -> integer)
+    2. PivotConfig ValueFields (base -> integer, percentage -> pct)
+    3. Source table patterns (detects "(n = X)" and "X%" formatting)
     """
     from slidegen.synapse_chart_mapper import (
         pivot_records_to_chart_data, _remap_field, _normalize_key, _match_pivot_col,
@@ -413,6 +538,16 @@ def _refresh_table_from_connector(
 
     n_table_rows = len(table.rows)
     n_table_cols = len(table.columns)
+
+    # Read source table patterns for format detection
+    source_patterns = _read_source_table_patterns(source_table) if source_table else []
+
+    # Determine format for each selected column
+    col_formats = []
+    for si, sc in enumerate(selected):
+        # Get source pattern values for this column index (from first data row)
+        src_col_vals = [row[si] for row in source_patterns if si < len(row)] if source_patterns else None
+        col_formats.append(_detect_column_format(sc, si, pivot_config, src_col_vals))
 
     # Build table content from chart_data + selectedColumns
     # selectedColumns for tables typically looks like:
@@ -435,7 +570,7 @@ def _refresh_table_from_connector(
                     if si < len(chart_data.series):
                         vals = chart_data.series[si][1]
                         v = vals[ci] if ci < len(vals) else 0.0
-                        row.append(str(int(v)) if v > 2 else f"{v:.0%}" if v != 0 else "")
+                        row.append(_format_table_value(v, col_formats[si]))
                     else:
                         row.append("")
                 rows.append(row)
@@ -467,12 +602,7 @@ def _refresh_table_from_connector(
                     if series_idx < len(chart_data.series):
                         vals = chart_data.series[series_idx][1]
                         v = vals[ci] if ci < len(vals) else 0.0
-                        if abs(v) > 2:
-                            row.append(str(int(v)))
-                        elif v != 0:
-                            row.append(f"{v:.0%}")
-                        else:
-                            row.append("")
+                        row.append(_format_table_value(v, col_formats[si]))
                         series_idx += 1
                     else:
                         row.append("")
@@ -480,16 +610,11 @@ def _refresh_table_from_connector(
                     # First column = category label
                     row.append(str(cat))
                 else:
-                    # Data column from series
+                    # Non-blank, non-first column — data field from series
                     if series_idx < len(chart_data.series):
                         vals = chart_data.series[series_idx][1]
                         v = vals[ci] if ci < len(vals) else 0.0
-                        if abs(v) > 2:
-                            row.append(str(int(v)))
-                        elif v != 0:
-                            row.append(f"{v:.0%}")
-                        else:
-                            row.append("")
+                        row.append(_format_table_value(v, col_formats[si]))
                         series_idx += 1
                     else:
                         row.append("")
@@ -759,9 +884,8 @@ def stage2_refresh_from_specs():
                 if not chart_data.success:
                     print(f"    Transform fail slide {slide_idx}: {chart_data.error}")
 
-        # Restore tables from source. Tables have complex formatting (base sizes,
-        # computed columns, metric labels) that the Connector populates correctly.
-        # Product/attribute names don't change between waves — only values do.
+        # Refresh tables from Connector data (Synapse API) when possible,
+        # fall back to restoring from source deck when no data_mapping exists.
         def _write_cell(tbl, r, c, text):
             cell = tbl.cell(r, c)
             for para in cell.text_frame.paragraphs:
@@ -770,6 +894,13 @@ def stage2_refresh_from_specs():
             if cell.text_frame.paragraphs and cell.text_frame.paragraphs[0].runs:
                 cell.text_frame.paragraphs[0].runs[0].text = str(text)
 
+        def _restore_table_from_source(ref_tbl, src_tbl):
+            """Fall back: copy all cells from source table to refreshed table."""
+            for r in range(min(len(src_tbl.rows), len(ref_tbl.rows))):
+                for c in range(min(len(src_tbl.columns), len(ref_tbl.columns))):
+                    _write_cell(ref_tbl, r, c, src_tbl.cell(r, c).text.strip())
+
+        # Build sorted source table list for position matching (fallback)
         src_slide_tables = sorted(
             [s for s in source_prs.slides[slide_idx].shapes if s.has_table],
             key=lambda x: (x.left or 0, x.top or 0))
@@ -778,20 +909,77 @@ def stage2_refresh_from_specs():
             shape_left = round(shape.left / 914400, 2) if shape.left else 0
             shape_top = round(shape.top / 914400, 2) if shape.top else 0
 
+            # Find the matching source table shape (for fallback + format detection)
+            src_match = None
             for src_shape in src_slide_tables:
                 sl = round(src_shape.left / 914400, 2) if src_shape.left else 0
                 st2 = round(src_shape.top / 914400, 2) if src_shape.top else 0
                 if abs(sl - shape_left) < 0.2 and abs(st2 - shape_top) < 0.2:
-                    try:
-                        src_tbl = src_shape.table
+                    src_match = src_shape
+                    break
+
+            # Try to match this table shape to a spec component by position
+            best_tbl_comp = None
+            best_tbl_dist = float("inf")
+            for comp in table_specs:
+                if comp.position.left is None:
+                    continue
+                dist = abs(comp.position.left - shape_left) + abs(comp.position.top - shape_top)
+                if dist < best_tbl_dist:
+                    best_tbl_dist = dist
+                    best_tbl_comp = comp
+
+            # Attempt Connector-driven refresh if we have a matching spec with raw configs
+            refreshed_from_connector = False
+            if (best_tbl_comp is not None and best_tbl_dist < 0.5
+                    and best_tbl_comp.data_mapping
+                    and best_tbl_comp.data_mapping.raw_pivot_config
+                    and best_tbl_comp.data_mapping.raw_mapping_config):
+                try:
+                    tdm = best_tbl_comp.data_mapping
+                    static_names = lin.static_time_period_names if lin.static_time_period_names else None
+                    tbl_result = _refresh_table_from_connector(
+                        records=records,
+                        pivot_config=tdm.raw_pivot_config,
+                        mapping_config=tdm.raw_mapping_config,
+                        column_key_label_map=tdm.raw_column_key_label_map,
+                        static_time_period_names=static_names,
+                        table=shape.table,
+                        source_table=src_match.table if src_match else None,
+                    )
+                    if tbl_result.success and tbl_result.rows:
                         ref_tbl = shape.table
-                        for r in range(min(len(src_tbl.rows), len(ref_tbl.rows))):
-                            for c in range(min(len(src_tbl.columns), len(ref_tbl.columns))):
-                                _write_cell(ref_tbl, r, c, src_tbl.cell(r, c).text.strip())
+                        # Write computed rows into existing table cells,
+                        # preserving table dimensions
+                        max_r = min(len(tbl_result.rows), len(ref_tbl.rows))
+                        max_c = min(
+                            max(len(row) for row in tbl_result.rows) if tbl_result.rows else 0,
+                            len(ref_tbl.columns),
+                        )
+                        for r in range(max_r):
+                            for c in range(max_c):
+                                cell_text = tbl_result.rows[r][c] if c < len(tbl_result.rows[r]) else ""
+                                _write_cell(ref_tbl, r, c, cell_text)
+                        tables_refreshed += 1
+                        refreshed_from_connector = True
+                        print(f"    Table refreshed from Connector: slide {slide_idx} "
+                              f"({shape_left},{shape_top}) "
+                              f"type={best_tbl_comp.type} "
+                              f"{max_r}r x {max_c}c")
+                except Exception as e:
+                    print(f"    Table Connector refresh failed slide {slide_idx} "
+                          f"({shape_left},{shape_top}): {e} — falling back to source")
+
+            # Fall back to source restoration if Connector refresh did not succeed
+            if not refreshed_from_connector:
+                if src_match:
+                    try:
+                        _restore_table_from_source(shape.table, src_match.table)
                         tables_refreshed += 1
                     except Exception as e:
                         tables_failed += 1
-                    break
+                else:
+                    tables_failed += 1
 
         # ── Restore ALL text shapes from source by position ──
         # Headlines, section labels, footnotes — all text shapes get restored
