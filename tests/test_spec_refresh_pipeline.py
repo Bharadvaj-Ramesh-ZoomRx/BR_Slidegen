@@ -563,7 +563,7 @@ def stage2_refresh_from_specs():
                 return False
             print(f"  Token valid for {remaining/60:.0f} more minutes")
         except Exception:
-        print("  Warning: could not decode token expiry, proceeding anyway")
+            print("  Warning: could not decode token expiry, proceeding anyway")
 
     # Clone dummy -> refreshed
     shutil.copy2(str(DUMMY_PPTX), str(REFRESHED_PPTX))
