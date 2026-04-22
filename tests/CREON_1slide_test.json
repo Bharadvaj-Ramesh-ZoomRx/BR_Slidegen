@@ -1,0 +1,204 @@
+{
+  "source_deck": "../projects/CREON/Creon - 1 slide.pptx",
+  "data_sources": {
+    "p523_rp1143_a641211": {
+      "project_id": 523,
+      "reporting_plan_id": 1143,
+      "analysis_ids": [
+        641211
+      ],
+      "segment_ids": [],
+      "dynamic_latest_n": 3
+    },
+    "p523_rp1143_a641205": {
+      "project_id": 523,
+      "reporting_plan_id": 1143,
+      "analysis_ids": [
+        641205
+      ],
+      "segment_ids": [],
+      "dynamic_latest_n": 3
+    }
+  },
+  "slides": [
+    {
+      "slide_index": 0,
+      "data_source": null,
+      "components": [
+        {
+          "type": "chart",
+          "name": "PS",
+          "chart_pattern": "column_stacked_100_vertical",
+          "data_mapping": {
+            "row_field": "time_period_name",
+            "series_column": "option",
+            "value_field": "decimal"
+          },
+          "raw_pivot_config": {
+            "AggregationType": 0,
+            "ColumnFields": [
+              "option"
+            ],
+            "FilterCondition": 0,
+            "Filters": [],
+            "LatestColumnsFirst": false,
+            "RowFields": [
+              "time_period_name"
+            ],
+            "ValueFields": [
+              "decimal"
+            ],
+            "columnDefinitions": [
+              {
+                "IsDefaultAlias": true,
+                "Name": "time_period_name"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Major academic center group practice",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "University teaching hospital",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Major academic center hospital",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Community teaching hospital",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Community hospital (Non-teaching)",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Private practice (solo)",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Private practice (group)",
+                "Format": "0%"
+              }
+            ]
+          },
+          "raw_mapping_config": {
+            "selectedColumns": [
+              "time_period_name",
+              "Major academic center group practice",
+              "University teaching hospital",
+              "Major academic center hospital",
+              "Community teaching hospital",
+              "Community hospital (Non-teaching)",
+              "Private practice (solo)",
+              "Private practice (group)"
+            ],
+            "selectedRows": [],
+            "selectAllRows": true,
+            "addQuestionText": false,
+            "applyTranspose": false,
+            "addLegend": false,
+            "rowsPerObject": null,
+            "addSplitObjectsToSingleSlide": false,
+            "topNRows": null,
+            "rowIdentifierColumnName": null,
+            "customChartType": null,
+            "tableHeaderMode": 0,
+            "insertEmptyColumnsAt": null,
+            "moveRowsToFirst": [],
+            "moveRowsToLast": []
+          },
+          "data_source": "p523_rp1143_a641211"
+        },
+        {
+          "type": "chart",
+          "name": "PMS",
+          "chart_pattern": "bar_stacked_100_horizontal",
+          "data_mapping": {
+            "row_field": "time_period_name",
+            "series_column": "option",
+            "value_field": "decimal"
+          },
+          "raw_pivot_config": {
+            "AggregationType": 0,
+            "ColumnFields": [
+              "option"
+            ],
+            "FilterCondition": 0,
+            "Filters": [],
+            "LatestColumnsFirst": false,
+            "RowFields": [
+              "time_period_name"
+            ],
+            "ValueFields": [
+              "decimal"
+            ],
+            "columnDefinitions": [
+              {
+                "IsDefaultAlias": true,
+                "Name": "time_period_name"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Gastroenterology",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Internal Medicine (PCP)",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "Family Medicine (PCP)",
+                "Format": "0%"
+              },
+              {
+                "IsDefaultAlias": true,
+                "Name": "General Medicine / Practice (PCP)",
+                "Format": "0%"
+              }
+            ]
+          },
+          "raw_mapping_config": {
+            "selectedColumns": [
+              "time_period_name",
+              "Gastroenterology",
+              "Internal Medicine (PCP)",
+              "Family Medicine (PCP)",
+              "General Medicine / Practice (PCP)"
+            ],
+            "selectedRows": [],
+            "selectAllRows": true,
+            "addQuestionText": false,
+            "applyTranspose": false,
+            "addLegend": false,
+            "rowsPerObject": null,
+            "addSplitObjectsToSingleSlide": false,
+            "topNRows": null,
+            "rowIdentifierColumnName": null,
+            "customChartType": null,
+            "tableHeaderMode": 0,
+            "insertEmptyColumnsAt": null,
+            "moveRowsToFirst": [],
+            "moveRowsToLast": []
+          },
+          "data_source": "p523_rp1143_a641205"
+        },
+        {
+          "type": "table",
+          "name": "Table 17",
+          "static": true
+        }
+      ]
+    }
+  ]
+}

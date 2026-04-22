@@ -139,14 +139,25 @@ def main():
                         help="Comma-separated slide indices to take from manual-spec (e.g. 1,4,7)")
     args = parser.parse_args()
 
-    specs_path   = Path(args.specs)
-    pptx_path    = Path(args.pptx)
-    output_path  = Path(args.output)
+    pptx_path   = Path(args.pptx)
+    output_path = Path(args.output)
+    specs_path  = Path(args.specs)
 
-    assert specs_path.exists(), f"Specs not found: {specs_path}"
-    assert pptx_path.exists(),  f"PPTX not found: {pptx_path}"
+    assert pptx_path.exists(), f"PPTX not found: {pptx_path}"
 
-    connector_specs = json.loads(specs_path.read_text(encoding="utf-8"))
+    # ── Load connector specs ─────────────────────────────────────────────
+    # Prefer: read tags directly from the PPTX via generate_config_specs().
+    # Fallback: load from a pre-generated JSON (legacy path / offline mode).
+    if not specs_path.exists():
+        print(f"Specs JSON not found — reading tags directly from PPTX ...")
+        from slidegen.deck_reader.tag_reader import generate_config_specs
+        from slidegen.slide_spec.schema import dump_spec
+        specs_list, summary = generate_config_specs(str(pptx_path))
+        connector_specs = [json.loads(dump_spec(s)) for s in specs_list]
+        print(f"  {len(connector_specs)} slide specs extracted  "
+              f"(tagged={summary.tagged_shapes}, untagged={summary.untagged_shapes})")
+    else:
+        connector_specs = json.loads(specs_path.read_text(encoding="utf-8"))
 
     # Optional manual specs for non-connected slides
     manual_slides: dict[int, dict] = {}

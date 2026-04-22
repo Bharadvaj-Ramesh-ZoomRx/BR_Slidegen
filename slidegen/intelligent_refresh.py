@@ -21,12 +21,17 @@ Usage:
 """
 from __future__ import annotations
 
+import hashlib
+import html
 import json
 import os
+import random
+import re
 import shutil
 import sys
 import uuid
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -473,6 +478,692 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
 
     df = pd.DataFrame(records) if records else pd.DataFrame()
     return records, df
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Analysis Verification
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def verify_analysis_for_chart(
+    analysis_id: int,
+    chart_series: list[str],
+    project_id: int,
+    reporting_plan_id: int,
+    match_threshold: float = 0.6,
+) -> dict:
+    """Verify that a Synapse analysis_id matches a chart's series names.
+
+    Fetches a small sample from Synapse, extracts the unique `option` values,
+    and computes the overlap with the chart's current series names.
+
+    Returns:
+        {
+          "confirmed": True,
+          "analysis_id": <id>,
+          "matched": [...],       # series names found in both
+          "score": 0.0–1.0,
+          "api_options": [...],   # all options returned by the API
+        }
+        or
+        {
+          "confirmed": False,
+          "analysis_id": <id>,
+          "score": 0.0–1.0,
+          "matched": [...],
+          "unmatched_chart": [...],   # chart series NOT found in API
+          "unmatched_api": [...],     # API options NOT in chart series
+          "api_options": [...],
+          "message": "<human-readable explanation>",
+        }
+
+    A score < match_threshold triggers confirmed=False, prompting the caller
+    to ask the user for a corrected analysis_id.
+    """
+    lineage = {
+        "project_id": project_id,
+        "reporting_plan_id": reporting_plan_id,
+        "analysis_ids": [analysis_id],
+        "segment_ids": [],
+        "dynamic_latest_n": 1,  # minimal fetch — just need option values
+    }
+    _, df = fetch_synapse_data(lineage)
+
+    if df.empty or "option" not in df.columns:
+        return {
+            "confirmed": False,
+            "analysis_id": analysis_id,
+            "score": 0.0,
+            "matched": [],
+            "unmatched_chart": chart_series,
+            "unmatched_api": [],
+            "api_options": [],
+            "message": (
+                f"Analysis {analysis_id} returned no data or no 'option' column. "
+                "Please check the analysis_id."
+            ),
+        }
+
+    api_options = df["option"].dropna().unique().tolist()
+    api_set = {s.lower().strip() for s in api_options}
+    chart_set = {s.lower().strip() for s in chart_series}
+
+    matched = [s for s in chart_series if s.lower().strip() in api_set]
+    unmatched_chart = [s for s in chart_series if s.lower().strip() not in api_set]
+    unmatched_api = [s for s in api_options if s.lower().strip() not in chart_set]
+
+    # Score = Jaccard similarity between the two sets
+    union = len(api_set | chart_set)
+    score = len(api_set & chart_set) / union if union else 0.0
+
+    if score >= match_threshold:
+        return {
+            "confirmed": True,
+            "analysis_id": analysis_id,
+            "matched": matched,
+            "score": round(score, 3),
+            "api_options": api_options,
+        }
+    else:
+        return {
+            "confirmed": False,
+            "analysis_id": analysis_id,
+            "score": round(score, 3),
+            "matched": matched,
+            "unmatched_chart": unmatched_chart,
+            "unmatched_api": unmatched_api,
+            "api_options": api_options,
+            "message": (
+                f"Analysis {analysis_id} has low overlap with chart series "
+                f"(score={score:.0%}). "
+                f"Chart expects: {chart_series}. "
+                f"API returned: {api_options}. "
+                "Please provide the correct analysis_id."
+            ),
+        }
+
+
+def propose_raw_configs(chart_shape: dict, df: pd.DataFrame) -> dict:
+    """Derive raw_pivot_config + raw_mapping_config for a non-connected chart.
+
+    Uses the chart shape context (from read_slide_context) and a fetched
+    Synapse DataFrame to identify RowFields, ColumnFields, and ValueFields
+    via overlap matching — no user input required.
+
+    CustomList and moveRowsToFirst/moveRowsToLast are left as null/[] — time
+    period ordering is delegated to the Synapse CLI.
+
+    Args:
+        chart_shape: one shape dict from read_slide_context() with type="chart"
+        df:          full DataFrame from fetch_synapse_data()
+
+    Returns:
+        {
+            "raw_pivot_config":  {...},
+            "raw_mapping_config": {...},
+            "derivation": {
+                "row_field":    (col_name, overlap_score),
+                "series_column": (col_name, overlap_score),
+                "value_field":  (col_name, reason_str),
+            },
+            "error": None | str,
+        }
+    """
+    chart_categories = [str(c) for c in chart_shape.get("categories", [])]
+    chart_series     = [str(s) for s in chart_shape.get("series_names", [])]
+    chart_values_raw = chart_shape.get("series_values", {})
+
+    # Flatten all numeric values visible in the chart (for range inference)
+    all_chart_vals = [
+        v for vals in chart_values_raw.values()
+        for v in (vals if isinstance(vals, list) else [])
+        if isinstance(v, (int, float))
+    ]
+
+    # Covers both legacy object dtype and newer pd.StringDtype
+    str_cols = [
+        c for c in df.columns
+        if df[c].dtype == object or pd.api.types.is_string_dtype(df[c])
+    ]
+    num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+
+    def _jaccard(col_unique_vals, target_vals):
+        a = {str(v).lower().strip() for v in col_unique_vals}
+        b = {str(v).lower().strip() for v in target_vals}
+        return len(a & b) / len(a | b) if (a | b) else 0.0
+
+    # ── RowFields: column whose unique values best overlap chart categories ──
+    row_scores = {
+        col: _jaccard(df[col].dropna().unique(), chart_categories)
+        for col in str_cols
+    }
+    row_field = max(row_scores, key=row_scores.get) if row_scores else None
+    row_score = row_scores.get(row_field, 0.0)
+    if not row_field or row_score == 0.0:
+        return {"error": f"Cannot match chart categories {chart_categories} to any column. "
+                         f"Scores: {row_scores}"}
+
+    # ── ColumnFields: column (excl. row_field) that best matches series names ──
+    series_scores = {
+        col: _jaccard(df[col].dropna().unique(), chart_series)
+        for col in str_cols if col != row_field
+    }
+    col_field = max(series_scores, key=series_scores.get) if series_scores else None
+    col_score = series_scores.get(col_field, 0.0)
+    if not col_field or col_score == 0.0:
+        return {"error": f"Cannot match chart series {chart_series} to any column. "
+                         f"Scores: {series_scores}"}
+
+    # ── ValueFields: numeric column whose 0–1 range matches stacked chart values ──
+    val_field = None
+    val_reason = ""
+    # Prefer "decimal" if it exists and sits in 0–1 range
+    if "decimal" in num_cols and df["decimal"].max() <= 1.01:
+        val_field = "decimal"
+        val_reason = "decimal column present with 0–1 range"
+    else:
+        # Pick first numeric column whose values are in 0–1 range
+        for col in num_cols:
+            if df[col].min() >= 0 and df[col].max() <= 1.01:
+                val_field = col
+                val_reason = f"{col} has 0–1 range"
+                break
+        if val_field is None and num_cols:
+            val_field = num_cols[0]
+            val_reason = f"fallback — first numeric column ({val_field})"
+
+    if val_field is None:
+        return {"error": "No numeric value column found in DataFrame."}
+
+    val_format = "0%" if df[val_field].max() <= 1.01 else ""
+
+    # ── columnDefinitions ──
+    # Row field entry — label column, no format, no sort criteria
+    col_defs = [{"IsDefaultAlias": True, "Name": row_field}]
+    # Series entries — use chart's series order so column ordering is preserved
+    ordered_series = chart_series or df[col_field].dropna().unique().tolist()
+    for sname in ordered_series:
+        entry: dict = {"IsDefaultAlias": True, "Name": sname}
+        if val_format:
+            entry["Format"] = val_format
+        col_defs.append(entry)
+
+    # ── selectedColumns: row field first, then series in chart order ──
+    selected_cols = [row_field] + ordered_series
+
+    raw_pivot_config = {
+        "AggregationType": 0,
+        "ColumnFields": [col_field],
+        "FilterCondition": 0,
+        "Filters": [],
+        "LatestColumnsFirst": False,
+        "RowFields": [row_field],
+        "ValueFields": [val_field],
+        "columnDefinitions": col_defs,
+    }
+
+    raw_mapping_config = {
+        "selectedColumns": selected_cols,
+        "selectedRows": [],
+        "selectAllRows": True,
+        "addQuestionText": False,
+        "applyTranspose": False,
+        "addLegend": False,
+        "rowsPerObject": None,
+        "addSplitObjectsToSingleSlide": False,
+        "topNRows": None,
+        "rowIdentifierColumnName": None,
+        "customChartType": None,
+        "tableHeaderMode": 0,
+        "insertEmptyColumnsAt": None,
+        "moveRowsToFirst": [],
+        "moveRowsToLast": [],
+    }
+
+    return {
+        "raw_pivot_config": raw_pivot_config,
+        "raw_mapping_config": raw_mapping_config,
+        "derivation": {
+            "row_field":     (row_field, round(row_score, 3)),
+            "series_column": (col_field, round(col_score, 3)),
+            "value_field":   (val_field, val_reason),
+        },
+        "error": None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Connector Tag Writer — stamp non-connected shapes with Synapse Connector tags
+# ══════════════════════════════════════════════════════════════════════════════
+
+_TAG_NS = (
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+    'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
+)
+_TAGS_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.presentationml.tags+xml"
+)
+_TAGS_REL_TYPE = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags"
+)
+
+
+def _tag_json(obj: dict) -> str:
+    """Compact, sort_keys=True JSON — matches Connector's serialisation format."""
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=True, sort_keys=True)
+
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def _escape_attr(s: str) -> str:
+    """Escape a string for embedding inside an XML attribute value."""
+    return (s.replace("&", "&amp;")
+              .replace('"', "&quot;")
+              .replace("<", "&lt;")
+              .replace(">", "&gt;"))
+
+
+def _build_tag_xml(tags: dict) -> bytes:
+    """Serialise a name→value dict as a p:tagLst XML document."""
+    entries = "".join(
+        f'<p:tag name="{k}" val="{_escape_attr(str(v))}"/>'
+        for k, v in tags.items()
+    )
+    return (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        f"<p:tagLst {_TAG_NS}>{entries}</p:tagLst>"
+    ).encode("utf-8")
+
+
+def _shape_tag_rid(slide_xml: str, shape_name: str) -> str | None:
+    """Return the tag rId linked from the named shape's custDataLst, or None."""
+    # 1. Locate the cNvPr element for this shape
+    cnvpr_m = re.search(
+        r'<p:cNvPr\s[^>]*name="' + re.escape(shape_name) + r'"[^>]*/?>', slide_xml
+    )
+    if not cnvpr_m:
+        return None
+    # 2. The sibling <p:nvPr> follows immediately in the same container element
+    rest = slide_xml[cnvpr_m.end():]
+    nvpr_m = re.search(r"<p:nvPr\b", rest)
+    if not nvpr_m:
+        return None
+    # 3. Content up to </p:nvPr>
+    nvpr_rest = rest[nvpr_m.end():]
+    end_m = re.search(r"</p:nvPr>", nvpr_rest)
+    if not end_m:
+        return None
+    nvpr_content = nvpr_rest[: end_m.start()]
+    rid_m = re.search(r'<p:tags\s[^>]*r:id="(rId\d+)"', nvpr_content)
+    return rid_m.group(1) if rid_m else None
+
+
+def _inject_custdata(slide_xml: str, shape_name: str, cust_tag: str) -> str:
+    """Inject <p:custDataLst>…</p:custDataLst> into a shape's nvPr.
+
+    Only called when the shape has no existing custDataLst.
+    """
+    cnvpr_m = re.search(
+        r'<p:cNvPr\s[^>]*name="' + re.escape(shape_name) + r'"[^>]*/?>', slide_xml
+    )
+    if not cnvpr_m:
+        return slide_xml
+    rest = slide_xml[cnvpr_m.end():]
+    nvpr_m = re.search(r"<p:nvPr\b", rest)
+    if not nvpr_m:
+        return slide_xml
+
+    nvpr_tag_end = nvpr_m.end()
+    nvpr_tag_str = rest[nvpr_m.start(): nvpr_tag_end]
+
+    # Position in original string where <p:nvPr…> starts / content starts
+    nvpr_abs_start = cnvpr_m.end() + nvpr_m.start()
+    nvpr_content_abs = cnvpr_m.end() + nvpr_tag_end
+
+    if rest[nvpr_m.start(): nvpr_tag_end].rstrip().endswith("/>"):
+        # Self-closing: expand to element with custDataLst
+        new_nvpr = f"<p:nvPr>{cust_tag}</p:nvPr>"
+        return (
+            slide_xml[:nvpr_abs_start]
+            + new_nvpr
+            + slide_xml[nvpr_abs_start + len(nvpr_tag_str):]
+        )
+
+    # Has children: find end tag
+    tail_rest = rest[nvpr_tag_end:]
+    end_m = re.search(r"</p:nvPr>", tail_rest)
+    if not end_m:
+        return slide_xml
+    nvpr_content = tail_rest[: end_m.start()]
+    if "custDataLst" in nvpr_content:
+        return slide_xml  # already present
+
+    # Insert before extLst if present, else at the start
+    if "<p:extLst>" in nvpr_content:
+        new_content = nvpr_content.replace("<p:extLst>", cust_tag + "<p:extLst>", 1)
+    else:
+        new_content = cust_tag + nvpr_content
+
+    nvpr_end_abs = nvpr_content_abs + end_m.start()
+    return (
+        slide_xml[:nvpr_content_abs]
+        + new_content
+        + slide_xml[nvpr_end_abs:]
+    )
+
+
+def write_connector_tags(
+    pptx_path: str,
+    slide_index: int,
+    shape_configs: list[dict],
+    data_lineage: dict,
+    survey_id: int | None = None,
+) -> dict:
+    """Stamp non-connected chart shapes with Synapse Connector tags (in-place).
+
+    After calling this function, the Synapse Connector UI will recognise each
+    shape as a connected object and can refresh it natively.
+
+    Args:
+        pptx_path:     Path to the PPTX to modify (edited in-place).
+        slide_index:   0-based slide index.
+        shape_configs: One entry per chart shape::
+
+                           [{"shape_name": "PS",
+                             "raw_pivot_config":   {...},
+                             "raw_mapping_config": {...},
+                             "analysis_id":        641211}]
+
+        data_lineage:  Shared project/plan/segment context::
+
+                           {"project_id": 523, "reporting_plan_id": 1143,
+                            "segment_ids": [], "dynamic_latest_n": 3}
+
+        survey_id:     Synapse SurveyId.  Auto-detected from existing PPTX
+                       tags (OLDDARWIN_SURVEY) when None.
+
+    Returns:
+        Dict of shape_name → {"action": "replaced"|"added", "tag": path, ...}
+    """
+    slide_num  = slide_index + 1
+    slide_path = f"ppt/slides/slide{slide_num}.xml"
+    rels_path  = f"ppt/slides/_rels/slide{slide_num}.xml.rels"
+
+    # ── Read all zip entries into memory ────────────────────────────────────
+    with zipfile.ZipFile(pptx_path, "r") as z:
+        all_names = z.namelist()
+        all_files: dict[str, bytes] = {n: z.read(n) for n in all_names}
+
+    slide_xml = all_files[slide_path].decode("utf-8")
+    rels_xml  = all_files.get(rels_path, b"").decode("utf-8")
+    ct_xml    = all_files["[Content_Types].xml"].decode("utf-8")
+
+    # ── Auto-detect SurveyId from existing tags ──────────────────────────
+    if survey_id is None:
+        for name, data in all_files.items():
+            if not name.startswith("ppt/tags/"):
+                continue
+            m = re.search(rb'name="OLDDARWIN_SURVEY"\s+val="(\d+)"', data)
+            if m:
+                survey_id = int(m.group(1))
+                break
+
+    # ── Determine next available tag number ─────────────────────────────
+    existing_tag_nums = []
+    for n in all_names:
+        mm = re.match(r"ppt/tags/tag(\d+)\.xml$", n)
+        if mm:
+            existing_tag_nums.append(int(mm.group(1)))
+    next_tag_num = max(existing_tag_nums, default=0) + 1
+
+    # ── Parse slide rels: rId → tag filename ────────────────────────────
+    rid_to_tag: dict[str, str] = {}
+    for m in re.finditer(
+        r'<Relationship\s+Id="(rId\d+)"\s+Type="[^"]*tags[^"]*"\s+Target="\.\./tags/([^"]+)"',
+        rels_xml,
+    ):
+        rid_to_tag[m.group(1)] = m.group(2)  # e.g. "rId2" → "tag3.xml"
+
+    # ── Next available rId ───────────────────────────────────────────────
+    used_rids = [int(r[3:]) for r in re.findall(r'Id="(rId\d+)"', rels_xml)]
+    next_rid_num = max(used_rids, default=0) + 1
+
+    results: dict[str, dict] = {}
+
+    for cfg in shape_configs:
+        shape_name  = cfg["shape_name"]
+        pivot_cfg   = cfg["raw_pivot_config"]
+        mapping_cfg = cfg["raw_mapping_config"]
+        analysis_id = cfg["analysis_id"]
+
+        # ── Build the three JSON payloads ────────────────────────────────
+        report_cfg = {
+            "AnalysisIds": [analysis_id],
+            "DynamicTimePeriod": {
+                "IncludeLiveWave": True,
+                "LatestNDeliverables": data_lineage.get("dynamic_latest_n", 5),
+            },
+            "IncludeAlias": True,
+            "IncludeOverallSegment": True,
+            "NestSegments": False,
+            "ProjectId": data_lineage["project_id"],
+            "ReportingPlanId": data_lineage["reporting_plan_id"],
+            "RollUpDeliverables": False,
+            "SegmentIds": data_lineage.get("segment_ids", []),
+            "SurveyId": survey_id,
+            "TimePeriodType": 1,
+        }
+        if survey_id is None:
+            del report_cfg["SurveyId"]
+
+        report_json  = _tag_json(report_cfg)
+        pivot_json   = _tag_json(pivot_cfg)
+        mapping_json = _tag_json(mapping_cfg)
+
+        report_hash = _sha256(report_json)
+        pivot_hash  = _sha256(pivot_json)
+
+        # ── Column key label map: field name → display label ─────────────
+        row_field  = (pivot_cfg.get("RowFields") or ["time_period_name"])[0]
+        col_field  = (pivot_cfg.get("ColumnFields") or ["option"])[0]
+        val_field  = (pivot_cfg.get("ValueFields") or ["decimal"])[0]
+        col_label_map = {
+            row_field: "Deliverable",
+            col_field: col_field.replace("_", " ").title(),
+            val_field: "Value(%)",
+        }
+
+        vis_id      = f"Darwin_{random.randint(10_000_000, 99_999_999)}"
+        stassig_id  = f"StasSigId_{random.randint(1_000_000, 99_999_999)}"
+        now_iso     = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
+
+        tag_entries = {
+            "UPDATE":                    "unlock",
+            "DARWINVERSION":             "CSharp",
+            "VISUALISATION_ID":          vis_id,
+            "FAILEDREFRESHICONID":       vis_id,
+            "STASSIGID":                 stassig_id,
+            "MIGRATIONPHASE":            "Phase0",
+            "ANALYSISTYPE":              "SINGLE_QUESTION",
+            "REPORTCONFIGHASH":          report_hash,
+            "REPORTCONFIGHASH_BACKUP":   report_json,
+            "DATAFRAMECONFIGHASH":       pivot_hash,
+            "DATAFRAMECONFIGHASH_BACKUP": pivot_json,
+            "MAPPINGCONFIG":             mapping_json,
+            "COLUMNKEYLABELMAP":         _tag_json(col_label_map),
+            "LASTREFRESHTIME":           now_iso,
+        }
+        tag_bytes = _build_tag_xml(tag_entries)
+
+        # ── Decide: replace existing tag OR add new one ──────────────────
+        existing_rid = _shape_tag_rid(slide_xml, shape_name)
+
+        if existing_rid and existing_rid in rid_to_tag:
+            # Replace the existing tag file content
+            existing_tag_path = "ppt/tags/" + rid_to_tag[existing_rid]
+            all_files[existing_tag_path] = tag_bytes
+            results[shape_name] = {
+                "action": "replaced",
+                "tag":    existing_tag_path,
+                "rId":    existing_rid,
+            }
+        else:
+            # New tag file + content type + rel + custDataLst injection
+            tag_filename = f"tag{next_tag_num}.xml"
+            tag_path     = f"ppt/tags/{tag_filename}"
+            all_files[tag_path] = tag_bytes
+
+            new_rid = f"rId{next_rid_num}"
+
+            # Content type override
+            override = (
+                f'<Override PartName="/ppt/tags/{tag_filename}"'
+                f' ContentType="{_TAGS_CONTENT_TYPE}"/>'
+            )
+            ct_xml = ct_xml.replace("</Types>", f"{override}</Types>")
+
+            # Relationship entry
+            new_rel = (
+                f'<Relationship Id="{new_rid}" Type="{_TAGS_REL_TYPE}"'
+                f' Target="../tags/{tag_filename}"/>'
+            )
+            rels_xml = rels_xml.replace(
+                "</Relationships>", f"{new_rel}</Relationships>"
+            )
+
+            # Inject custDataLst into the shape's nvPr
+            cust_xml = f'<p:custDataLst><p:tags r:id="{new_rid}"/></p:custDataLst>'
+            slide_xml = _inject_custdata(slide_xml, shape_name, cust_xml)
+
+            results[shape_name] = {
+                "action": "added",
+                "tag":    tag_path,
+                "rId":    new_rid,
+            }
+            next_tag_num  += 1
+            next_rid_num  += 1
+
+    # ── Write everything back atomically ─────────────────────────────────
+    all_files[slide_path] = slide_xml.encode("utf-8")
+    all_files[rels_path]  = rels_xml.encode("utf-8")
+    all_files["[Content_Types].xml"] = ct_xml.encode("utf-8")
+
+    tmp_path = pptx_path + ".tmp"
+    with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for name, data in all_files.items():
+            zout.writestr(name, data)
+
+    os.replace(tmp_path, pptx_path)
+    return results
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Spec updater — persist derived raw configs so the refresh path uses them
+# ══════════════════════════════════════════════════════════════════════════════
+
+def save_proposed_configs_to_spec(
+    spec_path: str,
+    slide_index: int,
+    updates: list[dict],
+) -> dict:
+    """Write derived raw_pivot_config + raw_mapping_config into the spec JSON.
+
+    After calling this, refresh_deck_from_spec() routes the updated components
+    through the RAW CONNECTOR PATH (pivot_records_to_chart_data) instead of
+    the interpreted mapping path.
+
+    Each item in ``updates``::
+
+        {
+            "shape_name":         "PS",
+            "raw_pivot_config":   {...},   # from propose_raw_configs()
+            "raw_mapping_config": {...},   # from propose_raw_configs()
+            "analysis_id":        641211,
+            "data_lineage": {
+                "project_id": 523, "reporting_plan_id": 1143,
+                "segment_ids": [], "dynamic_latest_n": 3
+            }
+        }
+
+    Data-source handling
+    --------------------
+    Each analysis_id gets its own entry in ``data_sources`` (key format:
+    ``p{pid}_rp{rpid}_a{aid}``).  When a component's analysis differs from the
+    slide-level data_source, a ``"data_source"`` key is written directly on the
+    component so that refresh_deck_from_spec() fetches the right data per chart.
+
+    Returns
+    -------
+    dict with ``updated``, ``data_sources_added``, ``spec_path``.
+    """
+    spec_file = Path(spec_path)
+    spec = json.loads(spec_file.read_text(encoding="utf-8"))
+
+    updated_shapes: list[str] = []
+    ds_added: list[str] = []
+
+    slide_entry = next(
+        (s for s in spec.get("slides", []) if s["slide_index"] == slide_index),
+        None,
+    )
+    if slide_entry is None:
+        # Auto-create a minimal slide entry so setup-nonconnected works on
+        # specs that don't yet mention this slide (e.g. first-time non-connected setup)
+        slide_entry = {"slide_index": slide_index, "data_source": None, "components": []}
+        spec.setdefault("slides", []).append(slide_entry)
+
+    for upd in updates:
+        shape_name = upd["shape_name"]
+        raw_pc     = upd["raw_pivot_config"]
+        raw_mc     = upd["raw_mapping_config"]
+        aid        = upd["analysis_id"]
+        lineage    = upd["data_lineage"]
+
+        pid  = lineage["project_id"]
+        rpid = lineage["reporting_plan_id"]
+        ds_key = f"p{pid}_rp{rpid}_a{aid}"
+
+        # Register data_source if new
+        if ds_key not in spec.get("data_sources", {}):
+            spec.setdefault("data_sources", {})[ds_key] = {
+                "project_id":        pid,
+                "reporting_plan_id": rpid,
+                "analysis_ids":      [aid],
+                "segment_ids":       lineage.get("segment_ids", []),
+                "dynamic_latest_n":  lineage.get("dynamic_latest_n", 5),
+            }
+            ds_added.append(ds_key)
+
+        # Find or create the component
+        comp = next(
+            (c for c in slide_entry.get("components", []) if c.get("name") == shape_name),
+            None,
+        )
+        if comp is None:
+            comp = {"type": "chart", "name": shape_name}
+            slide_entry.setdefault("components", []).append(comp)
+
+        # Write raw configs — refresh_deck_from_spec() checks these first
+        comp["raw_pivot_config"]   = raw_pc
+        comp["raw_mapping_config"] = raw_mc
+
+        # Component-level data_source override when analysis differs from the
+        # slide-level source (enables per-chart data fetching in refresh)
+        if ds_key != slide_entry.get("data_source", ""):
+            comp["data_source"] = ds_key
+
+        updated_shapes.append(shape_name)
+
+    spec_file.write_text(json.dumps(spec, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return {
+        "updated":            updated_shapes,
+        "data_sources_added": ds_added,
+        "spec_path":          str(spec_file),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -958,7 +1649,9 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 data_cache[ds_key] = pd.DataFrame()
 
         df = data_cache.get(ds_key, pd.DataFrame())
-        if df.empty:
+        # Allow slides where every component has its own data_source override
+        has_comp_ds = any(c.get("data_source") for c in slide_spec.get("components", []))
+        if df.empty and not has_comp_ds:
             all_results["slides"].append({"slide_index": si, "error": "no data"})
             continue
 
@@ -969,17 +1662,29 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
         slide_results = {"slide_index": si, "charts": [], "tables": []}
 
-        # Convert DataFrame to records once per slide (used by raw config path)
-        records_list = df.to_dict("records")
-
-        # Read static_time_period_names — check slide-level first, then data source
-        lineage = data_sources.get(ds_key, {})
-        lin_raw_static_names = (
-            slide_spec.get("static_time_period_names")
-            or lineage.get("static_time_period_names")
-        )
-
         for comp in slide_spec.get("components", []):
+            # ── Resolve active data source for this component ────────────
+            # Components may carry their own data_source key (written by
+            # save_proposed_configs_to_spec when analysis_ids differ per chart).
+            _comp_ds = comp.get("data_source") or ds_key
+            if _comp_ds and _comp_ds not in data_cache:
+                _cl = data_sources.get(_comp_ds, {})
+                if _cl:
+                    print(f"  Fetching component data_source '{_comp_ds}': "
+                          f"analysis={_cl.get('analysis_ids')}")
+                    _, _cdf = fetch_synapse_data(_cl)
+                    data_cache[_comp_ds] = _cdf
+                    print(f"    -> {len(_cdf)} records")
+                else:
+                    data_cache[_comp_ds] = pd.DataFrame()
+            df = data_cache.get(_comp_ds, pd.DataFrame())
+            records_list = df.to_dict("records") if not df.empty else []
+            _cl = data_sources.get(_comp_ds, {})
+            lin_raw_static_names = (
+                slide_spec.get("static_time_period_names")
+                or _cl.get("static_time_period_names")
+            )
+
             name = comp.get("name", "")
             ctype = comp.get("type", "")
 
@@ -1153,6 +1858,8 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
             seg = dm.get("segment_filter")
             if seg and "segment_1" in sub.columns:
                 sub = sub[sub["segment_1"] == seg]
+
+            # Single time period filter (exact match)
             tp = dm.get("time_period")
             if tp and "time_period_name" in sub.columns:
                 sub = sub[sub["time_period_name"] == tp]
@@ -1352,6 +2059,35 @@ def main():
     p_deck.add_argument("--pptx", default=None, help="Source PPTX (default: from spec)")
     p_deck.add_argument("--output", default=None, help="Output (default: Output_<source>)")
 
+    # ── setup-nonconnected: derive + save raw configs for non-connected charts ──
+    p_setup = sub.add_parser(
+        "setup-nonconnected",
+        help="Derive Connector configs for non-connected charts, save to spec, stamp PPTX tags",
+    )
+    p_setup.add_argument("--spec",   required=True, help="Spec JSON path")
+    p_setup.add_argument("--pptx",   required=True, help="Source PPTX")
+    p_setup.add_argument("--slide",  required=True, type=int, help="Slide index (0-based)")
+    p_setup.add_argument(
+        "--shapes", required=True,
+        help=(
+            'JSON array of chart configs, one per chart.  '
+            'Example: \'[{"shape_name":"PS","analysis_id":641211},'
+            '{"shape_name":"PMS","analysis_id":641205}]\''
+        ),
+    )
+    p_setup.add_argument("--project-id",        required=True, type=int)
+    p_setup.add_argument("--reporting-plan-id",  required=True, type=int)
+    p_setup.add_argument("--segment-ids",        default="[]",
+                         help="JSON array of segment rule IDs (default: [])")
+    p_setup.add_argument("--latest-n",           default=5, type=int,
+                         help="dynamic_latest_n deliverables (default: 5)")
+    p_setup.add_argument("--survey-id",          default=None, type=int,
+                         help="Synapse SurveyId (auto-detected from PPTX if omitted)")
+    p_setup.add_argument("--verify-threshold",   default=0.6, type=float,
+                         help="Min Jaccard score to accept an analysis_id (default: 0.6)")
+    p_setup.add_argument("--no-tag",             action="store_true",
+                         help="Skip writing Connector tags to the PPTX")
+
     # ── headline: write headline into slide ──
     p_headline = sub.add_parser("headline", help="Write headline text into a slide")
     p_headline.add_argument("--pptx", required=True)
@@ -1393,6 +2129,116 @@ def main():
     elif args.command == "refresh-deck":
         results = refresh_deck_from_spec(args.spec, args.pptx, args.output)
         print(json.dumps(results, indent=2, ensure_ascii=False))
+
+    elif args.command == "setup-nonconnected":
+        import sys as _sys
+
+        shape_inputs = json.loads(args.shapes)
+        segment_ids  = json.loads(args.segment_ids)
+        data_lineage = {
+            "project_id":        args.project_id,
+            "reporting_plan_id": args.reporting_plan_id,
+            "segment_ids":       segment_ids,
+            "dynamic_latest_n":  args.latest_n,
+        }
+
+        # Read slide context once — need chart shapes for derivation
+        print(f"Reading slide {args.slide} from {args.pptx} ...")
+        ctx = read_slide_context(args.pptx, slide_index=args.slide)
+        chart_shapes = {s["name"]: s for s in ctx["shapes"] if s["type"] == "chart"}
+
+        updates    = []
+        tag_inputs = []
+        errors     = []
+
+        for cfg in shape_inputs:
+            shape_name  = cfg["shape_name"]
+            analysis_id = cfg["analysis_id"]
+
+            chart_shape = chart_shapes.get(shape_name)
+            if not chart_shape:
+                errors.append(f"Shape '{shape_name}' not found on slide {args.slide}")
+                continue
+
+            chart_series = chart_shape.get("series_names", [])
+
+            # ── 1. Verify analysis_id ────────────────────────────────────
+            print(f"\n[{shape_name}] Verifying analysis {analysis_id} ...")
+            vfy = verify_analysis_for_chart(
+                analysis_id, chart_series,
+                args.project_id, args.reporting_plan_id,
+                match_threshold=args.verify_threshold,
+            )
+            if not vfy["confirmed"]:
+                errors.append(
+                    f"[{shape_name}] Analysis {analysis_id} rejected "
+                    f"(score={vfy['score']:.0%}). {vfy.get('message', '')}"
+                )
+                continue
+            print(f"  confirmed  score={vfy['score']:.0%}  "
+                  f"matched={vfy['matched']}")
+
+            # ── 2. Fetch full data + derive raw configs ──────────────────
+            print(f"[{shape_name}] Fetching data (latest_n={args.latest_n}) ...")
+            _, df = fetch_synapse_data({
+                **data_lineage, "analysis_ids": [analysis_id],
+            })
+            if df.empty:
+                errors.append(f"[{shape_name}] No data returned from Synapse API")
+                continue
+
+            result = propose_raw_configs(chart_shape, df)
+            if result.get("error"):
+                errors.append(f"[{shape_name}] propose_raw_configs: {result['error']}")
+                continue
+
+            drv = result["derivation"]
+            print(f"  row_field={drv['row_field'][0]} (score={drv['row_field'][1]})")
+            print(f"  series_column={drv['series_column'][0]} (score={drv['series_column'][1]})")
+            print(f"  value_field={drv['value_field'][0]}  ({drv['value_field'][1]})")
+
+            updates.append({
+                "shape_name":         shape_name,
+                "raw_pivot_config":   result["raw_pivot_config"],
+                "raw_mapping_config": result["raw_mapping_config"],
+                "analysis_id":        analysis_id,
+                "data_lineage":       data_lineage,
+            })
+            tag_inputs.append({
+                "shape_name":         shape_name,
+                "raw_pivot_config":   result["raw_pivot_config"],
+                "raw_mapping_config": result["raw_mapping_config"],
+                "analysis_id":        analysis_id,
+            })
+
+        if errors:
+            print("\nERRORS:")
+            for e in errors:
+                print(f"  {e}")
+            if not updates:
+                _sys.exit(1)
+
+        # ── 3. Save raw configs to spec JSON ────────────────────────────
+        if updates:
+            print(f"\nSaving configs to spec: {args.spec} ...")
+            save_result = save_proposed_configs_to_spec(
+                args.spec, args.slide, updates,
+            )
+            print(f"  updated:            {save_result['updated']}")
+            print(f"  data_sources_added: {save_result['data_sources_added']}")
+
+        # ── 4. Stamp PPTX with Connector tags ───────────────────────────
+        if tag_inputs and not args.no_tag:
+            print(f"\nWriting Connector tags to {args.pptx} ...")
+            tag_result = write_connector_tags(
+                args.pptx, args.slide, tag_inputs,
+                data_lineage, survey_id=args.survey_id,
+            )
+            for sname, info in tag_result.items():
+                print(f"  {sname}: {info['action']} -> {info['tag']}")
+
+        print("\nDone. Run refresh-deck to apply new data:")
+        print(f"  python -m slidegen.intelligent_refresh refresh-deck --spec {args.spec}")
 
     elif args.command == "headline":
         write_headline(args.pptx, args.slide, args.text)
