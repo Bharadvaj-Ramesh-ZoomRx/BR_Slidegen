@@ -18,7 +18,7 @@ FIXTURE_DECKS = {
 # If a refreshed fixture is missing, the eval skips with guidance to generate it.
 REFRESHED_DECKS = {
     "atu_q1_26": REPO_ROOT / "output" / "atu_refresh" / "ATU_refreshed.pptx",
-    # "creon_pet_w33": TODO — run Vijay's pipeline on CREON PET to produce the refreshed fixture
+    "creon_pet_w33": REPO_ROOT / "output" / "creon_pet_w33_refresh" / "creon_pet_w33_refreshed.pptx",
 }
 
 GOLDEN_DIR = Path(__file__).parent / "deck_reader" / "golden"
