@@ -172,87 +172,73 @@ Without `pptx_utils`, Claude writes 200-line scripts rediscovering lxml every se
 
 \---
 
-## 3. Workflows We Need to Support
+## 3. Two Major Workflows
 
-Derived from Sriram's Apr 14 "hypothetical workflows" exercise + a MECE audit against actual user utterances. Workflows map 1:1 to verbs users say — create, refresh, edit, add, annotate, restructure, audit, summarize. Eight MECE workflows cover the full deck lifecycle.
+All consulting deck work reduces to two workflows. Everything else (editing, annotating, restructuring, auditing, summarizing) is a sub-operation within one of these.
 
-### Workflow 1: Create deck — `create-deck-workflow`
+### Workflow 1: Create New Deck
 
-**Input:** Project brief, raw data (or Synapse setup), KBQs. Optional `mode="hypothesis"` + pre-built `hypothesis_bank.md` for Vinoth's storyboarding flow.
-**Output:** Complete first-cut deck following ZoomRx methodology for the project type.
-**Modes:** `briefing` (default — data + KBQs → hypotheses → slides) and `hypothesis` (pre-built hypotheses → narrative arcs → slides; the "storyboarding" path).
+**Input:** Client template + project brief + raw data (Synapse or Excel) + KBQs.
+**Output:** Complete deck with data-driven slides, talking headlines, executive summary.
 
-### Workflow 2: Refresh deck — `refresh-deck-workflow`
+**Flow:**
+1. Context building — market context, prior wave context, survey context, project context
+2. Hypothesis generation — from KBQs + context + data
+3. Data validation — hypotheses tested against actual survey data
+4. Storyboarding — narrative threads (arcs, headlines, ES, recommendations)
+5. Slide planning — hypothesis clusters → slide specs with chart types + layouts
+6. Rendering — `pptx_utils` deterministic rendering from specs
+7. Headlines + ES — data-grounded, following PET deck conventions
 
-**Input:** Source PPTX + spec JSON (same name, e.g. `deck.json` beside `deck.pptx`).
-**Output:** `Output_deck.pptx` — refreshed deck with all charts updated from Synapse.
+**Skills involved:** build-project-context, hypotheses, sfea-insight-writer, slide-plan-generator, viz-selector, layout-selector, slide-creator, headline-writer, executive-summary-writer, deck-assembler.
 
-**Actual implementation (working):**
-1. `embed-config` — scans PPTX, writes lightweight slide manifest as Custom XML Part
-2. `read --slide N` — extracts visual context for Claude Code interpretation (non-connected slides only)
-3. Claude Code interprets spatial layout → writes component mappings into spec.json
-4. `refresh-deck --spec deck.json` — reconciles embedded config against spec, fetches data per data_source (cached), refreshes all slides using dual-mode engine:
-   - **Raw Connector path:** `pivot_records_to_chart_data()` with raw PivotConfig + MappingConfig
-   - **Interpreted mapping path:** pandas pivot with segment_filter, series_column, category_order
-5. `headline --slide N --text "..."` — writes data-grounded headline following PET conventions
+### Workflow 2: Refresh Existing Deck
 
-**Module:** `slidegen/intelligent_refresh.py`
-**Spec builder:** `tests/build_full_spec.py`
-**Skill:** `.claude/skills/workflows/refresh-deck-workflow/SKILL.md`
+**Input:** Source PPTX + spec JSON + Synapse API key.
+**Output:** `Output_deck.pptx` — same layout, fresh data, new headlines.
 
-### Workflow 3: Edit slide — `edit-slide-workflow`
+**Two paths based on data source:**
 
-**Input:** Deck, slide ID, action (`rebuild` / `data_refresh` / `edit`). For edit mode, a list of slide-editor instructions.
-**Output:** Same deck with the slide regenerated. Rebuild re-renders from current spec; data_refresh re-pulls from Synapse/Excel first; edit applies whitelisted structural/style changes.
+**2a: Connected (Synapse Connector tags)** — for PET/ATU decks already in the Connector ecosystem. Raw PivotConfig + MappingConfig extracted from PPTX tags, passed to `pivot_records_to_chart_data()`. Rigid layout preserved exactly. 126/126 charts refresh on 29-slide UAT deck.
 
-### Workflow 4: Add slide — `add-slide-workflow`
+**2b: Non-connected (Claude Code interpreted)** — for HCP-Pt, Digital Tracker, Qualitative, PCA, and any deck not in Synapse Connector. Claude Code reads the slide's spatial layout (group shape labels, text proximity, table structure), determines per-component data mappings, writes spec.json. Same deterministic refresh engine.
 
-**Input:** Deck, question (or segment-comparison ask), optional reference slide, optional insertion position.
-**Output:** One new slide inserted into the existing deck. Handles ad-hoc client questions AND segment comparisons (same output form; different analysis path).
+**Flow (both paths):**
+1. `embed-config` — scan PPTX, write slide manifest as Custom XML Part
+2. Spec generation — from Connector tags (2a) or Claude Code interpretation (2b)
+3. `refresh-deck --spec deck.json` — reconcile embedded config, fetch data, refresh
+4. Headline writing — data-grounded, from refreshed chart values
+5. Verification — compare output against source
 
-### Workflow 5: Annotate slide — `annotate-slide-workflow`
+**Post-refresh sub-operations** (part of this workflow, not separate):
+- Segment callouts and significance annotations
+- Executive summary regeneration
+- Slide reordering based on updated narrative
+- Hypothesis re-validation against new data (optional, for storyboard-driven decks)
 
-**Input:** Deck, target slide, callout type (`quote` / `insight` / `freeform`), callout content source.
-**Output:** Same slide with a callout inserted inline (quote box, data annotation, insight tag). Does NOT add a new slide — for that, see Workflow 4.
+**Skills involved:** deck-reader, intelligent_refresh (embed-config, read, refresh-deck, headline), headline-writer, executive-summary-writer, trend-analyzer, stat-sig-annotator.
 
-### Workflow 6: Restructure deck — `structural-edit-workflow`
+### What the old 8 workflows map to
 
-**Input:** Deck, action (`delete` / `reorder` / `split` / `merge`), action-specific params.
-**Output:** Same deck with slides removed, reordered, split, or merged. No changes to individual slide content.
+| Old workflow | Now |
+|---|---|
+| Create deck | Workflow 1 |
+| Refresh deck | Workflow 2 |
+| Edit slide | Sub-operation: micro-refresh (data change) or micro-create (layout change) |
+| Add slide | Sub-operation: add to existing deck (Workflow 2) or new deck (Workflow 1) |
+| Annotate slide | Sub-operation: post-processing in both workflows |
+| Restructure deck | Sub-operation: reorder after data changes narrative (Workflow 2) |
+| Audit deck | Sub-operation: verification step in both workflows |
+| Executive summary | Sub-operation: specific slide rendered in both workflows |
 
-### Workflow 7: Audit deck — `deck-audit-workflow`
+### Pre-condition: Spec Generation
 
-**Input:** Deck to audit, optional staleness threshold, optional severity filter.
-**Output:** Read-only audit report flagging data errors, unsupported claims, stale lineage, missing citations on ES slides, and structural inconsistencies. Report written to `<deck>.audit_<timestamp>.md`; deck is not mutated. Runs as a repeatable pre-delivery QA step (including in CI).
+For decks not previously processed by SlideGen, the first refresh requires spec generation:
+- **Connected decks:** `build_full_spec.py` extracts raw Connector configs from PPTX tags → spec.json
+- **Non-connected decks:** Claude Code reads each slide via `read --slide N`, interprets layout, writes mappings into spec.json
+- **Mixed decks:** Per-slide detection. Connected slides get raw configs, non-connected get interpreted mappings. Both coexist in the same spec.json.
 
-### Workflow 8: Executive summary — `executive-summary-workflow`
-
-**Input:** Full deck, KBQs to answer, optional narrative_threads.md.
-**Output:** 1-3 ES slides with findings citing back to supporting `slide_id`s. Every bullet has `metadata.citations: list\[slide_id]`. Unsourced claims rejected.
-
-### Pre-condition: Retroactive Spec Generation
-
-Before any of Workflows 2-8 can run on an *existing* deck (one not created by SlideGen), a one-time bootstrapping step is required: **`deck-reader` reads the existing PPTX and produces slide specs for every slide**, stored in `projects/{name}/context/{wave}/slide_specs/` alongside a bootstrapped `config.yaml`. This is the "one-time retrofitting" that gives the system backward compatibility with the hundreds of client decks already in use.
-
-How it works:
-
-* For **Connector-tagged shapes**: Tier 1 extraction — reads `ReportConfigHash` → Synapse lineage → populates `DataLineage` with canonical IDs
-* For **untagged or unhealthy-tag shapes**: Tier 2 inference — parses headline text, chart pattern, category labels, cross-references against project config
-* The resulting `list[SlideSpec]` + updated `config.yaml` are saved to the project folder and become the canonical inputs for all subsequent workflows
-
-After this one-time step, the deck is "SlideGen-legible" — refresh, edit, audit, and executive summary workflows all operate from the saved specs. Future waves auto-update the specs without re-bootstrapping.
-
-**Priority for existing projects:** Before running Workflow 2 (Refresh) on any live client deck for the first time, run `deck-reader` on the latest wave PPTX. Sriram (Apr 16): *"If we can create a workflow that takes as input an existing PowerPoint deck and creates the associated slide plan, we achieve full backward compatibility through that step."*
-
-### Supported via composition (not separate workflows)
-
-* **Template / brand migration** (swap brand on existing deck) — composable from `edit-slide-workflow` (in edit mode with `set_brand` instructions per slide) + `refresh-deck-workflow` if data changes with brand. Evaluated for Q4 as a dedicated workflow if user demand warrants.
-* **Bulk headline revision** (retune all headlines for tighter narrative) — composable by running `edit-slide-workflow` in edit mode across slides in sequence.
-* **Variant deck generation** (different client-facing versions) — composable from `edit-slide-workflow` applied in batch.
-* **Deck reconcile** (sync registry after manual PowerPoint edits) — already implemented in `slidegen/reconcile.py`; used as a collaboration primitive by multiple workflows.
-* **Cross-deck comparison** (diff between waves without refreshing) — composable from `deck-reader` on both decks + ad-hoc Claude reasoning. Evaluate for Q4 if needed.
-
-Synapse platform setup (creating segments, VQs, reporting plans, custom methodologies like RFSOV/MaxDiff) is out of scope for SlideGen — those are `synapse-cli` capabilities. SlideGen consumes the resulting analyses via `synapse-read`.
+On subsequent refreshes, the saved spec.json is the starting point — no re-extraction needed unless the deck structure changes (detected via embedded config reconciliation).
 
 \---
 
@@ -375,67 +361,24 @@ Each workflow skill maps user intent → composed skill sequence.
 
 ## 5. Workflow → Skill Composition Map
 
-Verifies that every workflow is fully executable as a composition of skills. If a workflow requires a skill not in the inventory, we're missing a building block.
+### Workflow 1: Create New Deck
+```
+market-context → prior-wave-context → survey-context → build-project-context
+    → hypotheses → sfea-insight-writer (validate + narrative threads)
+    → slide-plan-generator → viz-selector + layout-selector
+    → slide-creator + headline-writer + executive-summary-writer
+    → deck-assembler
+```
 
-### Workflow 1: Create deck
-
-**Composition:**
-`create-deck-workflow` → (`pet-deck` if PET project) → `project-context-builder` + `market-context-builder` + `survey-context-builder` + `prior-wave-context-builder` + `synapse-read` → `hypothesis-generator` (briefing mode) OR use provided `hypothesis_bank.md` (hypothesis mode) → insight-writer (sfea or atu per project type) → `slide-plan-generator-hypothesis` → `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` (×N) → `deck-assembler`
-
-### Workflow 2: Refresh deck
-
-**Composition:**
-`refresh-deck-workflow` → `deck-reader` (Tier 1 Connector tags + Tier 2 inference) → `prior-wave-context-builder` → `synapse-read` (new period data) → `slide-plan-generator-refresh` (diff plan) → for updates: `slide-updater`; for adds: `slide-creator` via `viz-selector` + `layout-selector`; for deletes: skip in assembly → optional `trend-analyzer` for cross-period callouts → `deck-assembler`
-
-### Workflow 3: Edit slide
-
-**Composition:**
-`edit-slide-workflow` → `deck-reader` (one slide) →
-
-* rebuild mode: `spec-validator` → `slide-creator`
-* data_refresh mode: `synapse-read` (lineage-driven) → `slide-updater` → `spec-validator` → `slide-creator`
-* edit mode: `slide-editor` (whitelisted actions) → `spec-validator` → `slide-creator`
-→ `deck-assembler` (replace at index)
-
-### Workflow 4: Add slide
-
-**Composition:**
-`add-slide-workflow` → `deck-reader` (reference slide for context) → optionally `synapse-read` (new data cuts or segment split) →
-
-* ad-hoc question: `slide-plan-generator-single`
-* segment comparison: `segment-comparator` + `stat-sig-annotator` → `slide-plan-generator-single`
-→ `viz-selector` + `layout-selector` + `headline-writer` → `spec-validator` → `slide-creator` → `deck-assembler` (insert at position) → optional `analysis-trace-store`
-
-### Workflow 5: Annotate slide
-
-**Composition:**
-`annotate-slide-workflow` → `deck-reader` (target slide) →
-
-* quote: `callout-writer` (from `qualitative_data.json`)
-* insight: `segment-comparator` + `stat-sig-annotator` → `callout-writer` (data annotation)
-* freeform: direct `CalloutComponent` build
-→ `slide-editor` (add_component action) → `spec-validator` → `slide-creator` → `deck-assembler` → optional `analysis-trace-store`
-
-### Workflow 6: Restructure deck
-
-**Composition:**
-`structural-edit-workflow` → `deck-reader` (all slides) →
-
-* delete / reorder: rewrite list of `SlideSpec`
-* split: split categories or series → 2+ child specs
-* merge: combine adjacent specs via `layout-selector` → single merged spec
-→ `spec-validator` (on every new/modified spec) → `deck-assembler`
-
-### Workflow 7: Audit deck
-
-**Composition:**
-`deck-audit-workflow` → `deck-reader` (all slides) → check categories: data integrity, lineage/audit trail, citation coverage (ES slides), narrative coherence, sample size, structural, chrome/standards → aggregate `list\[Finding]` → write `<deck>.audit_<timestamp>.md`
-(read-only — does not invoke `slide-creator` or `deck-assembler`)
-
-### Workflow 8: Executive summary
-
-**Composition:**
-`executive-summary-workflow` → `deck-reader` (full deck) → optionally `sfea-insight-writer` (if narrative threads missing) → `slide-plan-generator-exec-summary` → `executive-summary-writer` → `spec-validator` → `slide-creator` (×1-3 ES slides) → `deck-assembler` (insert at position)
+### Workflow 2: Refresh Existing Deck
+```
+deck-reader (Connector tags) OR intelligent_refresh (read + interpret)
+    → spec.json (data_sources + per-slide mappings)
+    → intelligent_refresh (refresh-deck) — fetch data, pivot, replace_data
+    → headline-writer (data-grounded headlines)
+    → executive-summary-writer (optional)
+    → trend-analyzer + stat-sig-annotator (optional annotations)
+```
 
 \---
 
@@ -800,16 +743,10 @@ Once these primitives are feature-complete, workflow orchestration is trivial �
 
 ### 9.2 Workflow shipping
 
-The 8 workflow orchestrators ship at ~2/week once primitives are solid. Ship order reflects risk and strategic value:
+The two major workflows ship sequentially. Sub-operations (edit, annotate, restructure, audit, ES) land as capabilities within each workflow, not as separate orchestrators.
 
-1. **`edit-slide-workflow`** — end-to-end shake-down of the full stack (rebuild mode first, then data_refresh + edit modes)
-2. **`refresh-deck-workflow`** — primary Q3 demo; exercises deck-reader Tier 1 + Tier 2 + slide-updater + headline-writer
-3. **`create-deck-workflow`** — full briefing + hypothesis modes on new primitives
-4. **`add-slide-workflow`** — client-followup + segment-new-slide paths
-5. **`annotate-slide-workflow`** — callouts on existing slides
-6. **`structural-edit-workflow`** — delete / reorder / split / merge
-7. **`deck-audit-workflow`** — pre-delivery QA
-8. **`executive-summary-workflow`** — uses full-deck deck-reader + narrative-threads + citation-gated bullets
+1. **Workflow 2: Refresh Existing Deck** — primary Q3 demo. Connected path (Connector tags) first, then non-connected (Claude Code interpreted). Includes sub-operations: headline regen, significance annotations, ES regeneration, slide reordering, verification.
+2. **Workflow 1: Create New Deck** — full context → hypotheses → storyboard → rendering pipeline. Includes sub-operations: viz selection, layout selection, headline writing, ES generation, deck assembly.
 
 ### 9.3 Q3 Milestones
 
