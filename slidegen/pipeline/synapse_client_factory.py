@@ -54,5 +54,7 @@ def get_client(config: "ProjectConfig", api_key: Optional[str] = None,
         raise ValueError(
             "synapse_url not provided and config has no synapse.api_url"
         )
+    if not base_url.endswith("/api"):
+        base_url += "/api"
 
     return SynapseClient(base_url=base_url, api_key=api_key)

@@ -30,7 +30,6 @@ import zipfile
 from pathlib import Path
 
 import pandas as pd
-import requests
 import yaml
 from dotenv import load_dotenv
 from pptx import Presentation
@@ -38,7 +37,7 @@ from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(REPO_ROOT / ".env")
+load_dotenv(REPO_ROOT / ".env", override=True)
 
 # Namespace for our Custom XML Part (distinguishes from Connector's parts)
 SLIDEGEN_CONFIG_NS = "http://slidegen.zoomrx.com/config"
@@ -420,15 +419,22 @@ def format_data_for_interpretation(df: pd.DataFrame) -> str:
 def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
     """Fetch records from Synapse API using data lineage dict.
 
+    Uses SynapseClient (synapse-cli) so auth is resolved automatically via
+    the CLI's fallback chain — works with sk_* keys, cached JWT, Azure AD.
+    SYNAPSE_API_URL must be set in .env; no explicit key is required.
+
     Returns (records_list, dataframe).
     """
-    token = os.environ.get("SYNAPSE_API_TOKEN", "")
-    base_url = os.environ.get("SYNAPSE_API_BASE_URL", "https://synapse-api.zoomrx.com")
-    headers = {
-        "Authorization": token if token.startswith("Bearer") else f"Bearer {token}",
-        "accept": "application/json",
-        "Content-Type": "application/json",
-    }
+    import time
+    from synapse_cli import SynapseClient
+    from synapse_cli.errors import SynapseError
+
+    base_url = os.environ.get("SYNAPSE_API_URL", "").rstrip("/")
+    if not base_url:
+        return [], pd.DataFrame()
+
+    client = SynapseClient(base_url=base_url)
+
     payload = {
         "project_id": data_lineage["project_id"],
         "reporting_plan_id": data_lineage["reporting_plan_id"],
@@ -440,13 +446,30 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
             "include_live_wave": True,
         },
     }
-    resp = requests.post(
-        f"{base_url}/api/reports/generate",
-        headers=headers, json=payload, timeout=60,
-    )
-    records = []
-    if resp.status_code in (200, 201):
-        records = resp.json().get("records", [])
+
+    try:
+        report = client.reports.generate(payload)
+
+        # Handle cached/async reports — poll until PROCESSED
+        if (report and report.get("is_cached_report")
+                and report.get("cache_status") == "PROCESSING"):
+            cached_id = report.get("cached_report_id")
+            if cached_id:
+                elapsed, poll_interval, max_wait = 0, 5, 120
+                while elapsed < max_wait:
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+                    report = client.reports.cached_get(cached_id)
+                    if report.get("cache_status") == "PROCESSED":
+                        break
+
+        records = report.get("records", []) if report else []
+    except SynapseError as e:
+        print(f"  Synapse API error: {e.code} — {e.message}")
+        records = []
+    except Exception as e:
+        print(f"  Synapse API exception: {e}")
+        records = []
 
     df = pd.DataFrame(records) if records else pd.DataFrame()
     return records, df

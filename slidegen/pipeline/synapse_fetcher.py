@@ -174,6 +174,8 @@ def _resolve_synapse_params(
             "synapse_url not provided and config has no synapse.api_url field. "
             "Pass --url on the CLI or add synapse.api_url to config.yaml."
         )
+    if not resolved_url.endswith("/api"):
+        resolved_url += "/api"
     headers = _build_headers(resolved_key)
     return synapse, resolved_url, headers
 

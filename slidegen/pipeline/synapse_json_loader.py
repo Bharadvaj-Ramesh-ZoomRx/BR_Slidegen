@@ -76,6 +76,8 @@ def fetch_data_as_json(
     ).rstrip("/")
     if not resolved_url:
         raise ValueError("No Synapse API URL available.")
+    if not resolved_url.endswith("/api"):
+        resolved_url += "/api"
 
     headers = {
         "Authorization": f"Bearer {resolved_key}",
