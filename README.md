@@ -74,17 +74,31 @@ python tests/test_spec_refresh_pipeline.py --stage 3   # verify source ~ refresh
 python tests/test_spec_refresh_pipeline.py --all        # all 3 stages
 ```
 
-### Intelligent Refresh (Non-Connected Slides)
+### Refresh a Deck from Spec (Intelligent Pipeline)
 
 ```bash
-# Read slide layout and visual context
-python -m slidegen.intelligent_refresh read --pptx path/to/slide.pptx
+# 1. Embed config into PPTX (scans slides, writes manifest as Custom XML Part)
+python -m slidegen.intelligent_refresh embed-config --pptx deck.pptx
 
-# Refresh with mapping + lineage from LLM interpretation
-python -m slidegen.intelligent_refresh refresh --pptx path/to/slide.pptx --output refreshed.pptx --mapping mapping.json --lineage lineage.json
+# 2. Build spec from Connector configs (connected slides)
+python tests/build_full_spec.py
 
-# Write data-grounded headline
-python -m slidegen.intelligent_refresh headline --pptx refreshed.pptx --slide 0 --text "New headline"
+# 3. Read slide context for Claude Code interpretation (non-connected slides)
+python -m slidegen.intelligent_refresh read --pptx deck.pptx --slide 0
+
+# 4. Refresh all slides from single spec JSON
+python -m slidegen.intelligent_refresh refresh-deck --spec "deck.json"
+# Output: Output_deck.pptx (same directory as spec)
+
+# 5. Write data-grounded headline
+python -m slidegen.intelligent_refresh headline --pptx Output_deck.pptx --slide 0 --text "..."
+```
+
+**File convention:**
+```
+deck.pptx          # source deck
+deck.json          # spec (same name, .json) — data_sources + per-slide mappings
+Output_deck.pptx   # refreshed output
 ```
 
 ### R3M Report Pipeline (YAML-driven)
@@ -160,23 +174,27 @@ data_lineage (from spec)
     → ChartRefreshData (categories + series ready for replace_data)
 ```
 
-### Intelligent Refresh (LLM-Interpreted)
+### Intelligent Refresh Pipeline
 
-For slides without Connector tags, Claude Code orchestrates the refresh:
+Single spec JSON per deck. Dual-mode engine — raw Connector configs for connected slides, Claude Code interpretation for non-connected slides.
 
-1. **Slide Reader** (deterministic): extracts all visual context from OOXML —
-   charts, tables, text boxes, group shape labels — with positions
-2. **Claude Code Interpretation**: reads the spatial layout, identifies which
-   labels are near which charts, determines per-component segment filters
-   and data mappings
-3. **Deterministic Refresh**: applies the mapping via pivot + replace_data()
-4. **Headline Writer**: analyzes refreshed data, writes data-grounded headline
+```
+Spec JSON (deck.json)
+  ├── data_sources: {key: {project_id, reporting_plan_id, analysis_ids, ...}}
+  └── slides[]
+      ├── Connected: raw_pivot_config + raw_mapping_config per component
+      │   → pivot_records_to_chart_data() — exact Connector fidelity
+      └── Non-connected: data_mapping {segment_filter, series_column, ...}
+          → Claude Code interpretation → pandas pivot
+```
 
-Two paths:
-- **Connected slides** (have Connector tags): raw PivotConfig + MappingConfig
-  for exact Connector fidelity. Tables refresh from Synapse using tag configs.
-- **Non-connected slides** (no tags): LLM interprets slide layout and data
-  to determine mappings. Same deterministic refresh engine.
+**PPTX carries an embedded config** (Custom XML Part) — lightweight manifest of slide IDs and data source assignments. When the deck is edited in PowerPoint (reorder, add, delete slides), the embedded config is used to auto-reconcile spec.json.
+
+```
+embed-config → read → interpret → refresh-deck → headline
+               ↑                      ↓
+           Claude Code           Output_deck.pptx
+```
 
 ### Auth Resolution
 
@@ -206,7 +224,7 @@ galen-consulting-r3m-report/
 │   ├── synapse_auth.py              # Auth (API key + JWT + MSAL)
 │   ├── slide_refresher.py           # Clone + in-place refresh
 │   ├── slide_creator.py             # Spec -> slide renderer
-│   ├── intelligent_refresh.py       # Slide reader + refresh engine for LLM-interpreted pipeline
+│   ├── intelligent_refresh.py       # ★ Dual-mode refresh engine: embedded config, raw Connector + interpreted mappings, headline writer
 │   ├── pptx_utils/                  # composition primitives
 │   │   ├── brand.py                 # 102 clients, 33 brand palettes
 │   │   ├── charts.py                # 15 chart patterns
@@ -232,9 +250,11 @@ galen-consulting-r3m-report/
 │
 ├── experiments/deck_analysis/       # 905-deck mass grounding exercise
 ├── tests/
-│   ├── test_spec_refresh_pipeline.py  # ★ 3-stage connected refresh test (122 charts, 60 tables)
-│   ├── test_intelligent_refresh.py    # ★ Two-phase non-connected refresh (Claude Code interpreted)
+│   ├── test_spec_refresh_pipeline.py  # 3-stage connected refresh test (legacy, uses Connector specs directly)
+│   ├── test_intelligent_refresh.py    # Non-connected refresh test harness
 │   ├── test_nonconnected_refresh.py   # Non-connected inference prototype (mechanical)
+│   ├── build_full_spec.py             # ★ Builds complete spec.json from Connector configs + manual specs
+│   ├── [deck].json                    # ★ Spec file (same name as PPTX)
 │   └── test_synapse_*.py             # Synapse integration tests
 ├── projects/                        # gitignored, shared via OneDrive
 ├── docs/                            # PRDs + setup guides
@@ -264,20 +284,21 @@ galen-consulting-r3m-report/
 **Done:**
 - 905-deck mass grounding exercise (102 clients, 33 brands, 15 chart patterns, 11 layouts)
 - SlideSpec v1.2 with spec-as-config architecture
-- Connector-faithful refresh pipeline (25/27 slides on UAT deck)
-- Non-connected slide inference prototype (series-name matching)
+- Dual-mode refresh engine: raw Connector configs (connected) + Claude Code interpretation (non-connected)
+- Single spec.json per deck with data_sources catalog + per-slide component mappings
+- Embedded config in PPTX (Custom XML Part) for structure tracking + spec reconciliation
+- 126/126 charts refresh on 29-slide UAT deck (0 errors)
+- Headline writer: data-grounded headlines from refreshed chart values
+- Non-connected slide inference: spatial label interpretation (group shapes, position proximity)
 - Synapse API key auth (no manual token pasting)
-- 22 slide type renderers, 20 canonical example specs
-- 8 workflow orchestrator skills, 40 total skills
-- Connected table refresh from Synapse (60/60 tables, no longer source-restored)
-- Intelligent refresh prototype (spatial label interpretation)
+- 22 slide type renderers, 40 skills
 
 **In progress:**
-- Headline writer grounded on refreshed data
-- End-to-end slide-refresh skill
-- Non-connected slide refresh (full flow with segment inference)
-- Remaining 2 UAT slides (pre-filtered empty-category edge case)
+- Table refresh from Synapse (currently source-restored; chart refresh is primary)
+- Category ordering edge cases (4 slides with custom sort not matching source)
+- Column alias formatting (SOV% vs sov casing)
 
 **Next:**
 - End-to-end dogfooding on production PET + ATU decks
-- config.yaml generation from slide specs
+- config.yaml as thin project-level metadata layer
+- Claude Code interpretation loop for remaining non-connected slides
