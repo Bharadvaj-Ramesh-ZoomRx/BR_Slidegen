@@ -268,7 +268,7 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |-|-|-|
 |`viz-selector`|🆕|Pick chart type via hierarchy: **Metric tag → Question type default → Human-in-the-loop**|
 |`slide-plan-generator-hypothesis`|✅|Generate slide plan from hypothesis-driven inputs (Vinoth's flow)|
-|`slide-plan-generator-refresh`|🆕|Diff wave N-1 deck vs. new wave data → edit plan|
+|`slide-plan-generator-refresh`|🆕 (used by Refresh workflow)|Diff wave N-1 deck vs. new wave data → edit plan|
 |`slide-plan-generator-single`|🆕|One ask (e.g., client question) → one slide spec|
 |`slide-plan-generator-exec-summary`|🆕|Full deck + KBQs → exec summary slide specs with citations|
 |`spec-validator`|🆕|Ensure slide spec has everything renderer needs (catches incomplete specs before rendering)|
@@ -279,7 +279,7 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |Skill|Status|Purpose|
 |-|-|-|
 |`slide-creator`|🔧|Render single slide from complete spec via `pptx_utils` composition (THE atomic unit — needs full refactor to be general, not J\&J-specific)|
-|`slide-updater`|🆕|Update existing slide with fresh data, preserve structure and formatting|
+|`slide-updater`|🆕 (invoked within Refresh workflow)|Update existing slide with fresh data, preserve structure and formatting|
 |`slide-editor`|🆕|Edit specific elements of existing slide (headline, callout, colors, data) — typically via win32com live edit|
 |`callout-adder`|🆕|Add data-driven annotation/callout to existing slide|
 |`deck-assembler`|🔧|Assemble slides into final PPTX with proper ordering, section breaks, master slide application|
@@ -312,16 +312,13 @@ Project-type skills orchestrate lower-level skills for a specific methodology.
 
 Each workflow skill maps user intent → composed skill sequence.
 
-|Skill|Status|Triggered by|
-|-|-|-|
-|`new-deck-workflow`|🔧|"Create a new PET deck for Pfizer Product X"|
-|`wave-refresh-workflow`|🆕|"Refresh wave 4 of the Rybrevant PET deck"|
-|`single-slide-regen-workflow`|🆕|"Regenerate slide 12 with the fixed data"|
-|`slide-update-workflow`|🆕|"Update slide 12 with the latest data"|
-|`client-followup-workflow`|🆕|"Client asked about Academic vs Community on slide 35 — create an answer slide"|
-|`executive-summary-workflow`|🆕|"Generate an executive summary answering these 3 KBQs"|
-|`segment-analysis-workflow`|🆕|"Highlight differences between segments — as callout or new slide"|
-|`storyboarding-workflow`|🔧|"Build a hypothesis-driven PET deck" (Vinoth's existing flow, refactored)|
+| Skill | Workflow | Status |
+|---|---|---|
+| `refresh-deck-workflow` | Workflow 2: Refresh | **Operational** — dual-mode engine, spec.json, embedded config |
+| `create-deck-workflow` | Workflow 1: Create | On hold until Refresh is proven |
+
+Sub-operation skills (invoked within the two major workflows, not standalone):
+`edit-slide-workflow`, `add-slide-workflow`, `annotate-slide-workflow`, `structural-edit-workflow`, `deck-audit-workflow`, `executive-summary-workflow`
 
 ### 4.7 Collaboration \& Persistence Skills
 
@@ -351,11 +348,11 @@ Each workflow skill maps user intent → composed skill sequence.
 * **7 creation skills** (2 refactor, 5 new)
 * **6 analysis skills** (2 exist, 4 new — includes `atu-insight-writer` parallel to `sfea-insight-writer`)
 * **5 project-type skills** (1 refactor, 4 new)
-* **8 workflow skills** (1 exists-as-concept, 2 refactor, 5 new)
+* **2 major workflow skills** (1 operational, 1 planned) + 6 sub-operation skills
 * **4 collaboration skills** (2 exist, 2 new)
 * **7 tools** (4 exist, 1 refactor, 2 new)
 
-**Total: 52 skills + tools.** Of these, ~20 exist in some form today; ~10 need refactoring to be general-purpose; ~22 are new.
+**Total: ~46 skills + tools.** Of these, ~20 exist in some form today; ~10 need refactoring to be general-purpose; ~22 are new.
 
 \---
 
@@ -608,12 +605,10 @@ galen-consulting-r3m-report/
 ├── .claude/
 │   ├── CLAUDE.md                    # Orchestration instructions
 │   └── skills/
-│       ├── workflows/               # Top-level workflow skills
-│       │   ├── new-deck/
-│       │   ├── wave-refresh/
-│       │   ├── client-followup/
-│       │   ├── executive-summary/
-│       │   └── ...
+│       ├── workflows/               # 2 major + 6 sub-operation workflow skills
+│       │   ├── refresh-deck-workflow/  # ★ Operational — dual-mode refresh
+│       │   ├── create-deck-workflow/   # Planned
+│       │   └── (sub-operations: edit, add, annotate, restructure, audit, ES)
 │       ├── projects/                # Project-type skills
 │       │   ├── pet/
 │       │   ├── atu/
@@ -711,7 +706,7 @@ Tools abstract external systems. Skills don't know about auth, retries, polling 
 
 ## 9. Q3 Scope
 
-**Target:** All 8 workflows working end-to-end across PET + ATU project types by end of Q3, with HCP-Pt + Digital Tracker + PCA project skills built in parallel by their respective project-team contributors using the same building blocks. Not an MVP — a **fully functional product across all core project types**. Deferring entire workflows to Q4 is not acceptable; sequencing *within* workflows (core paths before edge cases) is.
+**Target:** Both major workflows (Create + Refresh) working end-to-end across PET + ATU project types by end of Q3, with HCP-Pt + Digital Tracker + PCA project skills built in parallel by their respective project-team contributors using the same building blocks. Not an MVP — a **fully functional product across all core project types**. Deferring entire workflows to Q4 is not acceptable; sequencing *within* workflows (core paths before edge cases) is.
 
 ### 9.1 Building-block-first delivery
 
@@ -756,10 +751,10 @@ The two major workflows ship sequentially. Sub-operations (edit, annotate, restr
 |**Apr 16 — DONE**|Spec contract + slide-creator Python|`slidegen/slide_spec/` + `slidegen/slide_creator.py`; all 10 chart patterns render; 20 canonical example specs covering ~55% of real PET slide compositions|
 |**Apr 16 — DONE**|Edit-mode + spec-producer primitives|`deck-reader` (dual-mode), `slide-updater`, `slide-editor`, `deck-assembler`, `viz-selector`, `layout-selector`, `headline-writer`, `callout-writer`, all `slide-plan-generator-\*`, all 3 analysis skills (`segment-comparator`, `stat-sig-annotator`, `trend-analyzer`)|
 |**End of Apr**|Rendering fidelity complete + evals bootstrapped|Visual regression passing on top-6 chart patterns × representative brands. Line/doughnut Repair bug closed. Connector-tag integration tested on real tagged PET deck. **Evals harness started** (`tests/evals/`) with ≥1 refresh eval using prior JJ RYB deck.|
-|**Mid-May**|First workflow end-to-end|`edit-slide-workflow` (rebuild mode) produces a refreshed slide on a real PET deck, audit trail intact.|
+|**Mid-May**|First workflow end-to-end|`refresh-deck-workflow` produces refreshed slides on a real PET deck, audit trail intact.|
 |**End of May**|Primary demo: refresh deck (PET)|Full `refresh-deck-workflow` on a real PET brand, both Connector-tagged and untagged refresh paths demonstrable. Headline regen working (§6.10). Evals covering refresh + headline freshness passing.|
-|**Mid-Jun**|5 of 8 workflows live for PET|Create, Refresh, Edit-slide, Add-slide, Annotate.|
-|**End of Jun**|All 8 workflows live for PET + ATU|Restructure, Audit, Executive Summary added. `pet-deck` + `atu-deck` project skills both working. Dogfooded on ≥2 live PET projects + 1 ATU.|
+|**Mid-Jun**|Refresh workflow live for PET|Connected + non-connected refresh paths, headline writing, sub-operations (edit, add, annotate).|
+|**End of Jun**|Both workflows live for PET + ATU|Create workflow added. All sub-operations functional. `pet-deck` + `atu-deck` project skills both working. Dogfooded on ≥2 live PET projects + 1 ATU.|
 |**End of Q3 (Jul)**|Broader project coverage + polish|HCP-Pt + Digital Tracker + PCA project skills contributed in parallel by project-team owners using the established building blocks. Edge-case sweep. Consulting leadership demo across all 5 project types.|
 
 ### 9.4 Out of Scope for Q3
@@ -801,7 +796,7 @@ HCP-Pt, Digital Tracker, and PCA are **target Q3 deliverables** — built in par
 
 1. **How do we version skills + `pptx_utils`?** Git-based, but how do users opt into new versions? OneDrive-sync model from existing docs?
 2. **Skill registry mechanism:** does Claude Code auto-discover skills from directory structure, or explicit manifest?
-3. **How does `viz-selector` remember per-project overrides?** If a user overrides viz-selector's default for a given metric on one slide, should that override apply project-wide (persist as a local override to `METRIC_TAG_MAP`) or only to that slide? Currently per-slide-only via `edit-slide-workflow`. Project-level persistence is a possible future enhancement.
+3. **How does `viz-selector` remember per-project overrides?** If a user overrides viz-selector's default for a given metric on one slide, should that override apply project-wide (persist as a local override to `METRIC_TAG_MAP`) or only to that slide? Currently per-slide-only via edit sub-operation within Refresh workflow. Project-level persistence is a possible future enhancement.
 4. **What's the contract for `deck-reader` on client-branded decks?** Does it round-trip perfectly, or lose fidelity?
 5. **Should `analysis-trace-store` persist in the deck itself (shape metadata) or in a separate project-level store?**
 6. **For `executive-summary-writer`: how do we constrain hallucination?** Guardrails on citations, confidence indicators.
@@ -818,8 +813,8 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * ✅ **What is the spec-as-contract implementation?** → `slidegen/slide_spec/` subpackage with `schema.py` (dataclasses) + `validator.py`. See §6.3.
 * ✅ **How do we extract data lineage from existing decks for refresh workflows?** → Dual-mode `deck-reader`. Tier 1 reads Galen-PowerPoint Connector tags (`ReportConfigHash` → Custom XML Part) for canonical Synapse lineage. Tier 2 falls back to structural inference with user confirmation for untagged shapes. Not every deck is Connector-authored, so Tier 2 is required. See §6.3.
 * ✅ **What's the priority order for fidelity?** → Layout, then visualization, then data, then brand colors. Brand colors are parameterized inputs; the first three axes are where `slide-creator` must deliver pixel/numeric parity with real decks. See §6.3.
-* ✅ **Q3 target — PET-only or broader?** → PET + ATU land first-party (weeks 1-9); HCP-Pt + Digital Tracker + PCA project skills land in parallel via project-team contributors (weeks 9-13), using the same building blocks. All 8 workflows × all 5 project types by end of Q3, with dogfooding on ≥2 live PET projects + 1 ATU. See §9.3 + §9.5.
-* ✅ **Are the workflows MECE?** → Yes, after Apr 16 audit. Eight workflows map 1:1 to user verbs (create / refresh / edit / add / annotate / restructure / audit / summarize). Earlier drafts had redundancy (two create paths, two edit paths, two add paths) that collapsed into the current taxonomy. Structural-edit and deck-audit were added to close gaps the earlier lists missed.
+* ✅ **Q3 target — PET-only or broader?** → PET + ATU land first-party (weeks 1-9); HCP-Pt + Digital Tracker + PCA project skills land in parallel via project-team contributors (weeks 9-13), using the same building blocks. Both major workflows × all 5 project types by end of Q3, with dogfooding on ≥2 live PET projects + 1 ATU. See §9.3 + §9.5.
+* ✅ **Are the workflows MECE?** → Yes, after Apr 16 audit. Two major workflows (create / refresh) with sub-operations (edit / add / annotate / restructure / audit / summarize) cover all user verbs. Earlier drafts had redundancy (two create paths, two edit paths, two add paths) that collapsed into the current taxonomy. Structural-edit and deck-audit were added to close gaps the earlier lists missed.
 
 \---
 
@@ -862,18 +857,14 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 
 ### 11.4 Workflow Coverage Matrix
 
-All 8 workflows are in Q3 scope. Ship order reflects §9.2 — smallest-risk first, primary demo (refresh deck) early, analysis-heavy workflows later.
+Both major workflows are in Q3 scope. Ship order reflects §9.2 — smallest-risk first, primary demo (refresh deck) early, analysis-heavy workflows later.
 
-|#|Workflow|Skills Used|Ship Order|
-|-|-|-|-|
-|3|Edit slide|edit-slide-workflow, deck-reader, spec-validator, slide-updater, slide-editor, headline-writer, slide-creator, deck-assembler|1 (shake-down — rebuild mode first, then data_refresh and edit modes)|
-|2|Refresh deck|refresh-deck-workflow, pet-deck, deck-reader (Tier 1+2), prior-wave-context-builder, synapse-read, slide-plan-generator-refresh, slide-updater, slide-creator, trend-analyzer, headline-writer, deck-assembler|2 (primary demo)|
-|1|Create deck|create-deck-workflow, pet-deck, context-builders, hypothesis-generator, insight-writer (sfea or atu per project type), slide-plan-generator-hypothesis, viz-selector, layout-selector, headline-writer, slide-creator, deck-assembler|3|
-|4|Add slide|add-slide-workflow, deck-reader, synapse-read, slide-plan-generator-single, viz-selector, layout-selector, headline-writer, slide-creator, (segment-comparator + stat-sig-annotator for segment mode), deck-assembler|4|
-|5|Annotate slide|annotate-slide-workflow, deck-reader, callout-writer, slide-editor, (segment-comparator + stat-sig-annotator for insight mode), slide-creator, deck-assembler|5|
-|6|Restructure deck|structural-edit-workflow, deck-reader, spec-validator, layout-selector, deck-assembler|6|
-|7|Audit deck|deck-audit-workflow, deck-reader, spec-validator (read-only)|7|
-|8|Executive summary|executive-summary-workflow, deck-reader (full deck), insight-writer (sfea or atu per project type), slide-plan-generator-exec-summary, executive-summary-writer, slide-creator, deck-assembler|8|
+|Priority|Workflow|Skills composed|Ship order|
+|---|---|---|---|
+|1|Refresh deck|refresh-deck-workflow, intelligent_refresh (embed-config, read, refresh-deck, headline), deck-reader, headline-writer, trend-analyzer, stat-sig-annotator|1 (primary demo)|
+|2|Create deck|create-deck-workflow, context-builders, hypothesis-generator, sfea-insight-writer, slide-plan-generator, viz-selector, layout-selector, slide-creator, headline-writer, deck-assembler|2 (after Refresh validated)|
+
+Sub-operations (edit, add, annotate, restructure, audit, ES) are capabilities within the two major workflows, not separately shipped orchestrators.
 
 
 
