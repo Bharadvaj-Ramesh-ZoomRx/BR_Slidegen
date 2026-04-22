@@ -32,9 +32,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import io
+
+import openpyxl
 import pandas as pd
 from pptx import Presentation
-from pptx.chart.data import CategoryChartData
+from pptx.chart.data import CategoryChartData, XyChartData
+from pptx.enum.chart import XL_CHART_TYPE
 
 
 # ── Paths ────────────────────────────────────────────────────────────────────
@@ -42,10 +46,10 @@ from pptx.chart.data import CategoryChartData
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = REPO_ROOT / "tests"
 
-SOURCE_PPTX = TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.pptx"
-DUMMY_PPTX = TESTS_DIR / "UAT_dummy_data.pptx"
-REFRESHED_PPTX = TESTS_DIR / "UAT_refreshed_from_spec.pptx"
-SPECS_JSON = TESTS_DIR / "UAT_deck_config_specs.json"
+SOURCE_PPTX = REPO_ROOT / "projects" / "CREON" / "CREON.pptx"
+DUMMY_PPTX = TESTS_DIR / "CREON_dummy_data.pptx"
+REFRESHED_PPTX = TESTS_DIR / "CREON_refreshed_from_spec.pptx"
+SPECS_JSON = TESTS_DIR / "CREON_deck_config_specs.json"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -76,18 +80,158 @@ def stage1_create_dummy_deck():
                 chart = shape.chart
                 try:
                     plot = chart.plots[0]
-                    cats = list(plot.categories) if plot.categories else ["Cat1"]
-                    n_cats = len(cats)
                     n_series = len(plot.series)
 
-                    cd = CategoryChartData()
-                    cd.categories = [f"Dummy {i+1}" for i in range(n_cats)]
-                    for s_idx in range(n_series):
-                        name = f"Dummy Series {s_idx+1}"
-                        # Uniform dummy values (0.25 each for stacked, 0.5 for others)
+                    _XY_TYPES = {
+                        XL_CHART_TYPE.XY_SCATTER,
+                        XL_CHART_TYPE.XY_SCATTER_LINES,
+                        XL_CHART_TYPE.XY_SCATTER_LINES_NO_MARKERS,
+                        XL_CHART_TYPE.XY_SCATTER_SMOOTH,
+                        XL_CHART_TYPE.XY_SCATTER_SMOOTH_NO_MARKERS,
+                        XL_CHART_TYPE.BUBBLE,
+                        XL_CHART_TYPE.BUBBLE_THREE_D_EFFECT,
+                    }
+                    is_xy = chart.chart_type in _XY_TYPES
+                    _C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+                    _T = lambda tag: f"{{{_C}}}{tag}"
+
+                    # ── Capture best format code per series before replace_data ──
+                    # Priority: non-General numCache value > series-level numFmt > 'General'
+                    def _best_fmt(ser_el):
+                        # 1. Non-General formatCode in val/xVal numCache
+                        for val_tag in (_T("val"), _T("xVal")):
+                            v = ser_el.find(val_tag)
+                            if v is not None:
+                                fc = v.find(f".//{_T('formatCode')}")
+                                if fc is not None and fc.text and fc.text != "General":
+                                    return fc.text
+                        # 2. Non-General numFmt anywhere in the series (e.g. dLbls)
+                        for nf in ser_el.iter(_T("numFmt")):
+                            fc = nf.get("formatCode", "")
+                            if fc and fc != "General":
+                                return fc
+                        # 3. Fall back to whatever is in val/xVal numCache
+                        for val_tag in (_T("val"), _T("xVal")):
+                            v = ser_el.find(val_tag)
+                            if v is not None:
+                                fc = v.find(f".//{_T('formatCode')}")
+                                if fc is not None:
+                                    return fc.text or "General"
+                        return "General"
+
+                    ser_fmts = {
+                        i: _best_fmt(ser_el)
+                        for i, ser_el in enumerate(
+                            chart._chartSpace.iter(_T("ser"))
+                        )
+                    }
+
+                    # ── Build dummy chart data ──
+                    if is_xy:
+                        # XY charts (abacus, scatter): modify workbook in-place to
+                        # preserve the original column layout. DO NOT call replace_data()
+                        # — it rebuilds the workbook from scratch with a different layout
+                        # that breaks abacus rendering (y row-positions vs x data cols).
+                        dummy_val = round(0.5 / max(n_series, 1), 2)
+
+                        # Update XML numCache: replace xVal floats (0-1) with dummy
+                        for ser_el in chart._chartSpace.iter(_T("ser")):
+                            xval = ser_el.find(_T("xVal"))
+                            if xval is not None:
+                                for pt in xval.iter(_T("pt")):
+                                    v_el = pt.find(_T("v"))
+                                    if v_el is not None:
+                                        try:
+                                            if float(v_el.text) <= 1.0:
+                                                v_el.text = str(dummy_val)
+                                        except (TypeError, ValueError):
+                                            pass
+                            # Leave yVal (row positions) unchanged
+
+                        # Update embedded workbook in-place: replace percentage floats
+                        try:
+                            for rel in shape.chart.part.rels.values():
+                                if ("spreadsheet" in rel.reltype.lower()
+                                        or rel.reltype.endswith("/package")):
+                                    wb = openpyxl.load_workbook(
+                                        io.BytesIO(rel.target_part.blob)
+                                    )
+                                    ws = wb.active
+                                    for wb_row in ws.iter_rows(min_row=2):
+                                        for cell in wb_row:
+                                            if (isinstance(cell.value, float)
+                                                    and 0.0 <= cell.value <= 1.0):
+                                                cell.value = dummy_val
+                                    out = io.BytesIO()
+                                    wb.save(out)
+                                    rel.target_part._blob = out.getvalue()
+                                    break
+                        except Exception as e:
+                            print(f"    XY workbook in-place fix failed: {e}")
+
+                    else:
+                        try:
+                            cats = list(plot.categories) if plot.categories else []
+                        except Exception:
+                            cats = []
+                        n_cats = len(cats)
+                        # Fall back to series values count when categories unavailable
+                        if n_cats == 0:
+                            try:
+                                n_cats = len(list(plot.series[0].values)) if n_series else 1
+                            except Exception:
+                                n_cats = 1
+                        cats = cats if cats else [f"Cat {i+1}" for i in range(n_cats)]
                         val = round(1.0 / max(n_series, 1), 2)
-                        cd.add_series(name, [val] * n_cats)
-                    chart.replace_data(cd)
+                        cd = CategoryChartData()
+                        cd.categories = [f"Dummy {i+1}" for i in range(n_cats)]
+                        for s_idx in range(max(n_series, 1)):
+                            cd.add_series(f"Dummy Series {s_idx+1}", [val] * n_cats)
+
+                        chart.replace_data(cd)
+
+                        # ── Restore format codes in XML per series ──
+                        for i, ser_el in enumerate(chart._chartSpace.iter(_T("ser"))):
+                            fmt = ser_fmts.get(i, "General")
+                            if fmt == "General":
+                                continue
+                            for val_tag in (_T("val"), _T("xVal")):
+                                v = ser_el.find(val_tag)
+                                if v is not None:
+                                    fc = v.find(f".//{_T('formatCode')}")
+                                    if fc is not None:
+                                        fc.text = fmt
+
+                        # ── Fix embedded workbook cell formats ──
+                        # replace_data() regenerates the xlsx with General format.
+                        # PowerPoint reads number format from the workbook when
+                        # sourceLinked="1", so we must fix the workbook too.
+                        try:
+                            for rel in shape.chart.part.rels.values():
+                                if ("spreadsheet" in rel.reltype.lower()
+                                        or rel.reltype.endswith("/package")):
+                                    wb = openpyxl.load_workbook(
+                                        io.BytesIO(rel.target_part.blob)
+                                    )
+                                    ws = wb.active
+                                    # Category chart: col A = categories; B, C, ... = series
+                                    for ser_i, fmt in ser_fmts.items():
+                                        if fmt == "General":
+                                            continue
+                                        col = ser_i + 2  # B=2, C=3, ...
+                                        for wb_row in ws.iter_rows(
+                                            min_row=2, min_col=col, max_col=col
+                                        ):
+                                            for cell in wb_row:
+                                                if isinstance(cell.value, (int, float)):
+                                                    cell.number_format = fmt
+                                    out = io.BytesIO()
+                                    wb.save(out)
+                                    rel.target_part._blob = out.getvalue()
+                                    break
+                        except Exception:
+                            pass  # workbook fix is best-effort
+
                     charts_dummied += 1
                 except Exception as e:
                     print(f"  Warning: chart on slide {slide_idx} failed: {e}")
@@ -332,15 +476,18 @@ def apply_table_transform(
 # Synapse API fetch (builds payload from spec DataLineage)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def fetch_synapse_records(data_lineage, token: str, base_url: str) -> list[dict]:
-    """Fetch flat records from Synapse API using DataLineage fields."""
-    import requests
+def fetch_synapse_records(data_lineage, base_url: str) -> list[dict]:
+    """Fetch flat records from Synapse API using DataLineage fields.
 
-    headers = {
-        "Authorization": f"Bearer {token}" if not token.startswith("Bearer") else token,
-        "accept": "application/json",
-        "Content-Type": "application/json",
-    }
+    Uses SynapseClient (synapse-cli) — auth is resolved automatically via
+    the CLI's fallback chain (cached token → Azure AD → env vars).
+    SYNAPSE_API_URL must be set; no explicit key is passed.
+    """
+    import time
+    from synapse_cli import SynapseClient
+    from synapse_cli.errors import SynapseError
+
+    client = SynapseClient(base_url=base_url)
 
     # Build segment_ids from structured segments (v1.2) or legacy flat list
     segment_ids = []
@@ -357,20 +504,40 @@ def fetch_synapse_records(data_lineage, token: str, base_url: str) -> list[dict]
         "setup_type": "DYNAMIC",
         "dynamic_time_period": {
             "latest_n_deliverables": data_lineage.dynamic_latest_n or 8,
-            "include_live_wave": data_lineage.include_live_wave if data_lineage.include_live_wave is not None else True,
+            "include_live_wave": (data_lineage.include_live_wave
+                                  if data_lineage.include_live_wave is not None else True),
         },
     }
 
     try:
-        resp = requests.post(
-            f"{base_url}/api/reports/generate",
-            headers=headers, json=payload, timeout=60,
-        )
-        if resp.status_code in (200, 201):
-            return resp.json().get("records", [])
-        else:
-            print(f"  API error {resp.status_code}: {resp.text[:200]}")
-            return []
+        report = client.reports.generate(payload)
+
+        # Handle cached/async reports — poll until PROCESSED
+        if (report and report.get("is_cached_report")
+                and report.get("cache_status") == "PROCESSING"):
+            cached_id = report.get("cached_report_id")
+            if cached_id:
+                print(f"    Report is processing (cached_report_id={cached_id}), polling...")
+                elapsed = 0
+                poll_interval, max_wait = 5, 120
+                while elapsed < max_wait:
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+                    report = client.reports.cached_get(cached_id)
+                    status = report.get("cache_status", "")
+                    if status == "PROCESSED":
+                        break
+                    elif status == "PROCESSING":
+                        print(f"    [{elapsed}s] Still processing...")
+                    else:
+                        print(f"    Unexpected cache_status: {status}")
+                        break
+
+        return report.get("records", []) if report else []
+
+    except SynapseError as e:
+        print(f"  API error: {e.code} — {e.message}")
+        return []
     except Exception as e:
         print(f"  API exception: {e}")
         return []
@@ -657,38 +824,15 @@ def stage2_refresh_from_specs():
     specs = [load_spec(d) for d in specs_data]
     print(f"  Loaded {len(specs)} config specs")
 
-    # Get Synapse token
     from dotenv import load_dotenv
     import os
-    load_dotenv(REPO_ROOT / ".env")
+    load_dotenv(REPO_ROOT / ".env", override=True)
 
-    token = os.environ.get("SYNAPSE_API_TOKEN", "")
-    if not token:
-        print("  ERROR: No SYNAPSE_API_TOKEN in .env")
-        print("  Run: python -m slidegen.synapse_auth --update 'Bearer eyJ...'")
+    base_url = os.environ.get("SYNAPSE_API_URL", "").rstrip("/")
+    if not base_url:
+        print("  ERROR: SYNAPSE_API_URL not set in .env")
         return False
-
-    base_url = os.environ.get("SYNAPSE_API_BASE_URL", "https://synapse-api.zoomrx.com")
-
-    # Check token validity — skip expiry check for API keys (sk_*)
-    raw = token.replace("Bearer ", "").strip()
-    if raw.startswith("sk_"):
-        print(f"  Using API key (no expiry)")
-    else:
-        try:
-            import base64, time
-            payload_b64 = raw.split(".")[1]
-            payload_b64 += "=" * (4 - len(payload_b64) % 4)
-            claims = json.loads(base64.urlsafe_b64decode(payload_b64))
-            exp = claims.get("exp", 0)
-            remaining = exp - time.time()
-            if remaining < 60:
-                print(f"  ERROR: Token expired {abs(remaining)/60:.0f} minutes ago")
-                print("  Run: python -m slidegen.synapse_auth --update 'Bearer eyJ...'")
-                return False
-            print(f"  Token valid for {remaining/60:.0f} more minutes")
-        except Exception:
-            print("  Warning: could not decode token expiry, proceeding anyway")
+    print(f"  Using API URL: {base_url}")
 
     # Clone dummy -> refreshed
     shutil.copy2(str(DUMMY_PPTX), str(REFRESHED_PPTX))
@@ -723,7 +867,7 @@ def stage2_refresh_from_specs():
         # Fetch records (cached)
         if cache_key not in fetch_cache:
             print(f"\n  Fetching: project={lin.project_id}, analysis={lin.analysis_ids}, segments={seg_ids}")
-            records = fetch_synapse_records(lin, token, base_url)
+            records = fetch_synapse_records(lin, base_url)
             fetch_cache[cache_key] = records
             print(f"    -> {len(records)} records")
         records = fetch_cache[cache_key]
