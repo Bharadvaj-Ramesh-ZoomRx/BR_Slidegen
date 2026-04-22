@@ -1,117 +1,205 @@
 ---
 name: refresh-deck-workflow
 effort: high
-paths: []
-description: "Triggered by: 'Refresh wave N of the <brand> PET deck' / 'Pull in Q1 '26 data and rebuild the deck' / 'Refresh this deck'. Produces the next period's deck from the prior period's deck + new data. For PET/tracker decks this is the wave refresh flow; for other decks it's a multi-slide data refresh preserving narrative continuity. Primary Q3 demo."
+paths: ["slidegen/intelligent_refresh.py", "slidegen/synapse_chart_mapper.py", "slidegen/slide_spec/schema.py", "tests/test_spec_refresh_pipeline.py", "tests/test_intelligent_refresh.py"]
+description: "End-to-end slide/deck refresh. Handles BOTH Connector-tagged (connected) and non-tagged (non-connected) slides. Connected: raw PivotConfig + MappingConfig for exact Connector fidelity. Non-connected: Claude Code reads spatial layout, interprets data mappings, executes deterministic refresh. Both paths write data-grounded headlines. Triggered by 'Refresh this slide/deck' or 'Update data on slide N'."
 ---
 
 # refresh-deck-workflow
 
-Prior-wave deck + new wave data → next wave deck. Primary Q3 demo workflow.
+Refresh any slide or deck with fresh Synapse data — connected or non-connected.
 
-## Trigger phrases
+## Trigger Phrases
 
-- "Refresh wave 4 of the Rybrevant PET deck"
+- "Refresh this slide / deck"
+- "Update the data on slide 6"
+- "Refresh Repatha ATU Slide 6.pptx with project 1428, analysis 545991"
 - "Pull in Q1 '26 data and rebuild the deck"
-- "Run the wave refresh on projects/jnj_rybrevant"
-- "Create the Q1 '26 PET report using Q4 '25 as the base"
+
+## Architecture
+
+```
+Source PPTX
+    ├── Has Connector tags? ──YES──→ CONNECTED PATH
+    │                                 Extract specs (generate_config_specs)
+    │                                 Fetch data (Synapse API)
+    │                                 Pivot (pivot_records_to_chart_data)
+    │                                 Refresh charts + tables (replace_data)
+    │
+    └── No tags ──────────────→ NON-CONNECTED PATH
+                                  Step 1: read_slide_context() → shapes + positions
+                                  Step 2: Claude Code interprets spatial layout
+                                  Step 3: refresh_slide_from_mapping()
+    ↓
+BOTH PATHS → Write data-grounded headline → Output PPTX
+```
 
 ## Cardinal Rules
 
-1. **Preserve narrative continuity, not stale text.** Slide *structure* stays identical unless new data genuinely requires a change. But **headlines MUST be regenerated** to reflect new data — a headline like "dipped 3pp QoQ" from the prior wave becomes a delivery risk when new data says "up 2pp". `slide-updater` handles this via `headline-writer`. Subheadlines with period labels ("Q3 '25 vs Q4 '25") are rewritten to the new period pair.
-2. **Refresh the narrative backbone too.** `narrative_threads.md` is regenerated from new data before headlines are rewritten — arcs may shift wave over wave, and headlines inherit from the fresh narrative.
-3. **Every refresh is auditable.** Stamp `data_lineage.last_data_pull` on every updated slide. Preserve tag-based lineage in metadata even when the tag itself was rejected (audit trail).
-4. **Trust tags that pass health checks, route others through inference.** `deck-reader` applies a 5-step health check on every tagged shape. Only Tier 1 (all checks pass) tags are used for refresh directly. Unhealthy tags → Tier 2 inference. No per-shape user gate on tag failures — gating per-shape in a 40-slide deck is unusable. Blind-trusting a bad tag is how galen-powerpoint's own refresh can destroy a chart's layout — our refresh must not repeat that.
-5. **User review gate on low-confidence Tier 2 inferences only.** If `deck-reader` Tier 2 can't confidently reconstruct a slide's lineage (low match score), surface for confirmation before refreshing. This keeps human-in-the-loop narrow — only the genuinely ambiguous cases.
-6. **Deletes are explicit.** Slides removed from the diff plan must have a rationale — never silently drop a slide.
+1. **Two paths, one pipeline.** Connected slides use raw Connector configs for exact fidelity. Non-connected slides use Claude Code interpretation. Both produce the same output: refreshed PPTX with data-grounded headlines.
+2. **Headlines MUST be grounded on data.** Never copy headlines from source. Analyze the refreshed chart/table data, write a headline that reflects the current findings. Follow PET deck conventions (see Headline Writing below).
+3. **Spatial layout is ground truth for non-connected.** Use group shape labels, nearby text boxes, and table proximity — not headline parsing — to determine which chart shows which segment.
+4. **User provides data lineage for non-connected.** The analyst knows their Synapse project/analysis/segments. Claude Code interprets how that data maps to each component.
+5. **Preserve formatting, update only data.** Clone + replace_data(). Never reconstruct slides.
+6. **Every refresh is auditable.** Stamp data lineage, save mapping JSON, report what changed.
 
-## Pre-condition: Retroactive Spec Generation (first run only)
+## Connected Path (Connector-Tagged Slides)
 
-For decks not previously processed by SlideGen, run `deck-reader` on the prior wave PPTX before the first refresh. This one-time step produces slide specs for every slide and bootstraps `config.yaml`. On subsequent refreshes, the saved specs are the starting point — no re-bootstrapping needed.
+For slides with Synapse Connector tags (ReportConfigHash, DataFrameConfigHash, MappingConfig):
 
+```bash
+# Full pipeline: clone → dummy → refresh from specs → verify
+python tests/test_spec_refresh_pipeline.py --all
+
+# Or stage by stage:
+python tests/test_spec_refresh_pipeline.py --stage 1   # clone source → dummy
+python tests/test_spec_refresh_pipeline.py --stage 2   # refresh from Synapse via specs
+python tests/test_spec_refresh_pipeline.py --stage 3   # verify source ≈ refreshed
 ```
-deck-reader("prior_wave.pptx", config_path)
-→ saves list[SlideSpec] to projects/{name}/context/{wave}/slide_specs/
-→ creates/updates config.yaml with extracted extraction params
+
+Key modules:
+- `slidegen/deck_reader/tag_reader.py` → `generate_config_specs()` extracts raw configs per component
+- `slidegen/synapse_chart_mapper.py` → `pivot_records_to_chart_data()` replicates Connector transformation
+- Charts: pivot + replace_data() with formatCode preservation
+- Tables: each table's own PivotConfig + MappingConfig → formatted cell values (base sizes, percentages)
+
+## Non-Connected Path (Claude Code Interpretation)
+
+For slides WITHOUT Connector tags. User provides `data_lineage` (project_id, analysis_ids, segment_ids).
+
+### Step 1: Extract slide context
+
+```bash
+python -m slidegen.intelligent_refresh read --pptx path/to/slide.pptx --slide 0
 ```
 
-If slide specs already exist (in `context/{wave}/slide_specs/`), skip this step and proceed directly to the orchestration below.
+Output: JSON with all shapes — charts (series, categories, values), tables (headers, sample rows), text boxes, **group shape labels with positions**.
 
-## Inputs
+### Step 2: Claude Code interprets
 
-- `config_path`: project config.yaml (identifies brand, wave, source paths)
-- `prior_wave_deck_path`: path to the previous wave PPTX
-- Optional `feedback`: client feedback from prior wave that should inform the refresh
-- Synapse credentials (from env or `synapse-auth`)
+Read the Step 1 output. Determine per-component mappings by spatial proximity:
 
-## Outputs
+**What to look for:**
+- Group shape labels like "CARDs" at (2.74, 1.69) near Chart 35 at (2.94, 2.44) → Chart 35 shows CARD segment
+- Table base sizes to confirm segment (smaller n = one segment, larger = another)
+- Series names (L, N, H, IDK) → match to data column values (x_code: L, N, H, 0)
+- Table column headers ("Base", "Easy") → map to data fields (base, percentage)
 
-- New wave PPTX at `projects/{name}/output/{new_wave}/deck.pptx`
-- Updated `shape_registry.json` with refreshed lineage
-- Diff summary: `{updated: [...], added: [...], deleted: [...]}` printed to terminal
-
-## Orchestration
-
+**Write mapping JSON:**
+```json
+{
+  "charts": [
+    {"chart_name": "Chart 35", "segment_filter": "CARD",
+     "series_column": "x_code",
+     "series_name_map": {"L": "L", "N": "N", "H": "H", "IDK": "0"},
+     "row_field": "y_label", "value_field": "percentage"}
+  ],
+  "tables": [
+    {"table_name": "Table 25", "segment_filter": "CARD",
+     "columns": [
+       {"header": "Product", "data_field": "y_label", "format": "string"},
+       {"header": "Base", "data_field": "base", "format": "(n = {})"},
+       {"header": "", "data_field": null, "format": "spacer"},
+       {"header": "Easy", "data_field": "percentage", "format": "{}%",
+        "filter": {"x_code": "H"}}
+     ]}
+  ]
+}
 ```
-1. deck-reader(prior_wave_deck_path, config_path)
-     → list[SlideSpec] for every slide (Tier 1 where tagged, Tier 2 otherwise)
-     → summary dict with tagged/untagged counts
 
-2. synapse-read (or excel extraction) (config_path, new wave identifier)
-     → dict of {extraction_id: data} for the new wave
+### Step 3: Refresh
 
-3. prior-wave-context-builder (prior_wave_deck_path)
-     → updates context/{wave}/prior_wave_context.md (for narrative continuity)
-
-4. slide-plan-generator-refresh (prior_specs, new_data, feedback?, narrative_threads?)
-     → diff plan: {update: [SlideSpec], add: [SlideSpec], delete: [slide_id]}
-     → each plan entry has a rationale string
-
-5. (optional) trend-analyzer for deltas that warrant callouts
-
-6. Gate: show diff plan to user for review
-     → user can approve / reject / edit individual entries
-
-7. for spec in diff.update:
-     slide-updater(
-        spec,
-        new_data[spec.data_lineage],
-        period_labels={"prior": new_period_prior, "current": new_period_current}
-     )
-     → updated_spec with:
-        • fresh values + recomputed deltas
-        • HEADLINE regenerated via headline-writer (from new data + updated narrative_threads)
-        • SUBHEADLINE period labels rewritten ("Q3 '25 vs Q4 '25" → new period pair)
-        • audit stamps
-     spec-validator(updated_spec, strict=True)
-
-   for spec in diff.add:
-     viz-selector + layout-selector + headline-writer
-     slide-creator(spec)
-
-   for slide_id in diff.delete:
-     (skip in final assembly; log rationale)
-
-8. deck-assembler(specs, output_path=new_wave_deck_path, template_path=?)
-     → PPTX + shape_registry.json + backup of any prior output
+```bash
+python -m slidegen.intelligent_refresh refresh \
+  --pptx path/to/slide.pptx --output refreshed.pptx \
+  --mapping mapping.json --lineage lineage.json
 ```
+
+### Step 4: Verify
+
+Open the refreshed PPTX, compare visually with source. Check that:
+- Chart categories match expected products
+- Series values are segment-filtered correctly
+- Table base sizes and percentages match the segment
+- Formatting preserved (colors, fonts, layout)
+
+## Headline Writing (Both Paths)
+
+After refreshing data, analyze the chart/table values and write a data-grounded headline.
+
+### Process
+1. Read the refreshed slide's chart data (categories, series values)
+2. Identify the key finding: highest value, biggest delta, segment comparison, rank shift
+3. Write headline following PET conventions (≤120 chars, lead with direction, name the driver)
+4. Apply:
+```bash
+python -m slidegen.intelligent_refresh headline --pptx refreshed.pptx --slide 0 --text "headline text"
+```
+
+### Headline Patterns (from 3,569 real PET headlines)
+
+| Pattern | Example |
+|---|---|
+| Delta + driver | "Rybrevant efficacy recall dipped 3pp QoQ, driven by Efficacy-in-1L message" |
+| Segment divergence | "Repatha ease of access among CARDs leads PCPs by 20pp (44% vs 24%)" |
+| Magnitude threshold | "Half of NSCLC specialists now recall LITE + EP2 (+8pp vs Q4)" |
+| Rank shift | "Safety climbs to #2 recalled message, overtaking Convenience" |
+| Flat with context | "Recall holds at 45% — no wave-on-wave shift" |
+| Comparative | "Repatha vs Tagrisso: same reach, half the unaided recall" |
+
+### Rules
+- **Never invent numbers.** Every data point must be verifiable from the slide's chart/table values.
+- **Lead with direction.** Up, down, flat, above, below, leads, trails.
+- **Name the driver or segment.** "among CARDs" > "among HCPs".
+- **No hedging.** Ban: "may suggest," "appears to indicate."
+- **≤120 characters.**
+- For first iteration (testing on existing decks), ground purely on refreshed data. Client-specific narrative context will be layered in later.
 
 ## Decision Rules
 
 | Situation | Response |
 |---|---|
-| Prior deck has no Connector tags (all untagged) | All slides go through Tier 2 inference; require user confirmation on low-confidence specs |
-| New wave data is missing for a tagged slide | Flag in diff plan; skip that slide's update, keep prior data with warning |
-| A prior slide's Connector lineage points to a reporting plan that no longer exists | Surface error; user decides whether to delete the slide or swap the lineage |
-| Segment IDs in lineage differ from segments available in new wave | Halt; user resolves |
-| Diff plan is empty (nothing changed) | Report "no refresh needed" and exit without writing a new deck |
+| Slide has Connector tags | Connected path — use raw configs |
+| Slide has no tags | Non-connected path — Claude Code interprets |
+| Mixed deck (some slides tagged, some not) | Per-slide detection; use appropriate path for each |
+| User doesn't provide data_lineage for non-connected | Ask: "Which Synapse project/analysis does this slide's data come from?" |
+| Fetched data has no matching segment values | Show available segments, ask user to clarify |
+| Chart series names don't match any data column | Try fuzzy matching (abbreviations, case-insensitive), report if still unmatched |
+| Headline can't be grounded (no clear finding) | Use section title as fallback, flag for manual review |
+
+## Python API
+
+```python
+from slidegen.intelligent_refresh import (
+    read_slide_context,
+    format_slide_for_interpretation,
+    format_data_for_interpretation,
+    fetch_synapse_data,
+    refresh_slide_from_mapping,
+    write_headline,
+)
+
+# Phase 1: Read
+context = read_slide_context("slide.pptx", slide_index=0)
+records, df = fetch_synapse_data(data_lineage)
+print(format_slide_for_interpretation(context))
+print(format_data_for_interpretation(df))
+
+# Phase 2: Refresh (after Claude Code generates mapping)
+results = refresh_slide_from_mapping(
+    "slide.pptx", "refreshed.pptx", slide_index=0,
+    mapping=mapping_dict, data_lineage=data_lineage,
+)
+
+# Phase 3: Headline
+write_headline("refreshed.pptx", slide_index=0, headline_text="...")
+```
 
 ## References
 
-- PRD §3 Workflow 2, §5 composition map, §6.8 (dual-mode lineage)
-- `.claude/skills/context-data/deck-reader/SKILL.md`
-- `.claude/skills/planning/slide-plan-generator-refresh/SKILL.md`
-- `.claude/skills/creation/slide-updater/SKILL.md`
-- `.claude/skills/creation/slide-creator/SKILL.md`
-- `.claude/skills/creation/deck-assembler/SKILL.md`
-- Galen-PowerPoint Connector: `Docs/Export Import Tags - PRD.md` (for Tier 1 reference)
+- `slidegen/intelligent_refresh.py` — Slide reader + refresh engine
+- `slidegen/synapse_chart_mapper.py` — Connector-faithful pivot engine
+- `slidegen/deck_reader/tag_reader.py` — Config spec extraction from Connector tags
+- `tests/test_spec_refresh_pipeline.py` — Connected path end-to-end test
+- `tests/test_intelligent_refresh.py` — Non-connected path test harness
+- `.claude/skills/creation/headline-writer/SKILL.md` — Headline conventions reference

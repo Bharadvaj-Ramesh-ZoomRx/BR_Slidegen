@@ -74,6 +74,19 @@ python tests/test_spec_refresh_pipeline.py --stage 3   # verify source ~ refresh
 python tests/test_spec_refresh_pipeline.py --all        # all 3 stages
 ```
 
+### Intelligent Refresh (Non-Connected Slides)
+
+```bash
+# Read slide layout and visual context
+python -m slidegen.intelligent_refresh read --pptx path/to/slide.pptx
+
+# Refresh with mapping + lineage from LLM interpretation
+python -m slidegen.intelligent_refresh refresh --pptx path/to/slide.pptx --output refreshed.pptx --mapping mapping.json --lineage lineage.json
+
+# Write data-grounded headline
+python -m slidegen.intelligent_refresh headline --pptx refreshed.pptx --slide 0 --text "New headline"
+```
+
 ### R3M Report Pipeline (YAML-driven)
 
 ```bash
@@ -147,6 +160,24 @@ data_lineage (from spec)
     → ChartRefreshData (categories + series ready for replace_data)
 ```
 
+### Intelligent Refresh (LLM-Interpreted)
+
+For slides without Connector tags, Claude Code orchestrates the refresh:
+
+1. **Slide Reader** (deterministic): extracts all visual context from OOXML —
+   charts, tables, text boxes, group shape labels — with positions
+2. **Claude Code Interpretation**: reads the spatial layout, identifies which
+   labels are near which charts, determines per-component segment filters
+   and data mappings
+3. **Deterministic Refresh**: applies the mapping via pivot + replace_data()
+4. **Headline Writer**: analyzes refreshed data, writes data-grounded headline
+
+Two paths:
+- **Connected slides** (have Connector tags): raw PivotConfig + MappingConfig
+  for exact Connector fidelity. Tables refresh from Synapse using tag configs.
+- **Non-connected slides** (no tags): LLM interprets slide layout and data
+  to determine mappings. Same deterministic refresh engine.
+
 ### Auth Resolution
 
 ```
@@ -175,6 +206,7 @@ galen-consulting-r3m-report/
 │   ├── synapse_auth.py              # Auth (API key + JWT + MSAL)
 │   ├── slide_refresher.py           # Clone + in-place refresh
 │   ├── slide_creator.py             # Spec -> slide renderer
+│   ├── intelligent_refresh.py       # Slide reader + refresh engine for LLM-interpreted pipeline
 │   ├── pptx_utils/                  # composition primitives
 │   │   ├── brand.py                 # 102 clients, 33 brand palettes
 │   │   ├── charts.py                # 15 chart patterns
@@ -196,12 +228,13 @@ galen-consulting-r3m-report/
 │   ├── creation/                    # slide-creator, headline-writer, deck-assembler
 │   ├── planning/                    # viz-selector, layout-selector, slide-plan generators
 │   ├── projects/                    # pet-deck (276 decks), atu-deck (143 decks)
-│   └── workflows/                   # 8 top-level orchestrators
+│   └── workflows/                   # 8 top-level orchestrators (incl. refresh-deck-workflow)
 │
 ├── experiments/deck_analysis/       # 905-deck mass grounding exercise
 ├── tests/
-│   ├── test_spec_refresh_pipeline.py  # ★ 3-stage spec-driven refresh test
-│   ├── test_nonconnected_refresh.py   # non-connected inference prototype
+│   ├── test_spec_refresh_pipeline.py  # ★ 3-stage connected refresh test (122 charts, 60 tables)
+│   ├── test_intelligent_refresh.py    # ★ Two-phase non-connected refresh (Claude Code interpreted)
+│   ├── test_nonconnected_refresh.py   # Non-connected inference prototype (mechanical)
 │   └── test_synapse_*.py             # Synapse integration tests
 ├── projects/                        # gitignored, shared via OneDrive
 ├── docs/                            # PRDs + setup guides
@@ -221,6 +254,8 @@ galen-consulting-r3m-report/
 | **Series-name inference** | For non-connected slides, chart series names from OOXML matched against Synapse column values to infer DataTransform. |
 | **Split visualization** | Connector's `rowsPerObject` + `SPLITORDER` splits one pivot dataset across multiple chart shapes. Each shape gets 1 row. |
 | **Two-pass model** | Pass 1 (automatic): layout + components from PPTX. Pass 2 (data lineage): from Connector tags or Synapse catalog matching. |
+| **Intelligent interpretation** | Claude Code reads spatial layout to determine data mappings — group shape labels, position-based component grouping, segment filter inference. |
+| **Headline grounding** | Headlines written from refreshed data, not copied from source. Ensures no stale headlines survive a data refresh. |
 
 ---
 
@@ -234,13 +269,15 @@ galen-consulting-r3m-report/
 - Synapse API key auth (no manual token pasting)
 - 22 slide type renderers, 20 canonical example specs
 - 8 workflow orchestrator skills, 40 total skills
+- Connected table refresh from Synapse (60/60 tables, no longer source-restored)
+- Intelligent refresh prototype (spatial label interpretation)
 
 **In progress:**
+- Headline writer grounded on refreshed data
+- End-to-end slide-refresh skill
 - Non-connected slide refresh (full flow with segment inference)
-- Table data refresh from Synapse (currently restored from source)
 - Remaining 2 UAT slides (pre-filtered empty-category edge case)
 
 **Next:**
 - End-to-end dogfooding on production PET + ATU decks
 - config.yaml generation from slide specs
-- Headline refresh using headline-writer skill with fresh data

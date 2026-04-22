@@ -696,6 +696,76 @@ Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16)
 
 **Why this is explicit:** a previous iteration of `slide-updater` preserved headlines by default. That was wrong. Data + stale headline is the most visible kind of error in a client-ready deck and the hardest to spot in QA because the chart looks fine.
 
+### 6.11 Intelligent Refresh Pipeline
+
+For slides without Connector tags — and as a general-purpose refresh path for any deck — an LLM-interpreted pipeline replaces the tag-dependent Connector model. The pipeline has four deterministic stages with one intelligent interpretation step in the middle.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. SLIDE READER (deterministic)                                 │
+│     Extracts all visual context from OOXML:                      │
+│     - Charts: type, series names, categories, values             │
+│     - Tables: headers, row data, cell positions                  │
+│     - Text boxes: content, position, font styling                │
+│     - Group shape labels: text near chart/table components        │
+│     All with absolute positions (left, top, width, height)       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. CLAUDE CODE INTERPRETATION (intelligent)                     │
+│     Reads spatial layout from the slide reader output:           │
+│     - Which labels are near which charts (position grouping)     │
+│     - Per-component segment filters inferred from group labels   │
+│     - Data field mappings (series → Synapse columns)             │
+│     - Category axis semantics (brands, time periods, metrics)    │
+│     Produces: mapping.json + lineage.json                        │
+└──────────────────────────┬──────────────────────────────────────┘
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. DETERMINISTIC REFRESH                                        │
+│     Fetches data from Synapse using lineage identifiers          │
+│     Applies pivot via PivotConfig + MappingConfig                │
+│     Calls replace_data() on cloned deck — preserves formatting   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. HEADLINE WRITER (intelligent)                                │
+│     Analyzes refreshed data (new values, deltas, trends)         │
+│     Writes data-grounded headline following PET deck conventions │
+│     Never copies headline from source — always freshly derived   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Connected vs. non-connected paths:**
+
+| Path | Tag status | Interpretation | Refresh engine |
+|------|-----------|---------------|---------------|
+| **Connected** | Connector tags present | Not needed — raw PivotConfig + MappingConfig extracted from Custom XML Parts | Deterministic pivot + replace_data(). Tables refresh from Synapse using tag configs (60/60 tables verified). |
+| **Non-connected** | No tags | Claude Code reads spatial layout: group shape labels, position-based component grouping, segment filter inference | Same deterministic refresh engine. Mapping derived from LLM interpretation rather than tags. |
+
+Both paths converge at the same deterministic refresh engine (step 3). The difference is only in how the mapping is obtained — from tags (connected) or from LLM interpretation (non-connected).
+
+**Spatial layout interpretation:**
+
+The key insight is that PET decks use a consistent spatial convention: group shape labels (e.g., "Academic", "Community", "High Impact") sit above or beside their associated chart components. The slide reader extracts positions for every element; Claude Code then uses proximity to determine which labels govern which charts, inferring per-component segment filters without any tag dependency.
+
+This handles split-visualization slides (multiple charts from one dataset, each showing a segment cut), side-by-side brand comparisons, and multi-panel layouts — all patterns common in the 905-deck corpus.
+
+**Headline writing from refreshed data:**
+
+Per §6.10, headlines must refresh with data. The headline writer receives the refreshed chart data (new values, prior values, deltas) and writes a headline grounded in the actual numbers. PET deck conventions are followed: directional language ("up", "dipped"), percentage-point deltas, and brand-relative framing. The writer never copies the source deck's headline — it derives a fresh one every time.
+
+**Claude Code as orchestration + interpretation layer:**
+
+Claude Code plays two roles in this pipeline:
+1. **Orchestrator** — invokes the slide reader, interprets the output, calls the refresh engine, invokes the headline writer. The end-to-end flow is managed by `.claude/skills/workflows/refresh-deck-workflow/`.
+2. **Interpreter** — the intelligent step (step 2) where spatial layout is read and data mappings are inferred. This is the only non-deterministic step; everything else is pure Python.
+
+**Module:** `slidegen/intelligent_refresh.py` — slide reader + refresh engine CLI.
+**Skill:** `.claude/skills/workflows/refresh-deck-workflow/` — end-to-end orchestration (connected + non-connected).
+
 \---
 
 ## 7. What We Keep vs. What We Discard
