@@ -1,0 +1,379 @@
+{
+  "deck": "CREON Share of Voice Study - W33.pptx",
+  "totals": {
+    "total_slides": 91,
+    "total_shapes": 1592,
+    "tagged_shapes": 380,
+    "untagged_shapes": 1212,
+    "custom_xml_parts_found": 132,
+    "report_configs_resolved": 380,
+    "pivot_configs_resolved": 380,
+    "mapping_configs_resolved": 380
+  },
+  "per_slide": {
+    "1": {
+      "tagged": 0,
+      "untagged": 2
+    },
+    "2": {
+      "tagged": 0,
+      "untagged": 1
+    },
+    "3": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "4": {
+      "tagged": 2,
+      "untagged": 28
+    },
+    "5": {
+      "tagged": 0,
+      "untagged": 1
+    },
+    "6": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "7": {
+      "tagged": 0,
+      "untagged": 2
+    },
+    "8": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "9": {
+      "tagged": 8,
+      "untagged": 27
+    },
+    "10": {
+      "tagged": 7,
+      "untagged": 28
+    },
+    "11": {
+      "tagged": 15,
+      "untagged": 11
+    },
+    "12": {
+      "tagged": 15,
+      "untagged": 10
+    },
+    "13": {
+      "tagged": 15,
+      "untagged": 10
+    },
+    "14": {
+      "tagged": 0,
+      "untagged": 4
+    },
+    "15": {
+      "tagged": 0,
+      "untagged": 48
+    },
+    "16": {
+      "tagged": 0,
+      "untagged": 47
+    },
+    "17": {
+      "tagged": 0,
+      "untagged": 19
+    },
+    "18": {
+      "tagged": 0,
+      "untagged": 47
+    },
+    "19": {
+      "tagged": 0,
+      "untagged": 39
+    },
+    "20": {
+      "tagged": 0,
+      "untagged": 18
+    },
+    "21": {
+      "tagged": 0,
+      "untagged": 29
+    },
+    "22": {
+      "tagged": 0,
+      "untagged": 29
+    },
+    "23": {
+      "tagged": 0,
+      "untagged": 29
+    },
+    "24": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "25": {
+      "tagged": 5,
+      "untagged": 16
+    },
+    "26": {
+      "tagged": 5,
+      "untagged": 14
+    },
+    "27": {
+      "tagged": 0,
+      "untagged": 12
+    },
+    "28": {
+      "tagged": 0,
+      "untagged": 11
+    },
+    "29": {
+      "tagged": 14,
+      "untagged": 12
+    },
+    "30": {
+      "tagged": 15,
+      "untagged": 12
+    },
+    "31": {
+      "tagged": 14,
+      "untagged": 11
+    },
+    "32": {
+      "tagged": 15,
+      "untagged": 11
+    },
+    "33": {
+      "tagged": 0,
+      "untagged": 25
+    },
+    "34": {
+      "tagged": 1,
+      "untagged": 9
+    },
+    "35": {
+      "tagged": 1,
+      "untagged": 8
+    },
+    "36": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "37": {
+      "tagged": 8,
+      "untagged": 35
+    },
+    "38": {
+      "tagged": 6,
+      "untagged": 17
+    },
+    "39": {
+      "tagged": 6,
+      "untagged": 12
+    },
+    "40": {
+      "tagged": 6,
+      "untagged": 15
+    },
+    "41": {
+      "tagged": 6,
+      "untagged": 12
+    },
+    "42": {
+      "tagged": 6,
+      "untagged": 12
+    },
+    "43": {
+      "tagged": 0,
+      "untagged": 11
+    },
+    "44": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "45": {
+      "tagged": 1,
+      "untagged": 18
+    },
+    "46": {
+      "tagged": 6,
+      "untagged": 36
+    },
+    "47": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "48": {
+      "tagged": 2,
+      "untagged": 8
+    },
+    "49": {
+      "tagged": 5,
+      "untagged": 8
+    },
+    "50": {
+      "tagged": 3,
+      "untagged": 13
+    },
+    "51": {
+      "tagged": 0,
+      "untagged": 13
+    },
+    "52": {
+      "tagged": 0,
+      "untagged": 8
+    },
+    "53": {
+      "tagged": 2,
+      "untagged": 22
+    },
+    "54": {
+      "tagged": 0,
+      "untagged": 1
+    },
+    "55": {
+      "tagged": 0,
+      "untagged": 2
+    },
+    "56": {
+      "tagged": 0,
+      "untagged": 54
+    },
+    "57": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "58": {
+      "tagged": 0,
+      "untagged": 12
+    },
+    "59": {
+      "tagged": 0,
+      "untagged": 3
+    },
+    "60": {
+      "tagged": 14,
+      "untagged": 14
+    },
+    "61": {
+      "tagged": 14,
+      "untagged": 9
+    },
+    "62": {
+      "tagged": 14,
+      "untagged": 9
+    },
+    "63": {
+      "tagged": 14,
+      "untagged": 12
+    },
+    "64": {
+      "tagged": 14,
+      "untagged": 8
+    },
+    "65": {
+      "tagged": 14,
+      "untagged": 8
+    },
+    "66": {
+      "tagged": 14,
+      "untagged": 9
+    },
+    "67": {
+      "tagged": 14,
+      "untagged": 9
+    },
+    "68": {
+      "tagged": 14,
+      "untagged": 8
+    },
+    "69": {
+      "tagged": 14,
+      "untagged": 11
+    },
+    "70": {
+      "tagged": 14,
+      "untagged": 8
+    },
+    "71": {
+      "tagged": 14,
+      "untagged": 8
+    },
+    "72": {
+      "tagged": 7,
+      "untagged": 13
+    },
+    "73": {
+      "tagged": 7,
+      "untagged": 8
+    },
+    "74": {
+      "tagged": 7,
+      "untagged": 8
+    },
+    "75": {
+      "tagged": 0,
+      "untagged": 2
+    },
+    "76": {
+      "tagged": 0,
+      "untagged": 5
+    },
+    "77": {
+      "tagged": 0,
+      "untagged": 5
+    },
+    "78": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "79": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "80": {
+      "tagged": 0,
+      "untagged": 5
+    },
+    "81": {
+      "tagged": 0,
+      "untagged": 5
+    },
+    "82": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "83": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "84": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "85": {
+      "tagged": 0,
+      "untagged": 7
+    },
+    "86": {
+      "tagged": 0,
+      "untagged": 7
+    },
+    "87": {
+      "tagged": 0,
+      "untagged": 7
+    },
+    "88": {
+      "tagged": 0,
+      "untagged": 19
+    },
+    "89": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "90": {
+      "tagged": 0,
+      "untagged": 27
+    },
+    "91": {
+      "tagged": 0,
+      "untagged": 24
+    }
+  }
+}
