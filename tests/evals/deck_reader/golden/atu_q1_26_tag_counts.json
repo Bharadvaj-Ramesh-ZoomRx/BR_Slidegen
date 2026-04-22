@@ -1,0 +1,411 @@
+{
+  "deck": "ZoomRx_UC_ATU_Report_Q1_'26.pptx",
+  "totals": {
+    "total_slides": 99,
+    "total_shapes": 1813,
+    "tagged_shapes": 199,
+    "untagged_shapes": 1614,
+    "custom_xml_parts_found": 111,
+    "report_configs_resolved": 197,
+    "pivot_configs_resolved": 197,
+    "mapping_configs_resolved": 199
+  },
+  "per_slide": {
+    "1": {
+      "tagged": 0,
+      "untagged": 2
+    },
+    "2": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "3": {
+      "tagged": 0,
+      "untagged": 13
+    },
+    "4": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "5": {
+      "tagged": 6,
+      "untagged": 26
+    },
+    "6": {
+      "tagged": 5,
+      "untagged": 42
+    },
+    "7": {
+      "tagged": 3,
+      "untagged": 26
+    },
+    "8": {
+      "tagged": 3,
+      "untagged": 10
+    },
+    "9": {
+      "tagged": 5,
+      "untagged": 12
+    },
+    "10": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "11": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "12": {
+      "tagged": 0,
+      "untagged": 20
+    },
+    "13": {
+      "tagged": 0,
+      "untagged": 21
+    },
+    "14": {
+      "tagged": 0,
+      "untagged": 20
+    },
+    "15": {
+      "tagged": 8,
+      "untagged": 42
+    },
+    "16": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "17": {
+      "tagged": 8,
+      "untagged": 37
+    },
+    "18": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "19": {
+      "tagged": 0,
+      "untagged": 10
+    },
+    "20": {
+      "tagged": 0,
+      "untagged": 8
+    },
+    "21": {
+      "tagged": 0,
+      "untagged": 8
+    },
+    "22": {
+      "tagged": 0,
+      "untagged": 8
+    },
+    "23": {
+      "tagged": 1,
+      "untagged": 10
+    },
+    "24": {
+      "tagged": 1,
+      "untagged": 10
+    },
+    "25": {
+      "tagged": 3,
+      "untagged": 16
+    },
+    "26": {
+      "tagged": 2,
+      "untagged": 16
+    },
+    "27": {
+      "tagged": 2,
+      "untagged": 25
+    },
+    "28": {
+      "tagged": 2,
+      "untagged": 22
+    },
+    "29": {
+      "tagged": 5,
+      "untagged": 19
+    },
+    "30": {
+      "tagged": 6,
+      "untagged": 42
+    },
+    "31": {
+      "tagged": 0,
+      "untagged": 39
+    },
+    "32": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "33": {
+      "tagged": 8,
+      "untagged": 24
+    },
+    "34": {
+      "tagged": 0,
+      "untagged": 19
+    },
+    "35": {
+      "tagged": 1,
+      "untagged": 18
+    },
+    "36": {
+      "tagged": 1,
+      "untagged": 18
+    },
+    "37": {
+      "tagged": 5,
+      "untagged": 16
+    },
+    "38": {
+      "tagged": 6,
+      "untagged": 18
+    },
+    "39": {
+      "tagged": 6,
+      "untagged": 18
+    },
+    "40": {
+      "tagged": 2,
+      "untagged": 10
+    },
+    "41": {
+      "tagged": 2,
+      "untagged": 20
+    },
+    "42": {
+      "tagged": 2,
+      "untagged": 21
+    },
+    "43": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "44": {
+      "tagged": 12,
+      "untagged": 20
+    },
+    "45": {
+      "tagged": 0,
+      "untagged": 21
+    },
+    "46": {
+      "tagged": 3,
+      "untagged": 21
+    },
+    "47": {
+      "tagged": 3,
+      "untagged": 21
+    },
+    "48": {
+      "tagged": 5,
+      "untagged": 16
+    },
+    "49": {
+      "tagged": 6,
+      "untagged": 18
+    },
+    "50": {
+      "tagged": 6,
+      "untagged": 18
+    },
+    "51": {
+      "tagged": 3,
+      "untagged": 11
+    },
+    "52": {
+      "tagged": 3,
+      "untagged": 11
+    },
+    "53": {
+      "tagged": 3,
+      "untagged": 11
+    },
+    "54": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "55": {
+      "tagged": 3,
+      "untagged": 12
+    },
+    "56": {
+      "tagged": 3,
+      "untagged": 9
+    },
+    "57": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "58": {
+      "tagged": 4,
+      "untagged": 18
+    },
+    "59": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "60": {
+      "tagged": 3,
+      "untagged": 20
+    },
+    "61": {
+      "tagged": 3,
+      "untagged": 34
+    },
+    "62": {
+      "tagged": 3,
+      "untagged": 18
+    },
+    "63": {
+      "tagged": 3,
+      "untagged": 35
+    },
+    "64": {
+      "tagged": 3,
+      "untagged": 36
+    },
+    "65": {
+      "tagged": 0,
+      "untagged": 23
+    },
+    "66": {
+      "tagged": 0,
+      "untagged": 23
+    },
+    "67": {
+      "tagged": 0,
+      "untagged": 29
+    },
+    "68": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "69": {
+      "tagged": 5,
+      "untagged": 14
+    },
+    "70": {
+      "tagged": 5,
+      "untagged": 15
+    },
+    "71": {
+      "tagged": 3,
+      "untagged": 14
+    },
+    "72": {
+      "tagged": 2,
+      "untagged": 11
+    },
+    "73": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "74": {
+      "tagged": 2,
+      "untagged": 10
+    },
+    "75": {
+      "tagged": 2,
+      "untagged": 28
+    },
+    "76": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "77": {
+      "tagged": 0,
+      "untagged": 19
+    },
+    "78": {
+      "tagged": 0,
+      "untagged": 19
+    },
+    "79": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "80": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "81": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "82": {
+      "tagged": 0,
+      "untagged": 9
+    },
+    "83": {
+      "tagged": 2,
+      "untagged": 10
+    },
+    "84": {
+      "tagged": 2,
+      "untagged": 9
+    },
+    "85": {
+      "tagged": 3,
+      "untagged": 6
+    },
+    "86": {
+      "tagged": 2,
+      "untagged": 8
+    },
+    "87": {
+      "tagged": 1,
+      "untagged": 22
+    },
+    "88": {
+      "tagged": 0,
+      "untagged": 6
+    },
+    "89": {
+      "tagged": 0,
+      "untagged": 11
+    },
+    "90": {
+      "tagged": 0,
+      "untagged": 7
+    },
+    "91": {
+      "tagged": 0,
+      "untagged": 21
+    },
+    "92": {
+      "tagged": 0,
+      "untagged": 10
+    },
+    "93": {
+      "tagged": 0,
+      "untagged": 4
+    },
+    "94": {
+      "tagged": 0,
+      "untagged": 14
+    },
+    "95": {
+      "tagged": 0,
+      "untagged": 18
+    },
+    "96": {
+      "tagged": 0,
+      "untagged": 18
+    },
+    "97": {
+      "tagged": 0,
+      "untagged": 14
+    },
+    "98": {
+      "tagged": 0,
+      "untagged": 18
+    },
+    "99": {
+      "tagged": 0,
+      "untagged": 18
+    }
+  }
+}
