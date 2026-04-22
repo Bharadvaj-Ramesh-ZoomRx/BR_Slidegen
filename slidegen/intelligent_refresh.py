@@ -34,7 +34,7 @@ import requests
 import yaml
 from dotenv import load_dotenv
 from pptx import Presentation
-from pptx.chart.data import CategoryChartData
+from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -946,6 +946,16 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
         slide_results = {"slide_index": si, "charts": [], "tables": []}
 
+        # Convert DataFrame to records once per slide (used by raw config path)
+        records_list = df.to_dict("records")
+
+        # Read static_time_period_names — check slide-level first, then data source
+        lineage = data_sources.get(ds_key, {})
+        lin_raw_static_names = (
+            slide_spec.get("static_time_period_names")
+            or lineage.get("static_time_period_names")
+        )
+
         for comp in slide_spec.get("components", []):
             name = comp.get("name", "")
             ctype = comp.get("type", "")
@@ -954,6 +964,163 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 slide_results["tables"].append({"name": name, "status": "static_skipped"})
                 continue
 
+            raw_pc = comp.get("raw_pivot_config")
+            raw_mc = comp.get("raw_mapping_config")
+
+            # ── RAW CONNECTOR PATH ──
+            # When a component has raw_pivot_config + raw_mapping_config at the
+            # top level, use pivot_records_to_chart_data() for exact Connector
+            # fidelity.  This handles connected slides.
+            if raw_pc and raw_mc:
+                from slidegen.synapse_chart_mapper import pivot_records_to_chart_data
+
+                static_names = lin_raw_static_names
+                chart_pattern = comp.get("chart_pattern", "")
+                split_order = comp.get("split_order")
+                rows_per_object = comp.get("rows_per_object")
+                top_n_rows = comp.get("top_n_rows")
+
+                if ctype == "chart":
+                    shape = chart_shapes.get(name)
+                    if not shape:
+                        slide_results["charts"].append({"name": name, "status": "not_found"})
+                        continue
+
+                    try:
+                        chart_data = pivot_records_to_chart_data(
+                            records_list, raw_pc, raw_mc,
+                            static_time_period_names=static_names,
+                            chart_pattern=chart_pattern,
+                            split_order=split_order,
+                            rows_per_object=rows_per_object,
+                            top_n_rows=top_n_rows,
+                        )
+
+                        if not chart_data.success or not chart_data.categories:
+                            slide_results["charts"].append({
+                                "name": name, "status": "empty",
+                                "error": chart_data.error,
+                            })
+                            continue
+
+                        cats = chart_data.categories
+                        series_data = chart_data.series
+
+                        # Reorder categories to match source chart's order
+                        # (pivot may return alphabetical; source has Connector's order)
+                        try:
+                            src_chart = None
+                            for ss in src_prs.slides[si].shapes:
+                                if ss.has_chart and ss.name == name:
+                                    src_chart = ss
+                                    break
+                            if src_chart:
+                                src_cats = [str(c) for c in src_chart.chart.plots[0].categories]
+                                if set(src_cats) == set(cats) and src_cats != cats:
+                                    order = [cats.index(sc) for sc in src_cats if sc in cats]
+                                    if len(order) == len(cats):
+                                        cats = [cats[i] for i in order]
+                                        series_data = [(n, [v[i] for i in order])
+                                                       for n, v in series_data]
+                        except Exception:
+                            pass
+
+                        # Save formatCodes from source chart BEFORE replace_data
+                        src_fmts = [
+                            fc.text for fc in shape.chart._chartSpace.iter(
+                                f"{{{ns_c}}}formatCode")
+                        ]
+
+                        # Build chart data object
+                        chart_type_str = chart_pattern
+                        if "scatter" in chart_type_str or "xy_" in chart_type_str:
+                            # XY scatter / abacus: sort by first series value desc
+                            cd = XyChartData()
+                            n_cats = len(cats)
+                            if series_data and series_data[0][1]:
+                                order = sorted(
+                                    range(n_cats),
+                                    key=lambda i: (series_data[0][1][i]
+                                                   if i < len(series_data[0][1]) else 0),
+                                    reverse=True,
+                                )
+                            else:
+                                order = list(range(n_cats))
+                            for sname, vals in series_data:
+                                s = cd.add_series(sname)
+                                for rank, oi in enumerate(order):
+                                    x_val = round(vals[oi], 2) if oi < len(vals) else 0.0
+                                    y_val = float(n_cats - rank)
+                                    s.add_data_point(x_val, y_val)
+                        else:
+                            # Standard CategoryChartData
+                            cd = CategoryChartData()
+                            cd.categories = cats
+                            for sname, vals in series_data:
+                                cd.add_series(sname, [round(v, 2) for v in vals])
+
+                        shape.chart.replace_data(cd)
+
+                        # Restore formatCodes from source (replace_data resets them)
+                        for i, fc_el in enumerate(
+                            shape.chart._chartSpace.iter(f"{{{ns_c}}}formatCode")
+                        ):
+                            if i < len(src_fmts):
+                                fc_el.text = src_fmts[i]
+
+                        slide_results["charts"].append({
+                            "name": name, "status": "ok",
+                            "categories": len(cats), "series": len(series_data),
+                            "mode": "raw_connector",
+                        })
+                    except Exception as e:
+                        slide_results["charts"].append({
+                            "name": name, "status": "error", "error": str(e),
+                            "mode": "raw_connector",
+                        })
+
+                elif ctype in ("value_table", "label_table"):
+                    shape = table_shapes.get(name)
+                    if not shape:
+                        slide_results["tables"].append({"name": name, "status": "not_found"})
+                        continue
+
+                    tbl = shape.table
+
+                    # For connected tables, restore from source (reliable).
+                    # Table refresh from pivot configs is complex and fragile
+                    # across table types. Charts are the high-value refresh target.
+                    try:
+                        src_tbl_shape = None
+                        for s2 in src_prs.slides[si].shapes:
+                            if s2.has_table and s2.name == name:
+                                src_tbl_shape = s2
+                                break
+                        if src_tbl_shape:
+                            src_tbl = src_tbl_shape.table
+                            for r in range(min(len(src_tbl.rows), len(tbl.rows))):
+                                for c in range(min(len(src_tbl.columns), len(tbl.columns))):
+                                    _write_cell_text(
+                                        tbl.cell(r, c),
+                                        src_tbl.cell(r, c).text.strip(),
+                                    )
+                            slide_results["tables"].append({
+                                "name": name, "status": "ok", "mode": "source_restore",
+                            })
+                        else:
+                            slide_results["tables"].append({
+                                "name": name, "status": "no_source",
+                            })
+                    except Exception as e2:
+                        slide_results["tables"].append({
+                            "name": name, "status": "error", "error": str(e2),
+                        })
+
+                continue  # skip to next component
+
+            # ── INTERPRETED MAPPING PATH ──
+            # When a component has data_mapping with row_field/series_column/value_field,
+            # use the existing pandas-based pivot logic (non-connected slides).
             dm = comp.get("data_mapping", {})
             if not dm:
                 continue
