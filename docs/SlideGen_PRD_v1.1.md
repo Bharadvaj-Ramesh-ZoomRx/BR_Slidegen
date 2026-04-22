@@ -23,6 +23,8 @@ SlideGen is a **library of composable skills + a robust `pptx_utils` Python pack
 
 **Key design insight (Apr 14):** Get the slide specification right with intelligent skills UP FRONT, then let deterministic rendering (via `pptx_utils`) produce perfect slides every time. Intelligence flows INTO the spec; deterministic code reads the spec.
 
+**Working pipeline (Apr 22):** The intelligent refresh pipeline is operational. A single spec JSON per deck (same name as the PPTX) carries a `data_sources` catalog and per-slide component mappings. Connected slides use raw Connector configs for exact fidelity (126/126 charts refresh, 0 errors on 29-slide UAT deck). Non-connected slides use Claude Code interpretation — reads spatial layout (group shape labels, position proximity), determines per-component segment filters and data mappings. The PPTX carries an embedded config (Custom XML Part) that survives PowerPoint edits and auto-reconciles spec.json when slides are reordered, added, or deleted. Headlines are written from refreshed data, not copied from source.
+
 By end of Q3, this should work for all major project types (PET, ATU, PCA, HCP-Pt, Digital Trackers) and demonstrate enough versatility that consulting leadership can engage with FY27 staffing decisions.
 
 **Deck analysis grounding:** Reverse-engineering of **905 decks across 96 pharma clients** (50,072 charts, 50,303 tables, 36,914 slides) covering 2025+2026. By project type: 276 PET, 143 ATU, 83 HCP-Pt, 50 Qualitative, 27 PCA, 26 Digital Tracker, 7 MaxDiff, 5 SOV. This corpus directly populates `BRAND{}` (33 brands + 102 client entries), `CHART_PATTERNS{}` (15 patterns), `LAYOUTS{}` (14 presets), and per-project-type profiles that ground the project skills. See §6.6 for findings; see `experiments/deck_analysis/outputs/mass_scan_summary.md` for the full corpus summary.
@@ -182,8 +184,21 @@ Derived from Sriram's Apr 14 "hypothetical workflows" exercise + a MECE audit ag
 
 ### Workflow 2: Refresh deck — `refresh-deck-workflow`
 
-**Input:** Prior period's deck (PPTX), new period's data, any client feedback.
-**Output:** Next period's deck that preserves narrative continuity from prior period (same slides with refreshed data + deltas highlighted; new slides where warranted; old slides deleted where data is gone). For PET/tracker projects this is the wave refresh; for others it's any multi-slide data refresh.
+**Input:** Source PPTX + spec JSON (same name, e.g. `deck.json` beside `deck.pptx`).
+**Output:** `Output_deck.pptx` — refreshed deck with all charts updated from Synapse.
+
+**Actual implementation (working):**
+1. `embed-config` — scans PPTX, writes lightweight slide manifest as Custom XML Part
+2. `read --slide N` — extracts visual context for Claude Code interpretation (non-connected slides only)
+3. Claude Code interprets spatial layout → writes component mappings into spec.json
+4. `refresh-deck --spec deck.json` — reconciles embedded config against spec, fetches data per data_source (cached), refreshes all slides using dual-mode engine:
+   - **Raw Connector path:** `pivot_records_to_chart_data()` with raw PivotConfig + MappingConfig
+   - **Interpreted mapping path:** pandas pivot with segment_filter, series_column, category_order
+5. `headline --slide N --text "..."` — writes data-grounded headline following PET conventions
+
+**Module:** `slidegen/intelligent_refresh.py`
+**Spec builder:** `tests/build_full_spec.py`
+**Skill:** `.claude/skills/workflows/refresh-deck-workflow/SKILL.md`
 
 ### Workflow 3: Edit slide — `edit-slide-workflow`
 
@@ -258,7 +273,7 @@ Status legend: ✅ Exists · 🔧 Needs refactor · 🆕 New
 |`synapse-read`|🔧|Pull reports, segments, raw data, banner plans. Needs wrapping around Rajesh's Synapse CLI as tool|
 |`hashtag-benchmarks`|🆕|Pull industry benchmarks by metric + therapy area from Hashtag|
 |`raw-data-aggregator`|✅|Aggregate respondent-level data (top2box, yes_pct, etc.)|
-|`deck-reader`|🆕|Parse existing PPTX — slides, shapes, data lineage, structure, visualization types. **Dual-mode**: for shapes authored via Galen-PowerPoint Connector, reads `ReportConfigHash` shape tag → Custom XML Part for canonical Synapse lineage (Project/ReportingPlan/Analysis/Segment IDs). For untagged shapes, falls back to structural inference from headline + chart pattern + data shape, with user confirmation. See §6.8.|
+|`deck-reader`|🆕|Parse existing PPTX — slides, shapes, data lineage, structure, visualization types. **Dual-mode**: for shapes authored via Galen-PowerPoint Connector, reads `ReportConfigHash` shape tag → Custom XML Part for canonical Synapse lineage (Project/ReportingPlan/Analysis/Segment IDs). For untagged shapes, falls back to structural inference from headline + chart pattern + data shape, with user confirmation. See §6.3.|
 |`excel-indexer`|✅|Parse aggregated Excel data (banner plan export) into structured JSON|
 
 ### 4.2 Planning Skills
@@ -478,22 +493,24 @@ In practice: SlideSpec path for all workflow-driven operations; direct Python pa
 
 That's it. No hidden slides, no canonicals, no per-client rendering setup.
 
-### 6.3 Specification as Contract
+### 6.3 SlideSpec Architecture
 
-The slide plan is the contract between intelligent skills and deterministic skills. A complete spec includes:
+**The spec is CONFIG, not DATA.** SlideSpec v1.2 stores fetch instructions + render config per component. No chart values, no table text, no category labels. Same spec + new time period = new deck.
 
-* `slide_id`, `slide_type` (one of N chart types)
-* `headline` (talking header)
-* `data`: full values, labels, sort order, codes
-* `formatting`: colors, fonts, layout positions, period labels
-* `extras`: chart-type-specific parameters
-* `data_source`: provenance (which question, which segment, which wave)
-* `spec_completeness`: "complete" | "layout_complete_data_missing" | "partial" (see §6.7 two-pass model)
-* `data_lineage_candidates`: proposed data sources when lineage is unresolved (see §6.7)
+**The spec is the audit layer.** Every component's data provenance is traceable: which Synapse project, which analysis, which segments, which filters, which value field. The spec replaces the Connector as the authority on "where did these numbers come from."
 
-The `spec-validator` skill enforces completeness before rendering. Renderers fail loudly on incomplete specs rather than inventing fallbacks.
+**Two resolution paths for data mappings:**
+1. **Raw Connector configs** — for slides with Synapse Connector tags. `raw_pivot_config` + `raw_mapping_config` stored per component. Exact Connector fidelity.
+2. **Interpreted mappings** — for slides without tags. Claude Code reads the slide layout and writes `data_mapping` with `segment_filter`, `series_column`, `value_field`, `category_order`.
 
-**Specs + config.yaml are the auditability bundle.** Deck, slide specs, and config.yaml should always co-locate in the project's OneDrive folder. They travel together. When you hand off a deck for delivery, the specs + config.yaml travel with it. When a colleague refreshes next wave, they start from the saved specs — not from scratch. Synapse Connector tags are one *way to populate* the spec's data lineage (see §6.8), not a substitute for having specs. Six to twelve months out, every shape-level data connection in the system will flow through the slide spec; Connector tags are a bridge to get there from existing decks. (Sriram, Apr 16)
+Both paths produce the same output: refreshed charts + tables from live Synapse data.
+
+**Spec file convention:**
+- `deck.json` lives beside `deck.pptx` (same name, different extension)
+- Contains `data_sources` catalog (shared across slides) + `slides[]` with per-component mappings
+- Generated by `build_full_spec.py` (from Connector configs) or by Claude Code (from slide interpretation)
+
+**Data lineage lives in the spec, not in config.yaml.** The spec is self-contained — given a spec JSON and a Synapse API key, the refresh pipeline can produce the output deck without any other configuration.
 
 ### 6.4 Claude Code as Harness
 
@@ -554,111 +571,6 @@ A reverse-engineering exercise analyzed every chart, table, headline, and coordi
 
 **Full-corpus regrounding via mass scan.** The 40-deck analysis established the initial baseline. `experiments/deck_analysis/mass_deck_scanner.py` runs the same analysis at 10x scale across 400-500 client decks from the SharePoint archive (organized as `client/project/deck.pptx`). It extracts chart types, layout coordinates, brand colors, headline patterns, and component compositions, then **directly regenerates** `BRAND{}`, `LAYOUTS{}`, and `CHART_PATTERNS{}` Python source from the full corpus — not a delta report, but a complete re-grounding. The generated files replace the current `pptx_utils` modules after review. Sriram (Apr 16): *"When you build bottom up, it will get closer to exhaustive."* The scanner is resumable (saves every 25 decks), classifies decks by project type (PET/ATU/HCP-Pt/Digital Tracker/PCA/etc.) for coverage analysis, and the `experiments/deck_analysis/visual_regression.py` harness measures fidelity after each update.
 
-### 6.7 Slide Spec as the Contract
-
-The slide spec is a first-class artifact — the interface between intelligent planning skills and deterministic renderers. Implemented in `slidegen/slide_spec/`:
-
-* **`slide_spec/schema.py`** — Python dataclasses defining `SlideSpec` and its components (`ChartComponent`, `LabelTableComponent`, `ValueTableComponent`, `DeltaColumnComponent`, `CalloutComponent`, `ImageComponent`, `TextboxComponent`). JSON serde via `load_spec()` / `dump_spec()`.
-* **`slide_spec/validator.py`** — `validate_spec(spec)` returns list of errors; `validate_spec(spec, strict=True)` raises. Checks completeness, layout/pattern/brand existence, color-token syntax, cross-component row-count coherence, position bounds.
-
-**Primary fidelity axes** (in priority order — slide-creator is measured against these):
-
-1. **Layout** — shape positions match observed real-deck clusters (≤0.1" drift). Validated against the 30 coordinate clusters from the Apr 15 deck analysis.
-2. **Visualization** — chart pattern matches one of the 10 `CHART_PATTERNS` keys. Top 6 cover 88% of real charts; these are the hard P0 bar.
-3. **Data** — categories × series shape matches; values render to the exact numeric labels expected.
-4. **Brand colors** — resolvable at render time, *not hardcoded into the schema*. Four resolution sources:
-
-   * Explicit hex: `"#F75824"`
-   * `BRAND{}` token: `"{brand.primary_current}"`
-   * Context file token: `"{context.brand_palette.primary}"` (resolved from `market_context.md` or `project_context.md`)
-   * Deck-reader extraction: `"{deck.slide_4.series_0.color}"` (pulled from a prior wave PPTX by `deck-reader`)
-
-Tokens are resolved by `slide-creator` at render time, not at spec creation time — which means the same spec is portable across brands and refresh cycles without rewriting.
-
-**Why this matters.** Multiple skills can now produce a valid spec from different angles: `slide-plan-generator-hypothesis` from a hypothesis bank, `slide-plan-generator-refresh` from a deck-reader diff, `slide-plan-generator-single` from a single client question. Any valid spec is rendered identically by `slide-creator`. No bespoke glue. No workflow-specific renderer branches.
-
-**Two-pass spec model (v1.1).** When `deck-reader` creates specs from an existing PPTX, it works in two passes:
-
-* **Pass 1 (automatic):** Extracts everything the PPTX itself tells us — headline, chart type, chart data (categories, series values, colors), component positions, table content, layout classification, brand detection from series colors, section classification from headline text. This always completes. The spec is renderable after Pass 1.
-
-* **Pass 2 (data lineage):** Where did the numbers come from? For Synapse-connected shapes, Connector tags provide canonical IDs (`reporting_plan_id`, `analysis_ids`, etc.) and the spec is marked `spec_completeness="complete"`. For unconnected shapes, `deck-reader` cross-references chart categories against `source_data.json` to propose candidates — each with a confidence score and reason — stored in `data_lineage_candidates`. The spec is marked `spec_completeness="layout_complete_data_missing"`. The analyst reviews candidates, picks the right one (or provides their own), and the spec becomes "complete" — ready to freeze into `config.yaml`.
-
-`spec_completeness` values:
-
-* `"complete"` — layout + data lineage both resolved. Renderable AND refreshable.
-* `"layout_complete_data_missing"` — renderable (can re-create the slide from extracted data) but NOT refreshable (don't know where to get new data). Analyst must resolve data lineage before first refresh.
-* `"partial"` — some components could not be extracted. Render will be approximate.
-
-The pipeline never blocks on unresolved lineage. Specs with `"layout_complete_data_missing"` are saved alongside complete ones; the analyst fills gaps asynchronously. A spec with empty data lineage but full component data is still useful — it tells `slide-creator` exactly how to render the slide once someone provides the data source. See `slidegen/slide_spec/schema.py` `DataLineageCandidate` for the candidate structure.
-
-### 6.8 Spec v1.2: Spec as CONFIG, Not DATA
-
-**SlideSpec v1.2** (Apr 18) introduces the spec-as-config model. The spec stores INSTRUCTIONS for fetching and rendering — no data values. Chart categories, series values, table cell text are all fetched fresh from Synapse at refresh time.
-
-**New schema types:**
-* `DataFilter`, `DataTransform`, `SeriesConfig` — source-agnostic data mapping (works for Synapse, Excel, or any tabular source)
-* `ChartDataMapping` — per-chart: transform + series_config + raw Connector configs (raw\_pivot\_config, raw\_mapping\_config)
-* `TableDataMapping` — per-table: column configs with source\_field and header\_template
-* `SegmentRule` — structured segment: rule\_id (API parameter) + rule\_name + values + data\_column
-* Split visualization: `split_order`, `rows_per_object`, `top_n_rows` on ChartDataMapping
-
-**Two resolution paths for chart refresh:**
-1. **Connected slides** (have Connector tags): raw\_pivot\_config + raw\_mapping\_config passed directly to `pivot_records_to_chart_data()` which faithfully replicates the Connector's pivot, column selection, selectedRows filtering, transpose, and sort logic.
-2. **Non-connected slides** (no tags): `infer_data_transform()` in `data_inference.py` matches series names from OOXML against Synapse column values to generate a `DataTransform`. Same refresh pipeline from there.
-
-Both paths produce the same output: a complete spec that drives refresh independently. The Connector becomes a spec-generation accelerator, not a runtime dependency.
-
-**Test pipeline** (`tests/test_spec_refresh_pipeline.py`): 3-stage test — source → dummy deck (zeroed data) → refreshed deck (from Synapse via spec). Verified on 27-slide UAT deck: 25/27 slides visually correct, 60/60 tables, 27/27 headlines.
-
-### 6.8b Data Lineage: SlideSpec as the Long-Term Model
-
-**Long-term vision:** Every deck travels with its slide specs + config.yaml (§6.3). The spec is the authoritative source of data lineage — what analysis, what wave, what segments produced every chart on every slide. This does not depend on the Galen-PowerPoint Connector.
-
-**Short-term bridge:** The existing **Galen-PowerPoint Synapse Connector** already stamps Synapse configuration onto shapes in decks authored through the add-in. SlideGen **leverages these tags as the preferred source of data lineage when bootstrapping specs from existing Connector-tagged decks** — but does not require them, and does NOT trust them blindly. `deck-reader` is two-tier with explicit tag health checks:
-
-**Tier 1 — Trusted tag (preferred).** For shapes carrying a Connector tag that passes all 5 health checks:
-
-* Shape tag `ReportConfigHash` → SHA256 key into a Custom XML Part holding the `ReportConfigDto` JSON
-* The config DTO provides canonical identifiers: `ProjectId`, `ReportingPlanId`, `AnalysisIds\[]`, `SurveyId`, `SegmentIds\[]`, `StaticTimePeriodIds\[]` or `DynamicTimePeriod{LatestNDeliverables, IncludeLiveWave}` (deliverables), `AnalysisType`
-* Additional shape tags: `DataFrameConfigHashTag` (pivot config), `MappingConfig` (field-to-visual mapping), `LastRefreshTime`, `ColumnKeyLabelMap`, `RefreshErrorMsgTag`
-* These fields populate `DataLineage` directly — no inference required
-
-**Tag health check (5 steps)** — any failure routes the shape through Tier 2:
-
-1. Custom XML Part resolves (hash → parseable JSON)
-2. Synapse IDs still exist (reporting plan, analyses, segments, deliverables resolve today)
-3. DTO schema compatible with current Python dataclass (no legacy incompatibilities)
-4. Structural consistency — returned data shape matches chart's current dimensions (±1 row / ±1 column tolerance)
-5. Mapping plausibility — `MappingConfig` field names match actual chart data binding
-
-**Tier 2 — Structural inference (fallback).** For untagged shapes AND shapes whose tag failed any health check:
-
-* Parses headline text, chart pattern, category labels, and embedded table content
-* Cross-references against project config (`config.yaml`, `source_data.json`) to propose likely extraction method + question codes
-* Surfaces inference confidence with the spec; user confirmation only on `confidence="low"` inferences (driven by inference quality, NOT tag status)
-* Writes best-effort `DataLineage` into legacy fields (`data_source`, `extraction_method`, `question_codes`, `source_file`)
-* Failed-tag content preserved in `metadata.original_tag_lineage` for audit trail (not used for refresh)
-
-**Why two tiers, not three.** An earlier design had a "suspect" middle tier that required user confirmation per unhealthy tag. That's unusable in practice — a 40-slide deck with 10 suspect tags means 10 confirmations before refresh starts. Worse, tag-suspect cases are the ones where the chart has been manually edited — Tier 2 inference from the chart's actual content is a better source than a lineage the chart has drifted from.
-
-**Why blind-trust is dangerous.** Stale tags can point to analyses that have since been deleted, reporting plans that no longer exist, or data shapes that don't match the chart after manual editing. Galen-PowerPoint users have seen refreshes destroy chart layouts when refreshing against such tags. SlideGen must not repeat that failure mode.
-
-**User overrides:**
-
-* `--trust-tags` — skip health checks 2-5 (keep check 1 for parseability); use every parseable tag as Tier 1
-* `--ignore-tags` — bypass Tier 1 entirely; every shape goes through Tier 2
-
-**Why not rely on tags alone.** Not every existing deck was produced through the Connector. Older decks, manually-edited slides, and decks from other tools coexist with tagged decks in a typical client workspace. The two-tier design means every refresh workflow works against any deck while still getting the auditability benefits where the tags exist AND pass validation.
-
-**Refresh workflow implications:**
-
-* **Tier 1 path**: deterministic — `deck-reader` → `DataLineage` with `reporting_plan_id`+`analysis_ids` → `synapse-cli` fetches new data → `slide-updater` re-renders → tags updated with new `LastRefreshTime`
-* **Tier 2 path**: best-effort — `deck-reader` → inferred `DataLineage` with `question_codes`+`source_file` → Excel extraction via existing `data_loaders` → `slide-updater` re-renders → user shown before/after for confirmation
-
-**Audit trail.** Every refreshed slide (either tier) ends up with `last_data_pull` (and `last_refresh_error` if applicable) in its spec lineage, mirroring the Connector's `LastRefreshTime`/`RefreshErrorMsgTag` pattern. The `shape_registry.json` + spec together form the audit record.
-
-See Galen-PowerPoint repo: `Docs/Export Import Tags - PRD.md` (Connector DTO-to-Excel column mapping), `Constants.cs` (shape tag constants), `Services/ShapeConfigurationServiceBase.cs` (hash-based config read). Reference these when implementing `deck-reader` Tier 1.
-
 ### 6.9 Evals Strategy
 
 Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16): *"The bottlenecks you'll run into are testing, which you solve by solving evals, and the number of skills you need."* Without evals, every change requires manual verification — which doesn't scale once contributors across multiple project teams are landing skills simultaneously.
@@ -696,59 +608,16 @@ Sriram identified evals as the first major bottleneck SlideGen will hit (Apr 16)
 
 **Why this is explicit:** a previous iteration of `slide-updater` preserved headlines by default. That was wrong. Data + stale headline is the most visible kind of error in a client-ready deck and the hardest to spot in QA because the chart looks fine.
 
-### 6.11 Intelligent Refresh Pipeline
+### 6.11 Embedded Config and Spec Reconciliation
 
-A single spec JSON per deck drives the entire refresh. Dual-mode engine handles both Connector-tagged (connected) and non-tagged (non-connected) slides in one pass.
+The PPTX carries a lightweight config as a Custom XML Part (namespace: `http://slidegen.zoomrx.com/config`). This manifest lists slide IDs, component names, and data_source assignments.
 
-**File convention:**
-```
-deck.pptx          ← source deck (carries embedded config as Custom XML Part)
-deck.json          ← spec (same name) — data_sources catalog + per-slide mappings
-Output_deck.pptx   ← refreshed output
-```
+**Why embedded:** When an analyst edits the deck in PowerPoint (reorder, add, delete slides), the embedded config travels with the PPTX. On next refresh, `reconcile_spec_with_config()` diffs the embedded config against spec.json — corrects slide indices for reordered slides, flags added slides for interpretation, removes deleted slides.
 
-**Spec structure — no data values, only instructions:**
-```json
-{
-  "data_sources": {
-    "repatha_atu": {"project_id": 1428, "reporting_plan_id": 1139, "analysis_ids": [545991], ...}
-  },
-  "slides": [
-    {"slide_index": 4, "data_source": "repatha_atu", "static_time_period_names": ["Q1'26"],
-     "components": [
-       {"type": "chart", "name": "CARD",
-        "raw_pivot_config": {...}, "raw_mapping_config": {...}},
-       {"type": "table", "name": "Message Table", "static": true}
-     ]}
-  ]
-}
-```
+**CLI:** `python -m slidegen.intelligent_refresh embed-config --pptx deck.pptx`
+**Read:** `python -m slidegen.intelligent_refresh show-config --pptx deck.pptx`
 
-**Dual-mode engine:**
-
-| Mode | When | How |
-|------|------|-----|
-| **Raw Connector** | Component has `raw_pivot_config` + `raw_mapping_config` | `pivot_records_to_chart_data()` — proven Connector-faithful pivot with selectedColumns, selectedRows, transpose, split viz, CustomList sort |
-| **Interpreted mapping** | Component has `data_mapping` with `segment_filter`, `series_column`, etc. | Claude Code reads slide layout, writes mapping. Pandas-based pivot with explicit category ordering |
-
-Both modes share: Synapse data fetch (cached per data_source), `replace_data()` execution, formatCode restoration, source category reordering.
-
-**Embedded config (Custom XML Part in PPTX):**
-
-The PPTX carries a lightweight manifest — slide IDs, component names, data_source assignments. When the deck is edited in PowerPoint (reorder, add, delete slides), `reconcile_spec_with_config()` diffs the embedded config against spec.json and auto-updates slide indices, flags added slides for interpretation, removes deleted slides.
-
-**Pipeline steps:**
-1. `embed-config` — scan PPTX, write manifest as Custom XML Part
-2. `read --slide N` — extract visual context for Claude Code interpretation (non-connected)
-3. Claude Code interprets spatial layout → writes component mappings into spec.json
-4. `refresh-deck --spec deck.json` — reconcile config, fetch data, refresh all slides
-5. `headline --slide N --text "..."` — write data-grounded headline
-
-**Headline writing:** Per §6.10, headlines are derived from refreshed data following PET deck conventions: directional language, percentage-point deltas, segment comparisons. Never copied from source.
-
-**Module:** `slidegen/intelligent_refresh.py` — embedded config I/O, slide reader, dual-mode refresh engine, headline writer.
-**Spec builder:** `tests/build_full_spec.py` — generates spec.json from Connector config specs.
-**Skill:** `.claude/skills/workflows/refresh-deck-workflow/` — end-to-end orchestration.
+The PPTX is source of truth for structure. The spec.json is source of truth for data mappings. The embedded config bridges the two.
 
 \---
 
@@ -842,7 +711,7 @@ galen-consulting-r3m-report/
 │   │   ├── validator.py             # validate_spec() — completeness + semantics
 │   │   ├── __init__.py              # Re-exports for external use
 │   │   └── examples/                # Canonical example specs per chart pattern
-│   ├── deck_reader/                 # parse existing decks (dual-mode per §6.8)
+│   ├── deck_reader/                 # parse existing decks (dual-mode per §6.3)
 │   │   ├── tag_reader.py            # Tier 1 — Connector tag extraction
 │   │   └── inference.py             # Tier 2 — structural inference fallback
 │   ├── viz_selector/                # Metric > Q-type > HITL (deterministic)
@@ -871,7 +740,7 @@ Project teams provide upfront — and only these:
 
 * **Client Slide Master Deck** (required) — client-provided template with layouts, logos, disclaimers. Slide master only — NO canonical chart templates required.
 * **Product→Color Map** (required) — JSON/Excel mapping brand names (+ aliases) to RGB/hex colors. Added to `BRAND{}` in `pptx_utils/brand.py`.
-* **Project Metadata Config** (required) — Synapse `project_id`, `reporting_plan_id`, `deliverable_ids` (static period IDs) or dynamic period config (`latest_n_deliverables` + `include_live_wave`), `analysis_ids`, industry-average filter IDs. These are the same identifiers the Galen-PowerPoint Connector stamps onto shapes (§6.8) — SlideGen reads them from the config when generating a new deck, and reads them from shape tags when refreshing an existing one.
+* **Project Metadata Config** (required) — Synapse `project_id`, `reporting_plan_id`, `deliverable_ids` (static period IDs) or dynamic period config (`latest_n_deliverables` + `include_live_wave`), `analysis_ids`, industry-average filter IDs. These are the same identifiers the Galen-PowerPoint Connector stamps onto shapes (§6.3) — SlideGen reads them from the config when generating a new deck, and reads them from shape tags when refreshing an existing one.
 
 Assets live in the project workspace. Brand colors become a `BRAND{}` entry in `pptx_utils`; layouts are Python constants in `pptx_utils/layout.py`.
 
@@ -914,7 +783,7 @@ Primitives are the investment; workflows are the composition. Once the primitive
 
 **Edit-mode primitives** — unlock every workflow that starts from an existing deck.
 
-* `deck-reader` (dual-mode per §6.8 — Tier 1 Connector-tag-driven + Tier 2 structural inference)
+* `deck-reader` (dual-mode per §6.3 — Tier 1 Connector-tag-driven + Tier 2 structural inference)
 * `slide-updater` (data refresh + headline regen per §6.9)
 * `slide-editor` (whitelisted actions)
 * `deck-assembler` (insert/replace/reorder/delete)
@@ -1008,10 +877,10 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * ✅ **When does `slide-creator` render from scratch vs. use canonical templates?** → Fully from-scratch. The Apr 15 deck analysis found no evidence of hidden canonical templates in any of the 32 decks. Brand differentiation is achievable via `BRAND{}` + `LAYOUTS{}` Python constants alone.
 * ✅ **How does `viz-selector` resolve ambiguity?** → Deterministic rule: (1) 36 pre-mapped pharma metric tags → chart pattern (from Apr 15 analysis of 4,354 real PET charts — full table in §6.1); (2) question type default for unrecognized metrics (likert → bar_clustered_horizontal, etc.); (3) `"UNRESOLVED"` sentinel when neither path applies, which `spec-validator` rejects, forcing the planner to surface an HITL prompt. **Users can always override** viz-selector's default via `edit-slide-workflow` edit mode with the `set_chart_pattern` action — the selector provides a default, not a prescription.
 * ✅ **Test strategy for `pptx_utils` regression?** → Use the 30 coordinate clusters + per-chart OOXML inventory as a golden reference. For each renderer, compare against the corresponding real-deck signature cluster. Harness proposed in `experiments/deck_analysis/outputs/ACTIONABLE_FINDINGS.md`.
-* ✅ **How are brand colors sourced?** → Resolvable at render time from 4 sources: explicit hex, `BRAND{}` token, context-file reference (`market_context.md` / `project_context.md`), or deck-reader extraction from prior wave PPTX. `BRAND{}` is a convenience default, not a requirement. The spec carries color tokens; `slide-creator` resolves them. See §6.7.
-* ✅ **What is the spec-as-contract implementation?** → `slidegen/slide_spec/` subpackage with `schema.py` (dataclasses) + `validator.py`. See §6.7.
-* ✅ **How do we extract data lineage from existing decks for refresh workflows?** → Dual-mode `deck-reader`. Tier 1 reads Galen-PowerPoint Connector tags (`ReportConfigHash` → Custom XML Part) for canonical Synapse lineage. Tier 2 falls back to structural inference with user confirmation for untagged shapes. Not every deck is Connector-authored, so Tier 2 is required. See §6.8.
-* ✅ **What's the priority order for fidelity?** → Layout, then visualization, then data, then brand colors. Brand colors are parameterized inputs; the first three axes are where `slide-creator` must deliver pixel/numeric parity with real decks. See §6.7.
+* ✅ **How are brand colors sourced?** → Resolvable at render time from 4 sources: explicit hex, `BRAND{}` token, context-file reference (`market_context.md` / `project_context.md`), or deck-reader extraction from prior wave PPTX. `BRAND{}` is a convenience default, not a requirement. The spec carries color tokens; `slide-creator` resolves them. See §6.3.
+* ✅ **What is the spec-as-contract implementation?** → `slidegen/slide_spec/` subpackage with `schema.py` (dataclasses) + `validator.py`. See §6.3.
+* ✅ **How do we extract data lineage from existing decks for refresh workflows?** → Dual-mode `deck-reader`. Tier 1 reads Galen-PowerPoint Connector tags (`ReportConfigHash` → Custom XML Part) for canonical Synapse lineage. Tier 2 falls back to structural inference with user confirmation for untagged shapes. Not every deck is Connector-authored, so Tier 2 is required. See §6.3.
+* ✅ **What's the priority order for fidelity?** → Layout, then visualization, then data, then brand colors. Brand colors are parameterized inputs; the first three axes are where `slide-creator` must deliver pixel/numeric parity with real decks. See §6.3.
 * ✅ **Q3 target — PET-only or broader?** → PET + ATU land first-party (weeks 1-9); HCP-Pt + Digital Tracker + PCA project skills land in parallel via project-team contributors (weeks 9-13), using the same building blocks. All 8 workflows × all 5 project types by end of Q3, with dogfooding on ≥2 live PET projects + 1 ATU. See §9.3 + §9.5.
 * ✅ **Are the workflows MECE?** → Yes, after Apr 16 audit. Eight workflows map 1:1 to user verbs (create / refresh / edit / add / annotate / restructure / audit / summarize). Earlier drafts had redundancy (two create paths, two edit paths, two add paths) that collapsed into the current taxonomy. Structural-edit and deck-audit were added to close gaps the earlier lists missed.
 
@@ -1024,7 +893,7 @@ Concretely answered during PRD iteration — captured here so the rationale isn'
 * **Q3 Plan** — execution plan and team structure. This PRD is the product definition for SlideGen.
 * **Survey Design PRD** — parallel doc for the survey workstream. Both follow the same skills-based building blocks approach.
 * **Synapse CLI Proposal** — defines the data access layer SlideGen depends on. `synapse-read` wraps this CLI as a tool. Platform setup tasks (create segments, VQs, reporting plans, methodology configs) are the CLI's own responsibility, invoked directly by users outside SlideGen.
-* **Galen-PowerPoint Synapse Connector** — the existing PowerPoint add-in that stamps ReportConfig/PivotConfig/MappingConfig tags onto shapes. SlideGen's `deck-reader` leverages these tags as the Tier 1 (preferred) source of data lineage for refresh workflows. See §6.8. Key references: `Docs/Export Import Tags - PRD.md`, `Constants.cs`, `Services/ShapeConfigurationServiceBase.cs`.
+* **Galen-PowerPoint Synapse Connector** — the existing PowerPoint add-in that stamps ReportConfig/PivotConfig/MappingConfig tags onto shapes. SlideGen's `deck-reader` leverages these tags as the Tier 1 (preferred) source of data lineage for refresh workflows. See §6.3. Key references: `Docs/Export Import Tags - PRD.md`, `Constants.cs`, `Services/ShapeConfigurationServiceBase.cs`.
 * **Original PPT Agent Brief (Sep 2025)** — source of several workflows (edit, add, segment analysis, executive summary) and architectural concepts (viz hierarchy, multi-element assembly, analysis traces). Superseded in modality (embedded-in-PPT → Claude Code terminal) but many ideas survive.
 * **Siva's SlideGen PRD (Mar 10, 2026)** — at `docs/SlideGen_PRD.md`. The implementation blueprint (four-track data layer, win32com live editing, shape registry reconciliation, audit chain). This PRD (v1.1) is strategic direction; Siva's is the technical blueprint. Complementary, not contradictory.
 * **Existing SlideGen Workflow** — at `galen-consulting-r3m-report/docs/slidegen_workflow.md`. Current 8-stage pipeline documentation.
