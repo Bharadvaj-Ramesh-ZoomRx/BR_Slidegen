@@ -1,4 +1,4 @@
-"""Build the full spec.json from Connector config specs + manual specs.
+"""Build the full spec.json for intelligent_refresh from Connector config specs.
 
 For connected slides: includes raw_pivot_config + raw_mapping_config per component
 (used by pivot_records_to_chart_data for exact Connector fidelity).
@@ -6,9 +6,24 @@ For connected slides: includes raw_pivot_config + raw_mapping_config per compone
 For non-connected slides: includes interpreted data_mapping
 (used by the intelligent refresh mapping engine).
 
-Both live in the same spec.json structure. The refresh engine checks for
-raw configs first, falls back to mapping format.
+Usage:
+    # CREON (default)
+    python tests/build_full_spec.py
+
+    # Any deck
+    python tests/build_full_spec.py --specs tests/CREON_deck_config_specs.json \
+        --pptx projects/CREON/CREON.pptx \
+        --output tests/CREON.json
+
+    # UAT deck (Vijay)
+    python tests/build_full_spec.py \
+        --specs "tests/UAT_deck_config_specs.json" \
+        --pptx "tests/[Vijay] Synapse Connector UAT - Mar 2026.pptx" \
+        --output "tests/[Vijay] Synapse Connector UAT - Mar 2026.json" \
+        --manual-spec "tests/[Vijay] Synapse Connector UAT - Mar 2026_manual.json" \
+        --manual-slides 1,4,7
 """
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -16,14 +31,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+# ── Defaults (CREON) ──────────────────────────────────────────────────────────
 TESTS_DIR = REPO_ROOT / "tests"
-CONNECTOR_SPECS = TESTS_DIR / "UAT_deck_config_specs.json"
-MANUAL_SPEC = TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.json"
-OUTPUT_SPEC = TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.json"
+DEFAULT_SPECS   = TESTS_DIR / "CREON_deck_config_specs.json"
+DEFAULT_PPTX    = REPO_ROOT / "projects" / "CREON" / "CREON.pptx"
+DEFAULT_OUTPUT  = TESTS_DIR / "CREON.json"
 
-# Manual specs for non-connected slides (already hand-crafted and working)
-MANUAL_SLIDE_INDICES = {1, 4, 7}
 
+# ══════════════════════════════════════════════════════════════════════════════
 
 def build_data_sources(connector_specs: list[dict]) -> dict:
     """Extract unique data sources from Connector specs."""
@@ -52,10 +67,7 @@ def build_data_sources(connector_specs: list[dict]) -> dict:
 
 
 def build_connected_slide(spec: dict, ds_key: str) -> dict:
-    """Build a spec.json slide entry from a Connector config spec.
-
-    Includes raw_pivot_config + raw_mapping_config for each component.
-    """
+    """Build a spec.json slide entry from a Connector config spec."""
     components = []
     for comp in spec.get("components", []):
         ctype = comp.get("type")
@@ -68,12 +80,11 @@ def build_connected_slide(spec: dict, ds_key: str) -> dict:
 
         entry = {
             "type": ctype,
-            "name": "",  # filled from PPTX shape name
+            "name": "",  # filled from PPTX shape names below
             "position": comp.get("position", {}),
         }
 
         if dm.get("raw_pivot_config") and dm.get("raw_mapping_config"):
-            # Connected mode: store raw configs for pivot_records_to_chart_data()
             entry["raw_pivot_config"] = dm["raw_pivot_config"]
             entry["raw_mapping_config"] = dm["raw_mapping_config"]
             if dm.get("raw_column_key_label_map"):
@@ -85,7 +96,7 @@ def build_connected_slide(spec: dict, ds_key: str) -> dict:
             if dm.get("top_n_rows"):
                 entry["top_n_rows"] = dm["top_n_rows"]
 
-        # Also include the human-readable mapping for reference
+        # Human-readable mapping for reference / fallback
         tx = dm.get("transform", {})
         if tx:
             entry["data_mapping"] = {
@@ -99,38 +110,59 @@ def build_connected_slide(spec: dict, ds_key: str) -> dict:
 
         components.append(entry)
 
-    entry = {
+    slide_entry = {
         "slide_index": spec["slide_index"],
         "slide_id": spec.get("slide_id", f"slide_{spec['slide_index']:03d}"),
         "data_source": ds_key,
         "components": components,
     }
 
-    # Include static_time_period_names if present (controls which waves are used)
     lin = spec.get("data_lineage", {})
     stn = lin.get("static_time_period_names", [])
     if stn:
-        entry["static_time_period_names"] = stn
+        slide_entry["static_time_period_names"] = stn
 
-    return entry
+    return slide_entry
 
 
 def main():
-    from pptx import Presentation
+    parser = argparse.ArgumentParser(description="Build spec.json for intelligent_refresh")
+    parser.add_argument("--specs",        default=str(DEFAULT_SPECS),
+                        help="Connector config specs JSON (default: CREON_deck_config_specs.json)")
+    parser.add_argument("--pptx",         default=str(DEFAULT_PPTX),
+                        help="Source PPTX (used to resolve shape names)")
+    parser.add_argument("--output",       default=str(DEFAULT_OUTPUT),
+                        help="Output spec JSON path (default: tests/CREON.json)")
+    parser.add_argument("--manual-spec",  default=None,
+                        help="Optional JSON with hand-crafted specs for non-connected slides")
+    parser.add_argument("--manual-slides", default="",
+                        help="Comma-separated slide indices to take from manual-spec (e.g. 1,4,7)")
+    args = parser.parse_args()
 
-    # Load existing manual spec for non-connected slides
-    manual_spec = json.loads(MANUAL_SPEC.read_text(encoding="utf-8"))
-    manual_slides = {s["slide_index"]: s for s in manual_spec.get("slides", [])
-                     if s["slide_index"] in MANUAL_SLIDE_INDICES}
+    specs_path   = Path(args.specs)
+    pptx_path    = Path(args.pptx)
+    output_path  = Path(args.output)
 
-    # Load Connector specs
-    connector_specs = json.loads(CONNECTOR_SPECS.read_text(encoding="utf-8"))
+    assert specs_path.exists(), f"Specs not found: {specs_path}"
+    assert pptx_path.exists(),  f"PPTX not found: {pptx_path}"
 
-    # Build data sources
+    connector_specs = json.loads(specs_path.read_text(encoding="utf-8"))
+
+    # Optional manual specs for non-connected slides
+    manual_slides: dict[int, dict] = {}
+    manual_indices: set[int] = set()
+    if args.manual_spec and Path(args.manual_spec).exists():
+        manual_data = json.loads(Path(args.manual_spec).read_text(encoding="utf-8"))
+        if args.manual_slides:
+            manual_indices = {int(x) for x in args.manual_slides.split(",") if x.strip()}
+        manual_slides = {s["slide_index"]: s for s in manual_data.get("slides", [])
+                         if s["slide_index"] in manual_indices}
+
+    # Build data sources index
     sources = build_data_sources(connector_specs)
 
-    # Map slide_index -> data_source key
-    slide_to_ds = {}
+    # Map slide_index → data_source key
+    slide_to_ds: dict[int, str] = {}
     for spec in connector_specs:
         si = spec["slide_index"]
         lin = spec.get("data_lineage", {})
@@ -142,17 +174,15 @@ def main():
         key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
         slide_to_ds[si] = key
 
-    # Read PPTX for shape names (Connector specs use position, we need names)
-    pptx_path = str(TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.pptx")
-    prs = Presentation(pptx_path)
+    # Load PPTX once to resolve shape names from positions
+    from pptx import Presentation
+    prs = Presentation(str(pptx_path))
 
-    # Build full spec
     slides = []
     for spec in connector_specs:
         si = spec["slide_index"]
 
         if si in manual_slides:
-            # Use hand-crafted spec for non-connected slides
             slides.append(manual_slides[si])
             continue
 
@@ -162,7 +192,7 @@ def main():
 
         slide_entry = build_connected_slide(spec, ds_key)
 
-        # Fill in shape names from PPTX
+        # Fill in shape names from PPTX (intelligent_refresh matches by name)
         if si < len(prs.slides):
             pptx_slide = prs.slides[si]
             chart_shapes = sorted(
@@ -173,53 +203,50 @@ def main():
                 [s for s in pptx_slide.shapes if s.has_table],
                 key=lambda x: (x.left or 0, x.top or 0),
             )
-
-            # Match components to shapes by position
             for comp in slide_entry["components"]:
                 pos = comp.get("position", {})
-                cl = pos.get("left", 0)
-                ct = pos.get("top", 0)
-
-                if comp["type"] == "chart":
-                    for shape in chart_shapes:
-                        sl = round(shape.left / 914400, 2) if shape.left else 0
-                        st = round(shape.top / 914400, 2) if shape.top else 0
-                        if abs(sl - cl) < 0.3 and abs(st - ct) < 0.3:
-                            comp["name"] = shape.name
-                            break
-                else:
-                    for shape in table_shapes:
-                        sl = round(shape.left / 914400, 2) if shape.left else 0
-                        st = round(shape.top / 914400, 2) if shape.top else 0
-                        if abs(sl - cl) < 0.3 and abs(st - ct) < 0.3:
-                            comp["name"] = shape.name
-                            break
+                cl, ct = pos.get("left", 0), pos.get("top", 0)
+                pool = chart_shapes if comp["type"] == "chart" else table_shapes
+                for shape in pool:
+                    sl = round(shape.left / 914400, 2) if shape.left else 0
+                    st = round(shape.top / 914400, 2) if shape.top else 0
+                    if abs(sl - cl) < 0.3 and abs(st - ct) < 0.3:
+                        comp["name"] = shape.name
+                        break
 
         slides.append(slide_entry)
 
-    # Assemble final spec
+    # source_deck path relative to output spec's directory
+    rel_pptx = pptx_path.resolve().relative_to(output_path.parent.resolve()) \
+        if pptx_path.resolve().is_relative_to(output_path.parent.resolve()) \
+        else pptx_path.resolve()
+
     final = {
-        "source_deck": "[Vijay] Synapse Connector UAT - Mar 2026.pptx",
-        "data_sources": {**sources, **manual_spec.get("data_sources", {})},
+        "source_deck": str(rel_pptx).replace("\\", "/"),
+        "data_sources": sources,
         "slides": slides,
     }
 
-    OUTPUT_SPEC.write_text(json.dumps(final, indent=2, ensure_ascii=False), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(final, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
     # Summary
-    n_connected = sum(1 for s in slides if any(
-        c.get("raw_pivot_config") for c in s.get("components", [])))
-    n_manual = sum(1 for s in slides if s["slide_index"] in MANUAL_SLIDE_INDICES)
-    n_raw_comps = sum(
-        1 for s in slides for c in s.get("components", [])
-        if c.get("raw_pivot_config"))
+    n_connected = sum(1 for s in slides
+                      if any(c.get("raw_pivot_config") for c in s.get("components", [])))
+    n_manual = len(manual_slides)
+    n_raw_comps = sum(1 for s in slides
+                      for c in s.get("components", []) if c.get("raw_pivot_config"))
+    n_unnamed = sum(1 for s in slides
+                    for c in s.get("components", []) if not c.get("name"))
 
     print(f"Spec built: {len(slides)} slides")
     print(f"  Connected (raw configs): {n_connected}")
-    print(f"  Manual (interpreted): {n_manual}")
+    print(f"  Manual (interpreted):    {n_manual}")
     print(f"  Components with raw configs: {n_raw_comps}")
-    print(f"  Data sources: {len(final['data_sources'])}")
-    print(f"  Output: {OUTPUT_SPEC}")
+    print(f"  Unnamed components (no shape match): {n_unnamed}")
+    print(f"  Data sources: {len(sources)}")
+    print(f"  Output: {output_path}")
 
 
 if __name__ == "__main__":
