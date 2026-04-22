@@ -1,0 +1,233 @@
+{
+  "source_deck": "[Vijay] Synapse Connector UAT - Mar 2026.pptx",
+  "data_sources": {
+    "repatha_atu": {
+      "project_id": 1428,
+      "reporting_plan_id": 1139,
+      "analysis_ids": [545991],
+      "segment_ids": [14633],
+      "dynamic_latest_n": 5
+    },
+    "repatha_drivers": {
+      "project_id": 1428,
+      "reporting_plan_id": 1139,
+      "analysis_ids": [594765],
+      "segment_ids": [14633],
+      "dynamic_latest_n": 5
+    },
+    "tepmetko_recall": {
+      "project_id": 1241,
+      "reporting_plan_id": 906,
+      "analysis_ids": [680564],
+      "segment_ids": [12718],
+      "dynamic_latest_n": 5
+    }
+  },
+  "slides": [
+    {
+      "slide_index": 1,
+      "data_source": "repatha_atu",
+      "components": [
+        {
+          "type": "chart", "name": "CARD",
+          "data_mapping": {
+            "segment_filter": "CARD",
+            "time_period": "Q1'26",
+            "series_column": "x_code",
+            "series_name_map": {
+              "Q1'26 - CARD - Low - decimal": "L",
+              "Q1'26 - CARD - Neutral - decimal": "N",
+              "Q1'26 - CARD - High - decimal": "H",
+              "Q1'26 - CARD - 0 - decimal": "0"
+            },
+            "row_field": "y_label",
+            "value_field": "decimal",
+            "category_order": ["Repatha", "Praluent", "Leqvio", "Nexletol / Nexlizet$", "High Intensity Statins", "Entresto", "GLP-1 drugs", "NOACs"]
+          }
+        },
+        {
+          "type": "chart", "name": "PCP",
+          "data_mapping": {
+            "segment_filter": "PCP",
+            "time_period": "Q1'26",
+            "series_column": "x_code",
+            "series_name_map": {
+              "Q1'26 - PCP - Low - decimal": "L",
+              "Q1'26 - PCP - Neutral - decimal": "N",
+              "Q1'26 - PCP - High - decimal": "H",
+              "Q1'26 - PCP - 0 - decimal": "0"
+            },
+            "row_field": "y_label",
+            "value_field": "decimal",
+            "category_order": ["Repatha", "Praluent", "Leqvio", "Nexletol / Nexlizet$", "High Intensity Statins", "Entresto", "GLP-1 drugs", "NOACs"]
+          }
+        },
+        {
+          "type": "table", "name": "CARD Table",
+          "data_mapping": {
+            "segment_filter": "CARD",
+            "time_period": "Q1'26",
+            "columns": [
+              {"header": "Products", "data_field": "y_label", "format": "string"},
+              {"header": "Base", "data_field": "base", "format": "(n = {})"}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "CARDs-Easy",
+          "data_mapping": {
+            "segment_filter": "CARD",
+            "time_period": "Q4'25",
+            "columns": [
+              {"header": "Easy", "data_field": "percentage", "format": "{}%", "filter": {"x_code": "H"}}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "PCP",
+          "data_mapping": {
+            "segment_filter": "PCP",
+            "time_period": "Q1'26",
+            "columns": [
+              {"header": "Products", "data_field": "y_label", "format": "string"},
+              {"header": "Base", "data_field": "base", "format": "(n = {})"}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "PCPs-Easy",
+          "data_mapping": {
+            "segment_filter": "PCP",
+            "time_period": "Q4'25",
+            "columns": [
+              {"header": "Easy", "data_field": "percentage", "format": "{}%", "filter": {"x_code": "H"}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slide_index": 4,
+      "data_source": "repatha_atu",
+      "components": [
+        {
+          "type": "chart", "name": "CARD",
+          "data_mapping": {
+            "segment_filter": "CARD",
+            "time_period": "Q1'26",
+            "series_column": "x_code",
+            "series_name_map": {
+              "Q1'26 - Specialty (C/PCPs) - Overall - CARD - L - Average of Value(%)": "L",
+              "Q1'26 - Specialty (C/PCPs) - Overall - CARD - N - Average of Value(%)": "N",
+              "Q1'26 - Specialty (C/PCPs) - Overall - CARD - H - Average of Value(%)": "H",
+              "Q1'26 - Specialty (C/PCPs) - Overall - CARD - 0 - Average of Value(%)": "0"
+            },
+            "row_field": "y_label",
+            "value_field": "decimal",
+            "category_order": ["Repatha", "Praluent", "Leqvio", "Entresto", "Nexletol / Nexlizet$", "High Intensity Statins", "GLP-1 drugs", "NOACs"]
+          }
+        },
+        {
+          "type": "chart", "name": "PCP",
+          "data_mapping": {
+            "segment_filter": "PCP",
+            "time_period": "Q1'26",
+            "series_column": "x_code",
+            "series_name_map": {
+              "Q1'26 - Specialty (C/PCPs) - Overall - PCP - L - Average of Value(%)": "L",
+              "Q1'26 - Specialty (C/PCPs) - Overall - PCP - N - Average of Value(%)": "N",
+              "Q1'26 - Specialty (C/PCPs) - Overall - PCP - H - Average of Value(%)": "H",
+              "Q1'26 - Specialty (C/PCPs) - Overall - PCP - 0 - Average of Value(%)": "0"
+            },
+            "row_field": "y_label",
+            "value_field": "decimal",
+            "category_order": ["Repatha", "Praluent", "Leqvio", "Entresto", "Nexletol / Nexlizet$", "High Intensity Statins", "GLP-1 drugs", "NOACs"]
+          }
+        },
+        {
+          "type": "table", "name": "CARD Table",
+          "data_mapping": {
+            "segment_filter": "CARD", "time_period": "Q1'26",
+            "columns": [
+              {"header": "Products", "data_field": "y_label", "format": "string"},
+              {"header": "Base", "data_field": "base", "format": "(n = {})"}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "CARD-Easy",
+          "data_mapping": {
+            "segment_filter": "CARD", "time_period": "Q4'25",
+            "columns": [
+              {"header": "Easy", "data_field": "percentage", "format": "{}%", "filter": {"x_code": "H"}}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "PCP",
+          "data_mapping": {
+            "segment_filter": "PCP", "time_period": "Q1'26",
+            "columns": [
+              {"header": "Products", "data_field": "y_label", "format": "string"},
+              {"header": "Base", "data_field": "base", "format": "(n = {})"}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "PCP-Easy",
+          "data_mapping": {
+            "segment_filter": "PCP", "time_period": "Q4'25",
+            "columns": [
+              {"header": "Easy", "data_field": "percentage", "format": "{}%", "filter": {"x_code": "H"}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slide_index": 7,
+      "data_source": "tepmetko_recall",
+      "components": [
+        {
+          "type": "chart", "name": "Recall",
+          "data_mapping": {
+            "segment_filter": "Overall",
+            "time_period": "Wave 3",
+            "series_column": null,
+            "series_name_map": {},
+            "row_field": "y_code",
+            "value_field": "decimal",
+            "category_order": ["TP05", "TP02", "TP03", "TP04", "TP09", "TP13", "TP11", "TP10", "TP12", "TP01"]
+          }
+        },
+        {
+          "type": "table", "name": "Message Table",
+          "static": true
+        },
+        {
+          "type": "table", "name": "Sample",
+          "data_mapping": {
+            "time_period": "Wave 3",
+            "columns": [
+              {"header": "Recall", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "Overall"}},
+              {"header": "METi Believers", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "METi Believer"}},
+              {"header": "I/O Believers", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "IO Believer"}}
+            ]
+          }
+        },
+        {
+          "type": "table", "name": "METi vs IO",
+          "data_mapping": {
+            "time_period": "Wave 3",
+            "row_field": "y_code",
+            "category_order": ["TP05", "TP02", "TP03", "TP04", "TP09", "TP13", "TP11", "TP10", "TP12", "TP01"],
+            "columns": [
+              {"header": "METi", "data_field": "percentage", "format": "{}%", "filter": {"segment_1": "METi Believer"}},
+              {"header": "IO", "data_field": "percentage", "format": "{}%", "filter": {"segment_1": "IO Believer"}}
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

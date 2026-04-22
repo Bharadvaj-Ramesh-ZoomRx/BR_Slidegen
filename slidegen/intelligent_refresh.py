@@ -634,6 +634,271 @@ def write_headline(pptx_path: str, slide_index: int, headline_text: str) -> None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Deck-level refresh from a single spec JSON
+# ══════════════════════════════════════════════════════════════════════════════
+
+def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: str = None) -> dict:
+    """Refresh a deck using a single spec JSON file.
+
+    Spec JSON format:
+    {
+      "source_deck": "deck.pptx",
+      "data_sources": {
+        "source_key": {"project_id": ..., "reporting_plan_id": ..., ...}
+      },
+      "slides": [
+        {"slide_index": 4, "data_source": "source_key", "components": [...]}
+      ]
+    }
+
+    Fetches data per data_source (cached), then refreshes each slide's components.
+    Returns results dict.
+    """
+    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    spec_dir = Path(spec_path).parent
+
+    # Resolve paths
+    if pptx_path is None:
+        pptx_path = str(spec_dir / spec["source_deck"])
+    if output_path is None:
+        stem = Path(spec["source_deck"]).stem
+        ext = Path(spec["source_deck"]).suffix
+        output_path = str(spec_dir / f"Output_{stem}{ext}")
+
+    data_sources = spec.get("data_sources", {})
+    slides = spec.get("slides", [])
+
+    # Read source series order for all slides
+    src_prs = Presentation(pptx_path)
+    src_series_by_slide = {}
+    for slide_spec in slides:
+        si = slide_spec["slide_index"]
+        if si < len(src_prs.slides):
+            src_series_by_slide[si] = {}
+            for shape in src_prs.slides[si].shapes:
+                if shape.has_chart:
+                    src_series_by_slide[si][shape.name] = [
+                        str(s.name) for s in shape.chart.plots[0].series
+                    ]
+
+    # Clone source -> output
+    shutil.copy2(pptx_path, output_path)
+    prs = Presentation(output_path)
+
+    # Cache fetched data by data_source key
+    data_cache = {}
+    all_results = {"slides": [], "output": output_path}
+    ns_c = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+    for slide_spec in slides:
+        si = slide_spec["slide_index"]
+        ds_key = slide_spec.get("data_source")
+        if si >= len(prs.slides):
+            all_results["slides"].append({"slide_index": si, "error": "out of range"})
+            continue
+
+        slide = prs.slides[si]
+
+        # Fetch data (cached by data_source key)
+        if ds_key and ds_key not in data_cache:
+            lineage = data_sources.get(ds_key, {})
+            if lineage:
+                print(f"  Fetching data_source '{ds_key}': project={lineage.get('project_id')}, "
+                      f"analysis={lineage.get('analysis_ids')}")
+                records, df = fetch_synapse_data(lineage)
+                data_cache[ds_key] = df
+                print(f"    -> {len(records)} records")
+            else:
+                data_cache[ds_key] = pd.DataFrame()
+
+        df = data_cache.get(ds_key, pd.DataFrame())
+        if df.empty:
+            all_results["slides"].append({"slide_index": si, "error": "no data"})
+            continue
+
+        # Index shapes by name
+        chart_shapes = {s.name: s for s in slide.shapes if s.has_chart}
+        table_shapes = {s.name: s for s in slide.shapes if s.has_table}
+        src_chart_series = src_series_by_slide.get(si, {})
+
+        slide_results = {"slide_index": si, "charts": [], "tables": []}
+
+        for comp in slide_spec.get("components", []):
+            name = comp.get("name", "")
+            ctype = comp.get("type", "")
+
+            if comp.get("static"):
+                slide_results["tables"].append({"name": name, "status": "static_skipped"})
+                continue
+
+            dm = comp.get("data_mapping", {})
+            if not dm:
+                continue
+
+            # Apply filters
+            sub = df.copy()
+            seg = dm.get("segment_filter")
+            if seg and "segment_1" in sub.columns:
+                sub = sub[sub["segment_1"] == seg]
+            tp = dm.get("time_period")
+            if tp and "time_period_name" in sub.columns:
+                sub = sub[sub["time_period_name"] == tp]
+
+            if ctype == "chart":
+                shape = chart_shapes.get(name)
+                if not shape:
+                    slide_results["charts"].append({"name": name, "status": "not_found"})
+                    continue
+                if sub.empty:
+                    slide_results["charts"].append({"name": name, "status": "empty"})
+                    continue
+
+                row_f = dm.get("row_field", "y_label")
+                col_f = dm.get("series_column")
+                val_f = dm.get("value_field", "percentage")
+                name_map = dm.get("series_name_map", {})
+
+                try:
+                    if col_f and col_f in sub.columns:
+                        pivot = sub.pivot_table(index=row_f, columns=col_f,
+                                                values=val_f, aggfunc="first")
+                    else:
+                        pivot = sub.groupby(row_f, sort=False)[val_f].first().to_frame()
+
+                    categories = list(pivot.index.astype(str))
+
+                    # Apply category order
+                    cat_order = dm.get("category_order")
+                    if cat_order:
+                        order = [categories.index(c) for c in cat_order if c in categories]
+                        extra = [i for i in range(len(categories)) if i not in order]
+                        reorder = order + extra
+                        categories = [categories[i] for i in reorder]
+                        pivot = pivot.iloc[reorder]
+
+                    orig_series = src_chart_series.get(name, [])
+                    series_data = []
+                    for sn in orig_series:
+                        data_val = name_map.get(sn, sn)
+                        matched = None
+                        for pc in pivot.columns:
+                            if str(pc) == data_val or str(pc).lower() == data_val.lower():
+                                matched = pc
+                                break
+                        if matched is None and len(pivot.columns) == 1:
+                            matched = pivot.columns[0]
+                        vals = ([0.0 if pd.isna(v) else round(float(v), 4) for v in pivot[matched]]
+                                if matched is not None else [0.0] * len(categories))
+                        series_data.append((sn, vals))
+
+                    # Save + restore formatCodes
+                    src_fmts = [fc.text for fc in shape.chart._chartSpace.iter(f"{{{ns_c}}}formatCode")]
+                    cd = CategoryChartData()
+                    cd.categories = categories
+                    for sn, vals in series_data:
+                        cd.add_series(sn, vals)
+                    shape.chart.replace_data(cd)
+                    for i, fc_el in enumerate(shape.chart._chartSpace.iter(f"{{{ns_c}}}formatCode")):
+                        if i < len(src_fmts):
+                            fc_el.text = src_fmts[i]
+
+                    slide_results["charts"].append({
+                        "name": name, "status": "ok", "segment": seg,
+                        "categories": len(categories), "series": len(series_data),
+                    })
+                except Exception as e:
+                    slide_results["charts"].append({"name": name, "status": "error", "error": str(e)})
+
+            elif ctype == "table":
+                shape = table_shapes.get(name)
+                if not shape:
+                    slide_results["tables"].append({"name": name, "status": "not_found"})
+                    continue
+
+                tbl = shape.table
+                columns_spec = dm.get("columns", [])
+                if not columns_spec:
+                    continue
+
+                try:
+                    all_have_filters = all(cs.get("filter") for cs in columns_spec if cs.get("data_field"))
+                    row_key = None
+                    if not all_have_filters:
+                        for cs in columns_spec:
+                            if cs.get("data_field") and cs.get("format") != "spacer":
+                                row_key = cs["data_field"]
+                                break
+
+                    if all_have_filters and not row_key:
+                        # Single-row summary table
+                        target_row = 1 if len(tbl.rows) > 1 else 0
+                        for ci, cs in enumerate(columns_spec):
+                            if ci >= len(tbl.columns):
+                                break
+                            data_f = cs.get("data_field")
+                            col_filter = cs.get("filter")
+                            if not data_f:
+                                continue
+                            cell_sub = df.copy()
+                            if tp and "time_period_name" in cell_sub.columns:
+                                cell_sub = cell_sub[cell_sub["time_period_name"] == tp]
+                            if col_filter:
+                                for fk, fv in col_filter.items():
+                                    if fk in cell_sub.columns:
+                                        cell_sub = cell_sub[cell_sub[fk] == fv]
+                            if cell_sub.empty or data_f not in cell_sub.columns:
+                                continue
+                            _write_cell_text(tbl.cell(target_row, ci),
+                                             _format_cell(cell_sub.iloc[0][data_f], cs.get("format", "string")))
+
+                        slide_results["tables"].append({"name": name, "status": "ok", "rows": 1})
+                    else:
+                        if not row_key or sub.empty or row_key not in sub.columns:
+                            slide_results["tables"].append({"name": name, "status": "no_data"})
+                            continue
+
+                        # Apply table-level category order
+                        cat_order = dm.get("category_order")
+                        keys = sub[row_key].dropna().unique().tolist()
+                        if cat_order:
+                            ordered = [k for k in cat_order if k in keys]
+                            extra = [k for k in keys if k not in ordered]
+                            keys = ordered + extra
+
+                        n_rows = min(len(keys), len(tbl.rows) - 1)
+                        for ri in range(n_rows):
+                            row_data = sub[sub[row_key] == keys[ri]]
+                            if row_data.empty:
+                                continue
+                            for ci, cs in enumerate(columns_spec):
+                                if ci >= len(tbl.columns) or ri + 1 >= len(tbl.rows):
+                                    break
+                                fmt = cs.get("format", "string")
+                                data_f = cs.get("data_field")
+                                col_filter = cs.get("filter")
+                                if fmt == "spacer" or not data_f:
+                                    continue
+                                cell_data = row_data
+                                if col_filter:
+                                    for fk, fv in col_filter.items():
+                                        if fk in cell_data.columns:
+                                            cell_data = cell_data[cell_data[fk] == fv]
+                                if cell_data.empty or data_f not in cell_data.columns:
+                                    continue
+                                _write_cell_text(tbl.cell(ri + 1, ci),
+                                                 _format_cell(cell_data.iloc[0][data_f], fmt))
+
+                        slide_results["tables"].append({"name": name, "status": "ok", "rows": n_rows})
+                except Exception as e:
+                    slide_results["tables"].append({"name": name, "status": "error", "error": str(e)})
+
+        all_results["slides"].append(slide_results)
+
+    prs.save(output_path)
+    return all_results
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -655,12 +920,18 @@ def main():
     )
 
     # ── refresh ──
-    p_refresh = sub.add_parser("refresh", help="Apply mapping to refresh the slide")
+    p_refresh = sub.add_parser("refresh", help="Refresh one slide from mapping + lineage")
     p_refresh.add_argument("--pptx", required=True, help="Source PPTX path")
     p_refresh.add_argument("--output", required=True, help="Output PPTX path")
     p_refresh.add_argument("--slide", type=int, default=0, help="Slide index (0-based)")
     p_refresh.add_argument("--mapping", required=True, help="Path to mapping JSON")
     p_refresh.add_argument("--lineage", required=True, help="Path to data lineage JSON")
+
+    # ── refresh-deck ──
+    p_deck = sub.add_parser("refresh-deck", help="Refresh all slides from a single spec JSON")
+    p_deck.add_argument("--spec", required=True, help="Path to spec JSON (same name as PPTX)")
+    p_deck.add_argument("--pptx", default=None, help="Source PPTX (default: from spec)")
+    p_deck.add_argument("--output", default=None, help="Output PPTX (default: Output_<source>)")
 
     # ── headline ──
     p_headline = sub.add_parser("headline", help="Write headline text into a slide")
@@ -686,6 +957,10 @@ def main():
         results = refresh_slide_from_mapping(
             args.pptx, args.output, args.slide, mapping, lineage,
         )
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+
+    elif args.command == "refresh-deck":
+        results = refresh_deck_from_spec(args.spec, args.pptx, args.output)
         print(json.dumps(results, indent=2, ensure_ascii=False))
 
     elif args.command == "headline":
