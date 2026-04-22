@@ -246,6 +246,40 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
 # Phase 2: Refresh — apply mapping to update the deck
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _format_cell(raw, fmt: str) -> str:
+    """Format a raw value according to the mapping format string."""
+    if fmt == "string":
+        return str(raw)
+    elif "(n" in fmt or "(s" in fmt:
+        try:
+            prefix = "(s = " if "(s" in fmt else "(n = "
+            return f"{prefix}{int(float(raw))})" if raw and float(raw) != 0 else ""
+        except (ValueError, TypeError):
+            return str(raw) if raw else ""
+    elif "%" in fmt:
+        try:
+            v = float(raw)
+            return f"{v:.0%}" if abs(v) <= 1.0 else f"{int(v)}%"
+        except (ValueError, TypeError):
+            return str(raw) if raw else ""
+    elif "{}" in fmt:
+        try:
+            return fmt.format(raw)
+        except Exception:
+            return str(raw) if raw else ""
+    else:
+        return str(raw) if raw else ""
+
+
+def _write_cell_text(cell, text: str) -> None:
+    """Write text into a table cell preserving formatting."""
+    for p in cell.text_frame.paragraphs:
+        for r in p.runs:
+            r.text = ""
+    if cell.text_frame.paragraphs and cell.text_frame.paragraphs[0].runs:
+        cell.text_frame.paragraphs[0].runs[0].text = text
+
+
 def refresh_slide_from_mapping(
     pptx_path: str,
     output_path: str,
@@ -334,6 +368,17 @@ def refresh_slide_from_mapping(
                 pivot = sub.groupby(row_f, sort=False)[val_f].first().to_frame()
 
             categories = list(pivot.index.astype(str))
+
+            # Apply explicit category order from mapping if provided.
+            # Otherwise try to match source chart's category order.
+            cat_order = cm.get("category_order")
+            if cat_order:
+                order = [categories.index(c) for c in cat_order if c in categories]
+                extra = [i for i in range(len(categories)) if i not in order]
+                reorder = order + extra
+                categories = [categories[i] for i in reorder]
+                pivot = pivot.iloc[reorder]
+
             orig_series = src_chart_series.get(name, [])
 
             series_data = []
@@ -344,6 +389,9 @@ def refresh_slide_from_mapping(
                     if str(pc) == data_val or str(pc).lower() == data_val.lower():
                         matched = pc
                         break
+                # For single-column pivots (no series_column), use the only column
+                if matched is None and len(pivot.columns) == 1:
+                    matched = pivot.columns[0]
                 vals = (
                     [0.0 if pd.isna(v) else round(float(v), 4) for v in pivot[matched]]
                     if matched is not None
@@ -378,6 +426,12 @@ def refresh_slide_from_mapping(
     # ── Tables ──
     for tm in mapping.get("tables", []):
         name = tm["table_name"]
+
+        # Skip static reference tables (e.g. message description lookup tables)
+        if tm.get("static"):
+            results["tables"].append({"name": name, "status": "static_skipped"})
+            continue
+
         shape = table_shapes.get(name)
         if not shape:
             results["tables"].append({"name": name, "status": "not_found"})
@@ -385,73 +439,114 @@ def refresh_slide_from_mapping(
 
         tbl = shape.table
         sub = df.copy()
+
+        # Apply global segment filter
         seg = tm.get("segment_filter")
         if seg and "segment_1" in sub.columns:
             sub = sub[sub["segment_1"] == seg]
-        if sub.empty:
-            results["tables"].append({"name": name, "status": "empty"})
-            continue
+
+        # Apply time period filter
+        tp = tm.get("time_period")
+        if tp and "time_period_name" in sub.columns:
+            sub = sub[sub["time_period_name"] == tp]
 
         columns_spec = tm.get("columns", [])
         if not columns_spec:
             results["tables"].append({"name": name, "status": "no_columns"})
             continue
 
-        try:
-            row_key = None
+        # Determine if this is a row-iterated table or a single-row summary table.
+        # Single-row: every column has its own filter (e.g. sample size per segment).
+        # Row-iterated: columns share a row key field.
+        all_have_filters = all(cs.get("filter") for cs in columns_spec if cs.get("data_field"))
+        row_key = None
+        if not all_have_filters:
             for cs in columns_spec:
                 if cs.get("data_field") and cs.get("format") != "spacer":
                     row_key = cs["data_field"]
                     break
-            if not row_key or row_key not in sub.columns:
-                results["tables"].append({"name": name, "status": "no_row_key"})
-                continue
 
-            keys = sub[row_key].dropna().unique().tolist()
-            n_rows = min(len(keys), len(tbl.rows) - 1)
-
-            for ri in range(n_rows):
-                row_data = sub[sub[row_key] == keys[ri]]
-                if row_data.empty:
-                    continue
+        try:
+            if all_have_filters and not row_key:
+                # ── Single-row summary table (e.g. base sizes per segment) ──
+                # Each column independently queries the data with its own filter.
+                # Write into header row (row 0) or first data row (row 1).
+                target_row = 1 if len(tbl.rows) > 1 else 0
                 for ci, cs in enumerate(columns_spec):
-                    if ci >= len(tbl.columns) or ri + 1 >= len(tbl.rows):
+                    if ci >= len(tbl.columns):
                         break
                     fmt = cs.get("format", "string")
                     data_f = cs.get("data_field")
                     col_filter = cs.get("filter")
-                    if fmt == "spacer" or not data_f:
+                    if not data_f:
                         continue
 
-                    cell_data = row_data
+                    cell_sub = df.copy()  # start from unfiltered
+                    if tp and "time_period_name" in cell_sub.columns:
+                        cell_sub = cell_sub[cell_sub["time_period_name"] == tp]
                     if col_filter and isinstance(col_filter, dict):
                         for fk, fv in col_filter.items():
-                            if fk in cell_data.columns:
-                                cell_data = cell_data[cell_data[fk] == fv]
-                    if cell_data.empty or data_f not in cell_data.columns:
+                            if fk in cell_sub.columns:
+                                cell_sub = cell_sub[cell_sub[fk] == fv]
+                    if cell_sub.empty or data_f not in cell_sub.columns:
                         continue
 
-                    raw = cell_data.iloc[0][data_f]
-                    if fmt == "string":
-                        text = str(raw)
-                    elif "(n" in fmt:
-                        text = f"(n = {int(float(raw))})" if raw else ""
-                    elif "%" in fmt:
-                        v = float(raw)
-                        text = f"{v:.0%}" if abs(v) <= 1.0 else f"{int(v)}%"
-                    else:
-                        text = str(raw)
+                    # Take first row's value (or max for base)
+                    raw = cell_sub.iloc[0][data_f]
+                    text = _format_cell(raw, fmt)
 
-                    cell = tbl.cell(ri + 1, ci)
-                    for p in cell.text_frame.paragraphs:
-                        for r in p.runs:
-                            r.text = ""
-                    if cell.text_frame.paragraphs and cell.text_frame.paragraphs[0].runs:
-                        cell.text_frame.paragraphs[0].runs[0].text = text
+                    cell = tbl.cell(target_row, ci)
+                    _write_cell_text(cell, text)
 
-            results["tables"].append({
-                "name": name, "status": "ok", "segment": seg, "rows": n_rows,
-            })
+                results["tables"].append({
+                    "name": name, "status": "ok", "segment": seg, "rows": 1,
+                })
+            else:
+                # ── Row-iterated table ──
+                if not row_key or (sub.empty and not all_have_filters):
+                    results["tables"].append({"name": name, "status": "no_row_key"})
+                    continue
+                if sub.empty:
+                    results["tables"].append({"name": name, "status": "empty"})
+                    continue
+                if row_key not in sub.columns:
+                    results["tables"].append({"name": name, "status": "missing_col",
+                                              "col": row_key})
+                    continue
+
+                keys = sub[row_key].dropna().unique().tolist()
+                n_rows = min(len(keys), len(tbl.rows) - 1)
+
+                for ri in range(n_rows):
+                    row_data = sub[sub[row_key] == keys[ri]]
+                    if row_data.empty:
+                        continue
+                    for ci, cs in enumerate(columns_spec):
+                        if ci >= len(tbl.columns) or ri + 1 >= len(tbl.rows):
+                            break
+                        fmt = cs.get("format", "string")
+                        data_f = cs.get("data_field")
+                        col_filter = cs.get("filter")
+                        if fmt == "spacer" or not data_f:
+                            continue
+
+                        cell_data = row_data
+                        if col_filter and isinstance(col_filter, dict):
+                            for fk, fv in col_filter.items():
+                                if fk in cell_data.columns:
+                                    cell_data = cell_data[cell_data[fk] == fv]
+                        if cell_data.empty or data_f not in cell_data.columns:
+                            continue
+
+                        raw = cell_data.iloc[0][data_f]
+                        text = _format_cell(raw, fmt)
+
+                        cell = tbl.cell(ri + 1, ci)
+                        _write_cell_text(cell, text)
+
+                results["tables"].append({
+                    "name": name, "status": "ok", "segment": seg, "rows": n_rows,
+                })
         except Exception as e:
             results["tables"].append({
                 "name": name, "status": "error", "error": str(e),

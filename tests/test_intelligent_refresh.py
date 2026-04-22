@@ -36,9 +36,9 @@ from slidegen.intelligent_refresh import (
     refresh_slide_from_mapping,
 )
 
-SAMPLE_DIR = REPO_ROOT.parent / "Sample Decks"
-SOURCE_PPTX = SAMPLE_DIR / "Repatha ATU Slide 6.pptx"
-OUTPUT_PPTX = SAMPLE_DIR / "Repatha_ATU_Slide6_intelligent_refresh.pptx"
+TESTS_DIR = REPO_ROOT / "tests"
+SOURCE_PPTX = TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.pptx"
+OUTPUT_PPTX = TESTS_DIR / "UAT_intelligent_refresh.pptx"
 
 # User-provided data lineage
 DATA_LINEAGE = {

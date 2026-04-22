@@ -1,0 +1,39 @@
+{
+  "charts": [
+    {
+      "chart_name": "Recall",
+      "segment_filter": "Overall",
+      "time_period": "Wave 3",
+      "series_column": null,
+      "series_name_map": {},
+      "row_field": "y_code",
+      "value_field": "decimal",
+      "category_order": ["TP05", "TP02", "TP03", "TP04", "TP09", "TP13", "TP11", "TP10", "TP12", "TP01"]
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "Message Table",
+      "static": true
+    },
+    {
+      "table_name": "Sample",
+      "time_period": "Wave 3",
+      "columns": [
+        {"header": "Recall", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "Overall"}},
+        {"header": "METi Believers", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "METi Believer"}},
+        {"header": "I/O Believers", "data_field": "base", "format": "(s = {})", "filter": {"segment_1": "IO Believer"}}
+      ]
+    },
+    {
+      "table_name": "METi vs IO",
+      "time_period": "Wave 3",
+      "row_field": "y_code",
+      "category_order": ["TP05", "TP02", "TP03", "TP04", "TP09", "TP13", "TP11", "TP10", "TP12", "TP01"],
+      "columns": [
+        {"header": "METi", "data_field": "percentage", "format": "{}%", "filter": {"segment_1": "METi Believer"}},
+        {"header": "IO", "data_field": "percentage", "format": "{}%", "filter": {"segment_1": "IO Believer"}}
+      ]
+    }
+  ]
+}

@@ -58,6 +58,10 @@ experiments/deck_analysis/outputs/generated/*
 experiments/deck_analysis/outputs/generated/*.pptx
 tests/track1/*.pptx
 tests/track3/*.pptx
+tests/UAT_dummy_data.pptx
+tests/UAT_refreshed_from_spec.pptx
+tests/UAT_intelligent_refresh.pptx
+tests/UAT_deck_config_specs.json
 projects/*
 
 # OneDrive archives

@@ -40,12 +40,12 @@ from pptx.chart.data import CategoryChartData
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SAMPLE_DIR = REPO_ROOT.parent / "Sample Decks"
+TESTS_DIR = REPO_ROOT / "tests"
 
-SOURCE_PPTX = SAMPLE_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.pptx"
-DUMMY_PPTX = SAMPLE_DIR / "UAT_dummy_data_v6.pptx"
-REFRESHED_PPTX = SAMPLE_DIR / "UAT_refreshed_from_spec_v6.pptx"
-SPECS_JSON = SAMPLE_DIR / "UAT_deck_config_specs_v1.2.json"
+SOURCE_PPTX = TESTS_DIR / "[Vijay] Synapse Connector UAT - Mar 2026.pptx"
+DUMMY_PPTX = TESTS_DIR / "UAT_dummy_data.pptx"
+REFRESHED_PPTX = TESTS_DIR / "UAT_refreshed_from_spec.pptx"
+SPECS_JSON = TESTS_DIR / "UAT_deck_config_specs.json"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
