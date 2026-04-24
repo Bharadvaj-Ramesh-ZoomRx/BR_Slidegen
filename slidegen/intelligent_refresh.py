@@ -314,13 +314,36 @@ def read_slide_context(pptx_path: str, slide_index: int = 0) -> dict:
                 [tbl.cell(0, c).text.strip() for c in range(nc)]
                 if nr > 0 else []
             )
-            sample = []
-            for r in range(1, min(nr, 4)):
-                sample.append([tbl.cell(r, c).text.strip() for c in range(nc)])
+            # Capture ALL rows — mask numeric data cells with placeholders
+            # so the snapshot is structure/spec, not data.
+            # "#value" = integer/count cell, "%value" = percentage cell
+            all_rows = []
+            for r in range(1, nr):
+                row = []
+                for c in range(nc):
+                    text = tbl.cell(r, c).text.strip()
+                    if not text:
+                        row.append("")
+                    else:
+                        # Check if cell is numeric data
+                        cleaned = text.replace(",", "").replace("%", "").replace("$", "").strip()
+                        try:
+                            float(cleaned)
+                            # It's numeric — classify and mask
+                            if "%" in text:
+                                row.append("%value")
+                            elif "." in cleaned:
+                                row.append("%value")
+                            else:
+                                row.append("#value")
+                        except ValueError:
+                            # Not numeric — keep the text (it's a label/header)
+                            row.append(text)
+                all_rows.append(row)
             shapes.append({
                 **base, "type": "table",
                 "row_count": nr, "col_count": nc,
-                "headers": headers, "sample_rows": sample,
+                "headers": headers, "all_rows": all_rows,
             })
 
         elif shape.has_text_frame:
@@ -377,7 +400,7 @@ def format_slide_for_interpretation(context: dict) -> str:
             lines.append(f"[TABLE] {s['name']} at {pos}")
             lines.append(f"  {s.get('row_count', '?')} rows x {s.get('col_count', '?')} cols")
             lines.append(f"  Headers: {s.get('headers', [])}")
-            for row in s.get("sample_rows", []):
+            for row in s.get("all_rows", s.get("sample_rows", [])):
                 lines.append(f"    {row}")
             lines.append("")
 
@@ -647,113 +670,495 @@ def verify_analysis_for_chart(
     }
 
 
-def propose_raw_configs(chart_shape: dict, df: pd.DataFrame) -> dict:
-    """Derive raw_pivot_config + raw_mapping_config for a non-connected chart.
+def _classify_columns(df: pd.DataFrame) -> dict:
+    """Classify every DataFrame column into a role based on name + values.
 
-    Uses the chart shape context (from read_slide_context) and a fetched
-    Synapse DataFrame to identify RowFields, ColumnFields, and ValueFields
-    via overlap matching — no user input required.
+    Returns:
+        {
+            "temporal":   [(col, score), ...],   # time-period-like columns
+            "categorical":[(col, cardinality), ...],  # low-cardinality string cols
+            "numeric":    [(col, range_type), ...],   # "decimal" | "whole" | "integer"
+            "identifier": [col, ...],            # IDs, high cardinality ints
+            "label":      [col, ...],            # y_label, question_text, etc.
+        }
+    """
+    import re as _re
 
-    CustomList and moveRowsToFirst/moveRowsToLast are left as null/[] — time
-    period ordering is delegated to the Synapse CLI.
+    _TEMPORAL_NAMES = {"time_period_name", "time_period", "period", "quarter",
+                       "wave", "date", "month", "year", "deliverable"}
+    _TEMPORAL_PATTERNS = [
+        _re.compile(r"^Q[1-4][\s']?\d{2,4}$", _re.I),        # Q1'26, Q1 2026
+        _re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s']?\d{2,4}$", _re.I),
+        _re.compile(r"^\d{4}[-/]\d{2}$"),                      # 2026-01
+        _re.compile(r"^(Wave|W)\s*\d+$", _re.I),               # Wave 3
+    ]
+    _ID_NAMES = {"analysis_id", "project_id", "reporting_plan_id", "segment_id",
+                 "rule_id", "id", "record_id", "respondent_id", "survey_id",
+                 "time_period_id"}
+    _LABEL_NAMES = {"y_label", "question_text", "question", "label", "text",
+                    "attribute", "product", "brand", "message"}
+    _NUMERIC_NAMES = {"decimal", "percentage", "value", "pct", "count", "mean",
+                      "base", "base_size", "n", "sample_size", "weight"}
+
+    result = {"temporal": [], "categorical": [], "numeric": [],
+              "identifier": [], "label": []}
+
+    for col in df.columns:
+        col_lower = col.lower().strip()
+        is_numeric = pd.api.types.is_numeric_dtype(df[col])
+        unique = df[col].dropna().unique()
+        cardinality = len(unique)
+
+        # ── Identifier columns: known ID names, or numeric with high cardinality ──
+        if col_lower in _ID_NAMES:
+            result["identifier"].append(col)
+            continue
+        if is_numeric and cardinality > 50 and col_lower not in _NUMERIC_NAMES:
+            result["identifier"].append(col)
+            continue
+
+        # ── Numeric value columns ──
+        if is_numeric:
+            if cardinality == 0:
+                continue
+            col_max = df[col].max()
+            col_min = df[col].min()
+            if col_min >= 0 and col_max <= 1.01:
+                range_type = "decimal"
+            elif col_min >= 0 and col_max <= 100.5:
+                range_type = "whole"
+            else:
+                range_type = "integer"
+            result["numeric"].append((col, range_type))
+            continue
+
+        # ── String columns: temporal, label, or categorical ──
+        str_vals = [str(v).strip() for v in unique if v is not None and str(v).strip()]
+
+        # Check temporal by name
+        if col_lower in _TEMPORAL_NAMES:
+            result["temporal"].append((col, 1.0))
+            continue
+
+        # Check temporal by value pattern
+        if str_vals:
+            temporal_hits = sum(
+                1 for v in str_vals[:20]
+                if any(p.match(v) for p in _TEMPORAL_PATTERNS)
+            )
+            if temporal_hits / max(len(str_vals[:20]), 1) >= 0.5:
+                result["temporal"].append((col, temporal_hits / len(str_vals[:20])))
+                continue
+
+        # Label columns by name
+        if col_lower in _LABEL_NAMES:
+            result["label"].append(col)
+            continue
+
+        # Everything else: categorical (if cardinality is reasonable)
+        if 1 <= cardinality <= 100:
+            result["categorical"].append((col, cardinality))
+
+    return result
+
+
+def propose_pivot_config(
+    df: pd.DataFrame,
+    chart_shape: dict | None = None,
+) -> dict:
+    """Infer PivotConfig entirely from a Synapse DataFrame.
+
+    When chart_shape is provided (from read_slide_context), uses series/category
+    Jaccard overlap to validate and refine the heuristic guess.  When chart_shape
+    is absent, relies purely on column classification.
 
     Args:
-        chart_shape: one shape dict from read_slide_context() with type="chart"
-        df:          full DataFrame from fetch_synapse_data()
+        df:           DataFrame from fetch_synapse_data().
+        chart_shape:  Optional shape dict with keys: categories, series_names,
+                      series_values, chart_pattern.
+
+    Returns:
+        {
+            "row_field":      str,          # categories / x-axis
+            "series_column":  str,          # series / legend
+            "value_field":    str,          # numeric cell values
+            "val_format":     str,          # "0%" or ""
+            "confidence":     float,        # 0.0–1.0 overall confidence
+            "derivation": {
+                "row_field":     (col, reason_str),
+                "series_column": (col, reason_str),
+                "value_field":   (col, reason_str),
+            },
+            "column_roles":   dict,         # full classification for debugging
+            "error":          str | None,
+        }
+    """
+    if df.empty:
+        return {"error": "DataFrame is empty."}
+
+    roles = _classify_columns(df)
+
+    # ── Helpers ──
+    def _jaccard(col_vals, target_vals):
+        a = {str(v).lower().strip() for v in col_vals}
+        b = {str(v).lower().strip() for v in target_vals}
+        return len(a & b) / len(a | b) if (a | b) else 0.0
+
+    chart_categories = [str(c) for c in chart_shape.get("categories", [])] if chart_shape else []
+    chart_series = [str(s) for s in chart_shape.get("series_names", [])] if chart_shape else []
+
+    row_field = None
+    row_reason = ""
+    row_confidence = 0.0
+
+    series_col = None
+    series_reason = ""
+    series_confidence = 0.0
+
+    val_field = None
+    val_reason = ""
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Step 1: VALUE FIELD — easiest to determine
+    # ════════════════════════════════════════════════════════════════════════
+    numerics = roles["numeric"]
+    if not numerics:
+        return {"error": "No numeric columns found in DataFrame."}
+
+    # Prefer "decimal" in 0–1 range, then "percentage", then first decimal-range col
+    decimal_cols = [(c, rt) for c, rt in numerics if rt == "decimal"]
+    whole_cols = [(c, rt) for c, rt in numerics if rt == "whole"]
+
+    for name in ("decimal", "percentage", "value", "pct"):
+        for c, rt in decimal_cols:
+            if c.lower() == name:
+                val_field, val_reason = c, f"known name '{c}' with 0–1 range"
+                break
+        if val_field:
+            break
+
+    if not val_field and decimal_cols:
+        val_field = decimal_cols[0][0]
+        val_reason = f"first 0–1 range column ({val_field})"
+
+    if not val_field:
+        for name in ("percentage", "value", "pct", "count", "mean"):
+            for c, rt in numerics:
+                if c.lower() == name:
+                    val_field, val_reason = c, f"known name '{c}' with {rt} range"
+                    break
+            if val_field:
+                break
+
+    if not val_field:
+        val_field = numerics[0][0]
+        val_reason = f"fallback — first numeric column ({val_field})"
+
+    val_format = "0%" if any(c == val_field and rt == "decimal" for c, rt in numerics) else ""
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Step 2: ROW FIELD — temporal or label column (chart categories)
+    # ════════════════════════════════════════════════════════════════════════
+    # When chart context is available, use Jaccard to find best overlap
+    if chart_categories:
+        all_string_cols = (
+            [(c, "temporal") for c, _ in roles["temporal"]]
+            + [(c, "label") for c in roles["label"]]
+            + [(c, "categorical") for c, _ in roles["categorical"]]
+        )
+        best_row_score = 0.0
+        for col, src in all_string_cols:
+            score = _jaccard(df[col].dropna().unique(), chart_categories)
+            if score > best_row_score:
+                best_row_score = score
+                row_field = col
+                row_reason = f"Jaccard {score:.2f} vs chart categories (from {src})"
+                row_confidence = score
+        if best_row_score == 0.0:
+            row_field = None
+
+    # Pure heuristic (no chart context, or chart overlap failed)
+    if not row_field:
+        # Filter temporal columns to those with cardinality > 1
+        # (single-value temporal cols are degenerate — not useful as row axis)
+        viable_temporal = [
+            (c, score) for c, score in roles["temporal"]
+            if len(df[c].dropna().unique()) > 1
+        ]
+
+        # Decide: temporal vs label. Label columns (y_label, product, brand)
+        # with multiple values are strong row_field candidates. Temporal wins
+        # only when it has meaningful cardinality (trended chart pattern).
+        label_with_cardinality = [
+            (c, len(df[c].dropna().unique())) for c in roles["label"]
+            if len(df[c].dropna().unique()) > 1
+        ]
+
+        if label_with_cardinality and not viable_temporal:
+            # Label column present, no viable temporal → label wins
+            best = max(label_with_cardinality, key=lambda x: x[1])
+            row_field = best[0]
+            row_reason = f"label column '{row_field}' ({best[1]} unique, no viable temporal)"
+            row_confidence = 0.7
+        elif viable_temporal and not label_with_cardinality:
+            # Temporal present, no label → temporal wins
+            best = max(viable_temporal, key=lambda x: x[1])
+            row_field = best[0]
+            row_reason = f"temporal column (pattern score {best[1]:.2f})"
+            row_confidence = 0.7 * best[1]
+        elif viable_temporal and label_with_cardinality:
+            # Both present — temporal wins if higher cardinality (trended chart),
+            # else label wins (categorical chart with a single wave filter)
+            temp_best = max(viable_temporal, key=lambda x: x[1])
+            temp_card = len(df[temp_best[0]].dropna().unique())
+            label_best = max(label_with_cardinality, key=lambda x: x[1])
+            if temp_card >= label_best[1]:
+                row_field = temp_best[0]
+                row_reason = f"temporal column ({temp_card} unique >= label {label_best[1]})"
+                row_confidence = 0.6
+            else:
+                row_field = label_best[0]
+                row_reason = f"label column '{label_best[0]}' ({label_best[1]} unique > temporal {temp_card})"
+                row_confidence = 0.6
+        elif roles["label"]:
+            row_field = roles["label"][0]
+            row_reason = f"label column by name ('{row_field}')"
+            row_confidence = 0.6
+        elif roles["temporal"]:
+            # Even single-value temporal as last resort
+            best = max(roles["temporal"], key=lambda x: x[1])
+            row_field = best[0]
+            row_reason = f"temporal column fallback (cardinality 1)"
+            row_confidence = 0.3
+        elif roles["categorical"]:
+            # Pick the categorical column with highest cardinality
+            best = max(roles["categorical"], key=lambda x: x[1])
+            row_field = best[0]
+            row_reason = f"highest-cardinality categorical ({best[1]} unique)"
+            row_confidence = 0.4
+
+    if not row_field:
+        return {"error": "Cannot determine row_field — no temporal, label, or categorical columns."}
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Step 3: SERIES COLUMN — categorical column (chart series / legend)
+    # ════════════════════════════════════════════════════════════════════════
+    # Exclude row_field and identifier columns from candidates
+    excluded = {row_field} | set(roles["identifier"])
+    # Also exclude the value_field
+    excluded.add(val_field)
+
+    candidates = []
+    for c, card in roles["categorical"]:
+        if c not in excluded:
+            candidates.append((c, card, "categorical"))
+    for c, _ in roles["temporal"]:
+        if c not in excluded:
+            candidates.append((c, len(df[c].dropna().unique()), "temporal"))
+    for c in roles["label"]:
+        if c not in excluded:
+            candidates.append((c, len(df[c].dropna().unique()), "label"))
+
+    # When chart context is available, use Jaccard to pick the best
+    if chart_series and candidates:
+        best_series_score = 0.0
+        for col, card, src in candidates:
+            score = _jaccard(df[col].dropna().unique(), chart_series)
+            if score > best_series_score:
+                best_series_score = score
+                series_col = col
+                series_reason = f"Jaccard {score:.2f} vs chart series (from {src})"
+                series_confidence = score
+
+    # Pure heuristic fallback
+    if not series_col and candidates:
+        # Known series column names
+        _SERIES_NAMES = {"option", "measure", "metric", "segment", "group",
+                         "segment_1", "segment_2", "response", "scale"}
+        # Priority 1: known name
+        for col, card, src in candidates:
+            if col.lower() in _SERIES_NAMES:
+                series_col = col
+                series_reason = f"known series name '{col}' ({card} unique)"
+                series_confidence = 0.7
+                break
+        # Priority 2: lowest cardinality categorical (series usually have 2–10 values)
+        if not series_col:
+            # Prefer columns with 2–10 unique values — that's series-like
+            series_like = [(c, card, src) for c, card, src in candidates if 2 <= card <= 10]
+            if series_like:
+                best = min(series_like, key=lambda x: x[1])
+                series_col = best[0]
+                series_reason = f"low-cardinality categorical ({best[1]} unique, {best[2]})"
+                series_confidence = 0.5
+            else:
+                best = min(candidates, key=lambda x: x[1])
+                series_col = best[0]
+                series_reason = f"lowest-cardinality remaining ({best[1]} unique, {best[2]})"
+                series_confidence = 0.3
+
+    if not series_col:
+        return {"error": "Cannot determine series_column — no categorical columns remain after row_field."}
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Step 4: Overall confidence
+    # ════════════════════════════════════════════════════════════════════════
+    confidence = min(row_confidence, series_confidence)
+    # Boost if both came from chart overlap
+    if chart_categories and chart_series and row_confidence > 0.5 and series_confidence > 0.5:
+        confidence = (row_confidence + series_confidence) / 2
+
+    return {
+        "row_field": row_field,
+        "series_column": series_col,
+        "value_field": val_field,
+        "val_format": val_format,
+        "confidence": round(confidence, 3),
+        "derivation": {
+            "row_field":     (row_field, row_reason),
+            "series_column": (series_col, series_reason),
+            "value_field":   (val_field, val_reason),
+        },
+        "column_roles": roles,
+        "error": None,
+    }
+
+
+def propose_raw_configs(
+    chart_shape: dict | None,
+    df: pd.DataFrame,
+    *,
+    value_field: str | None = None,
+    computed_columns: list[dict] | None = None,
+) -> dict:
+    """Derive raw_pivot_config + raw_mapping_config for a non-connected component.
+
+    Delegates field inference to propose_pivot_config().  When chart_shape is
+    provided (from read_slide_context), it is used for Jaccard validation.
+    When chart_shape is None, pure DataFrame heuristics are used.
+
+    Args:
+        chart_shape:      Optional shape dict from read_slide_context() with
+                          type="chart".  Pass None to infer from DataFrame.
+        df:               Full DataFrame from fetch_synapse_data().
+        value_field:      Override the inferred value field (e.g. "count" for
+                          tables showing counts instead of percentages).
+        computed_columns: List of computed column specs for tables with
+                          aggregated columns.  Each entry::
+
+                              {"name": "PCPs",
+                               "formula": "=B2+D2+E2",
+                               "source_columns": ["Internal Medicine (PCP)",
+                                                   "Family Medicine (PCP)",
+                                                   "General Medicine / Practice (PCP)"]}
+
+                          Source columns are included in columnDefinitions
+                          (for the formula to reference) but excluded from
+                          selectedColumns.  A ``<blank:name>`` entry is added
+                          to selectedColumns in their place.
 
     Returns:
         {
             "raw_pivot_config":  {...},
             "raw_mapping_config": {...},
             "derivation": {
-                "row_field":    (col_name, overlap_score),
-                "series_column": (col_name, overlap_score),
-                "value_field":  (col_name, reason_str),
+                "row_field":     (col_name, reason_str),
+                "series_column": (col_name, reason_str),
+                "value_field":   (col_name, reason_str),
             },
+            "confidence": float,
             "error": None | str,
         }
     """
-    chart_categories = [str(c) for c in chart_shape.get("categories", [])]
-    chart_series     = [str(s) for s in chart_shape.get("series_names", [])]
-    chart_values_raw = chart_shape.get("series_values", {})
+    pivot = propose_pivot_config(df, chart_shape)
+    if pivot.get("error"):
+        return {"error": pivot["error"]}
 
-    # Flatten all numeric values visible in the chart (for range inference)
-    all_chart_vals = [
-        v for vals in chart_values_raw.values()
-        for v in (vals if isinstance(vals, list) else [])
-        if isinstance(v, (int, float))
-    ]
+    row_field = pivot["row_field"]
+    col_field = pivot["series_column"]
+    val_field = value_field or pivot["value_field"]
+    val_format = pivot["val_format"] if not value_field else ""
 
-    # Covers both legacy object dtype and newer pd.StringDtype
-    str_cols = [
-        c for c in df.columns
-        if df[c].dtype == object or pd.api.types.is_string_dtype(df[c])
-    ]
-    num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    # When value_field is overridden, recompute val_format
+    if value_field:
+        if value_field in ("decimal",) and val_field == value_field:
+            val_format = "0%"
+        elif value_field in ("count", "base", "respondents"):
+            val_format = ""  # counts don't get % format
 
-    def _jaccard(col_unique_vals, target_vals):
-        a = {str(v).lower().strip() for v in col_unique_vals}
-        b = {str(v).lower().strip() for v in target_vals}
-        return len(a & b) / len(a | b) if (a | b) else 0.0
+    # ── Series ordering: use chart order when available, else data order ──
+    chart_series = (
+        [str(s) for s in chart_shape.get("series_names", [])]
+        if chart_shape else []
+    )
+    ordered_series = chart_series or df[col_field].dropna().unique().tolist()
+    ordered_series = [str(s) for s in ordered_series]
 
-    # ── RowFields: column whose unique values best overlap chart categories ──
-    row_scores = {
-        col: _jaccard(df[col].dropna().unique(), chart_categories)
-        for col in str_cols
-    }
-    row_field = max(row_scores, key=row_scores.get) if row_scores else None
-    row_score = row_scores.get(row_field, 0.0)
-    if not row_field or row_score == 0.0:
-        return {"error": f"Cannot match chart categories {chart_categories} to any column. "
-                         f"Scores: {row_scores}"}
-
-    # ── ColumnFields: column (excl. row_field) that best matches series names ──
-    series_scores = {
-        col: _jaccard(df[col].dropna().unique(), chart_series)
-        for col in str_cols if col != row_field
-    }
-    col_field = max(series_scores, key=series_scores.get) if series_scores else None
-    col_score = series_scores.get(col_field, 0.0)
-    if not col_field or col_score == 0.0:
-        return {"error": f"Cannot match chart series {chart_series} to any column. "
-                         f"Scores: {series_scores}"}
-
-    # ── ValueFields: numeric column whose 0–1 range matches stacked chart values ──
-    val_field = None
-    val_reason = ""
-    # Prefer "decimal" if it exists and sits in 0–1 range
-    if "decimal" in num_cols and df["decimal"].max() <= 1.01:
-        val_field = "decimal"
-        val_reason = "decimal column present with 0–1 range"
-    else:
-        # Pick first numeric column whose values are in 0–1 range
-        for col in num_cols:
-            if df[col].min() >= 0 and df[col].max() <= 1.01:
-                val_field = col
-                val_reason = f"{col} has 0–1 range"
-                break
-        if val_field is None and num_cols:
-            val_field = num_cols[0]
-            val_reason = f"fallback — first numeric column ({val_field})"
-
-    if val_field is None:
-        return {"error": "No numeric value column found in DataFrame."}
-
-    val_format = "0%" if df[val_field].max() <= 1.01 else ""
+    # ── Computed columns: track which source columns are consumed ──
+    computed = computed_columns or []
+    consumed_sources = set()
+    for cc in computed:
+        consumed_sources.update(cc.get("source_columns", []))
 
     # ── columnDefinitions ──
-    # Row field entry — label column, no format, no sort criteria
+    # Sort series alphabetically to match Connector convention.
+    # This ensures computed column formulas reference correct positions.
     col_defs = [{"IsDefaultAlias": True, "Name": row_field}]
-    # Series entries — use chart's series order so column ordering is preserved
-    ordered_series = chart_series or df[col_field].dropna().unique().tolist()
-    for sname in ordered_series:
+    for sname in sorted(ordered_series):
         entry: dict = {"IsDefaultAlias": True, "Name": sname}
-        if val_format:
+        if sname not in consumed_sources and val_format:
             entry["Format"] = val_format
         col_defs.append(entry)
 
-    # ── selectedColumns: row field first, then series in chart order ──
-    selected_cols = [row_field] + ordered_series
+    # Add computed column definitions
+    # Auto-compute Excel formula from source_columns positions in col_defs
+    def _col_letter(idx: int) -> str:
+        """Convert 0-based column index to Excel letter (A, B, ... Z, AA, ...)."""
+        result = ""
+        while True:
+            result = chr(65 + idx % 26) + result
+            idx = idx // 26 - 1
+            if idx < 0:
+                break
+        return result
+
+    # Build name→index map from current col_defs
+    col_name_to_idx = {cd["Name"]: i for i, cd in enumerate(col_defs)}
+
+    for cc in computed:
+        formula = cc.get("formula")
+        if not formula:
+            # Auto-generate from source_columns positions, sorted by column letter
+            src_refs = []
+            for src_col in cc.get("source_columns", []):
+                idx = col_name_to_idx.get(src_col)
+                if idx is not None:
+                    src_refs.append((idx, f"{_col_letter(idx)}2"))
+            src_refs.sort()  # sort by column index → alphabetical letter order
+            formula = "=" + "+".join(ref for _, ref in src_refs) if src_refs else ""
+
+        col_defs.append({
+            "Alias": cc["name"],
+            "Formula": formula,
+            "IsDefaultAlias": False,
+            "Name": f"<blank:{cc['name']}>",
+        })
+
+    # ── selectedColumns: visible series + computed columns ──
+    # For charts: include row_field (categories axis needs it).
+    # For tables: exclude row_field unless explicitly needed — Connector
+    # will show all selectedColumns as table columns, and including
+    # row_field adds an unwanted "Deliverable" column.
+    # When chart_shape is provided, it's a chart → include row_field.
+    # When chart_shape is None, it's likely a table → exclude row_field.
+    selected_cols = []
+    if chart_shape is not None:
+        selected_cols.append(row_field)
+    for sname in sorted(ordered_series):
+        if sname not in consumed_sources:
+            selected_cols.append(sname)
+    for cc in computed:
+        selected_cols.append(f"<blank:{cc['name']}>")
 
     raw_pivot_config = {
         "AggregationType": 0,
@@ -787,11 +1192,8 @@ def propose_raw_configs(chart_shape: dict, df: pd.DataFrame) -> dict:
     return {
         "raw_pivot_config": raw_pivot_config,
         "raw_mapping_config": raw_mapping_config,
-        "derivation": {
-            "row_field":     (row_field, round(row_score, 3)),
-            "series_column": (col_field, round(col_score, 3)),
-            "value_field":   (val_field, val_reason),
-        },
+        "derivation": pivot["derivation"],
+        "confidence": pivot["confidence"],
         "error": None,
     }
 
@@ -1031,26 +1433,24 @@ def write_connector_tags(
         pivot_hash  = _sha256(pivot_json)
 
         # ── Column key label map: field name → display label ─────────────
-        row_field  = (pivot_cfg.get("RowFields") or ["time_period_name"])[0]
-        col_field  = (pivot_cfg.get("ColumnFields") or ["option"])[0]
-        val_field  = (pivot_cfg.get("ValueFields") or ["decimal"])[0]
+        # Include all standard Synapse API fields (matches Connector's format)
         col_label_map = {
-            row_field: "Deliverable",
-            col_field: col_field.replace("_", " ").title(),
-            val_field: "Value(%)",
+            "time_period_name": "Deliverable",
+            "code": "Code",
+            "option": "Option",
+            "base": "Base",
+            "count": "Count",
+            "respondents": "Respondents",
+            "decimal": "Value(%)",
         }
 
-        vis_id      = f"Darwin_{random.randint(10_000_000, 99_999_999)}"
-        stassig_id  = f"StasSigId_{random.randint(1_000_000, 99_999_999)}"
         now_iso     = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
 
+        # Essential tags only — matches what Connector writes natively.
+        # Extra tags (DARWINVERSION, UPDATE, VISUALISATION_ID, STASSIGID,
+        # MIGRATIONPHASE, FAILEDREFRESHICONID) cause Connector to mishandle
+        # tables on refresh.
         tag_entries = {
-            "UPDATE":                    "unlock",
-            "DARWINVERSION":             "CSharp",
-            "VISUALISATION_ID":          vis_id,
-            "FAILEDREFRESHICONID":       vis_id,
-            "STASSIGID":                 stassig_id,
-            "MIGRATIONPHASE":            "Phase0",
             "ANALYSISTYPE":              "SINGLE_QUESTION",
             "REPORTCONFIGHASH":          report_hash,
             "REPORTCONFIGHASH_BACKUP":   report_json,
@@ -1266,6 +1666,9 @@ def _write_cell_text(cell, text: str) -> None:
             r.text = ""
     if cell.text_frame.paragraphs and cell.text_frame.paragraphs[0].runs:
         cell.text_frame.paragraphs[0].runs[0].text = text
+    else:
+        # Cell has no runs (empty cell) — set text directly
+        cell.text_frame.paragraphs[0].text = text
 
 
 def refresh_slide_from_mapping(
@@ -1878,7 +2281,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             "mode": "raw_connector",
                         })
 
-                elif ctype in ("value_table", "label_table"):
+                elif ctype in ("value_table", "label_table", "table"):
                     shape = table_shapes.get(name)
                     if not shape:
                         slide_results["tables"].append({"name": name, "status": "not_found"})
@@ -1886,9 +2289,84 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
                     tbl = shape.table
 
-                    # For connected tables, restore from source (reliable).
-                    # Table refresh from pivot configs is complex and fragile
-                    # across table types. Charts are the high-value refresh target.
+                    # ── CELL VALUES PATH ──
+                    # When cell_values is present (written by Claude after
+                    # interpreting table_description + Synapse data), write
+                    # them directly into the table cells.
+                    #
+                    # Dynamic sizing: cell_values drives the row/column count.
+                    # If more rows are needed, clone the last row via lxml.
+                    # Headers are controlled by source_snapshot — if the source
+                    # had headers, cell_values[0] is treated as a header row.
+                    cell_values = comp.get("cell_values")
+                    if cell_values:
+                        try:
+                            from copy import deepcopy
+                            tbl_xml = tbl._tbl
+                            ns_a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+                            xml_rows = tbl_xml.findall(f"{ns_a}tr")
+
+                            needed_rows = len(cell_values)
+                            current_rows = len(xml_rows)
+
+                            # Add rows if needed (clone last row)
+                            while current_rows < needed_rows:
+                                new_row = deepcopy(xml_rows[-1])
+                                tbl_xml.append(new_row)
+                                xml_rows = tbl_xml.findall(f"{ns_a}tr")
+                                current_rows = len(xml_rows)
+
+                            # Remove excess rows if data has fewer
+                            while current_rows > needed_rows:
+                                tbl_xml.remove(xml_rows[-1])
+                                xml_rows = tbl_xml.findall(f"{ns_a}tr")
+                                current_rows = len(xml_rows)
+
+                            # Write cell values + mark unwritten data cells as "xx"
+                            # Re-fetch python-pptx table reference after XML changes
+                            tbl = shape.table
+                            n_rows = len(tbl.rows)
+                            n_cols = len(tbl.columns)
+                            # Track which cells we explicitly write
+                            written = set()
+                            for r, row_vals in enumerate(cell_values):
+                                for c, val in enumerate(row_vals):
+                                    if r < n_rows and c < n_cols:
+                                        _write_cell_text(tbl.cell(r, c), str(val))
+                                        written.add((r, c))
+                            # Any unwritten cell that had data → mark stale
+                            # Numeric cells (stale data) → "xx", non-numeric (labels/headers) → retain
+                            for r in range(n_rows):
+                                for c in range(n_cols):
+                                    if (r, c) not in written:
+                                        existing = tbl.cell(r, c).text.strip()
+                                        if not existing:
+                                            continue
+                                        cleaned = existing.replace(",", "").replace("%", "").replace("$", "").strip()
+                                        try:
+                                            float(cleaned)
+                                            # Numeric — stale data, mark as xx
+                                            _write_cell_text(tbl.cell(r, c), "xx")
+                                        except ValueError:
+                                            pass  # Non-numeric (label/header) — retain
+
+                            slide_results["tables"].append({
+                                "name": name, "status": "ok",
+                                "mode": "cell_values",
+                                "rows_written": needed_rows,
+                                "rows_added": max(0, needed_rows - len(xml_rows)),
+                            })
+                        except Exception as e2:
+                            slide_results["tables"].append({
+                                "name": name, "status": "error", "error": str(e2),
+                                "mode": "cell_values",
+                            })
+                        continue
+
+                    # ── SOURCE RESTORE PATH ──
+                    # For connected tables without cell_values, restore from
+                    # source (reliable). Table refresh from pivot configs is
+                    # complex and fragile across table types.
                     try:
                         src_tbl_shape = None
                         for s2 in src_prs.slides[si].shapes:
