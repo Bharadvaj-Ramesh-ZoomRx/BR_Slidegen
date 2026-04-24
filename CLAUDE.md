@@ -783,8 +783,8 @@ For each chart/table, the user must provide:
 from slidegen.intelligent_refresh import fetch_synapse_data, propose_pivot_config, propose_raw_configs
 
 # Fetch
-lineage = {"project_id": 523, "reporting_plan_id": 1143,
-           "analysis_ids": [641211], "segment_ids": [], "dynamic_latest_n": 4}
+lineage = {"project_id": <pid>, "reporting_plan_id": <rpid>,
+           "analysis_ids": [<aid>], "segment_ids": [], "dynamic_latest_n": 4}
 records, df = fetch_synapse_data(lineage)
 
 # Infer — for charts (with chart_shape for Jaccard validation)
@@ -792,9 +792,8 @@ result = propose_pivot_config(df, chart_shape)
 
 # Infer — for tables (no chart_shape, override value_field, optional computed columns)
 raw = propose_raw_configs(None, df, value_field="count", computed_columns=[{
-    "name": "PCPs",
-    "source_columns": ["Internal Medicine (PCP)", "Family Medicine (PCP)",
-                        "General Medicine / Practice (PCP)"],
+    "name": "GroupedCol",
+    "source_columns": ["SourceA", "SourceB", "SourceC"],
 }])
 ```
 
@@ -826,9 +825,9 @@ Read the output PPTX. Check: correct categories/periods, values match expected f
 ```python
 from slidegen.intelligent_refresh import write_connector_tags
 
-shape_configs = [{"shape_name": "PS", "raw_pivot_config": {...},
-                  "raw_mapping_config": {...}, "analysis_id": 641211}]
-data_lineage = {"project_id": 523, "reporting_plan_id": 1143,
+shape_configs = [{"shape_name": "<shape>", "raw_pivot_config": {...},
+                  "raw_mapping_config": {...}, "analysis_id": <aid>}]
+data_lineage = {"project_id": <pid>, "reporting_plan_id": <rpid>,
                 "segment_ids": [], "dynamic_latest_n": 4}
 
 write_connector_tags("output/refreshed.pptx", slide_index=0,
@@ -879,7 +878,7 @@ result = propose_raw_configs(
     *,
     value_field: str | None = None,  # "count", "decimal", "base" — override auto-inference
     computed_columns: list[dict] | None = None,
-    # Each: {"name": "PCPs", "source_columns": ["col1", "col2", ...]}
+    # Each: {"name": "GroupedCol", "source_columns": ["col1", "col2", ...]}
     # Formula is auto-computed from source_columns positions in sorted columnDefinitions
 ) -> dict
 # Returns: {"raw_pivot_config": {...}, "raw_mapping_config": {...},
@@ -940,9 +939,9 @@ result = write_connector_tags(
 {
   "source_deck": "../deck.pptx",
   "data_sources": {
-    "p523_rp1143_a641211": {
-      "project_id": 523, "reporting_plan_id": 1143,
-      "analysis_ids": [641211], "segment_ids": [], "dynamic_latest_n": 4
+    "p<pid>_rp<rpid>_a<aid>": {
+      "project_id": "<pid>", "reporting_plan_id": "<rpid>",
+      "analysis_ids": ["<aid>"], "segment_ids": [], "dynamic_latest_n": 4
     }
   },
   "slides": [{
@@ -951,20 +950,20 @@ result = write_connector_tags(
     "components": [
       {
         "type": "chart",
-        "name": "PS",
+        "name": "<chart_shape_name>",
         "chart_pattern": "column_stacked_100_vertical",
-        "data_source": "p523_rp1143_a641211",
+        "data_source": "p<pid>_rp<rpid>_a<aid>",
         "raw_pivot_config": { "RowFields": ["time_period_name"], "ColumnFields": ["option"],
                               "ValueFields": ["decimal"], "columnDefinitions": [...] },
         "raw_mapping_config": { "selectedColumns": ["time_period_name", ...], "selectAllRows": true }
       },
       {
         "type": "value_table",
-        "name": "Table 17",
-        "data_source": "p523_rp1143_a641205",
-        "table_description": "# of HCPs by specialty groups...",
+        "name": "<table_shape_name>",
+        "data_source": "p<pid>_rp<rpid>_a<aid2>",
+        "table_description": "What the table shows — columns, value type, groupings...",
         "source_snapshot": { "headers": [...], "all_rows": [...] },
-        "cell_values": [["Gastros", "PCPs"], ["121", "64"], ...],
+        "cell_values": [["Header1", "Header2"], ["val1", "val2"], ...],
         "raw_pivot_config": { ... },
         "raw_mapping_config": { ... }
       }
@@ -1021,19 +1020,18 @@ Table has columns outside the Connector mapping (e.g., NP/PAs from a different a
 
 ### Computed columns
 
-For tables that aggregate multiple series into one (e.g., PCPs = 3 specialties summed):
+For tables that aggregate multiple series into one grouped column:
 
 ```python
 propose_raw_configs(None, df, value_field="count", computed_columns=[{
-    "name": "PCPs",
-    "source_columns": ["Internal Medicine (PCP)", "Family Medicine (PCP)",
-                        "General Medicine / Practice (PCP)"],
+    "name": "GroupedCol",
+    "source_columns": ["SourceA", "SourceB", "SourceC"],
 }])
 ```
 
-- Auto-generates Excel formula (e.g., `=B2+D2+E2`) from source_columns positions in alphabetically sorted `columnDefinitions`
-- Adds `{"Alias": "PCPs", "Formula": "=B2+D2+E2", "IsDefaultAlias": false, "Name": "<blank:PCPs>"}` to columnDefinitions
-- `selectedColumns` uses `"<blank:PCPs>"` instead of the raw source columns
+- Auto-generates Excel formula from source_columns positions in alphabetically sorted `columnDefinitions` (e.g., if SourceA is at column B, SourceB at D, SourceC at E → `=B2+D2+E2`)
+- Adds `{"Alias": "GroupedCol", "Formula": "=B2+D2+E2", "IsDefaultAlias": false, "Name": "<blank:GroupedCol>"}` to columnDefinitions
+- `selectedColumns` uses `"<blank:GroupedCol>"` instead of the raw source columns
 
 ---
 
@@ -1049,7 +1047,7 @@ propose_raw_configs(None, df, value_field="count", computed_columns=[{
 | `value` | float | 0.652482 | Full-precision decimal (rarely used directly) |
 | `time_period_name` | str | "Jan'26" | Row labels / categories |
 | `time_period_id` | int | 15163 | Period ordering (**NOT chronological for all projects!**) |
-| `option` | str | "Gastroenterology" | Series names / column headers |
+| `option` | str | "Option A" | Series names / column headers |
 | `code` | str | "A1" | Option code identifier |
 
 ---
@@ -1075,7 +1073,7 @@ propose_raw_configs(None, df, value_field="count", computed_columns=[{
 
 ## Known Decisions and Gotchas
 
-1. **`time_period_id` is NOT chronological** — for some projects (e.g., CREON 523), 2026 IDs are in reverse order. Parse period names to sort chronologically instead.
+1. **`time_period_id` is NOT chronological** — for some projects, IDs are assigned in reverse or non-sequential order. Parse period names to sort chronologically instead.
 
 2. **`dynamic_latest_n` may not filter at API level** — the Synapse API may return all periods regardless. Filter client-side when computing `cell_values` for tables.
 
@@ -1120,8 +1118,8 @@ python -m slidegen.intelligent_refresh refresh-deck --spec output/spec.json --ou
 # Setup non-connected: verify + derive + stamp tags
 python -m slidegen.intelligent_refresh setup-nonconnected \
     --spec output/spec.json --pptx deck.pptx --slide 0 \
-    --shapes '[{"shape_name":"PS","analysis_id":641211}]' \
-    --project-id 523 --reporting-plan-id 1143
+    --shapes '[{"shape_name":"<shape>","analysis_id":<aid>}]' \
+    --project-id <pid> --reporting-plan-id <rpid>
 
 # Write headline
 python -m slidegen.intelligent_refresh headline --pptx deck.pptx --slide 0 --text "..."
