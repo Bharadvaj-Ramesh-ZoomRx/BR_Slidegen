@@ -485,51 +485,68 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+_DEFAULT_LABEL_COL_PRIORITY = ("option", "alias_label", "x_label", "y_label")
+_SERIES_SUFFIXES = (" current", " prior", " previous")
+
+
+def _normalize_label(s: str) -> str:
+    """Lowercase, trim, and strip common wave/period suffixes from a label."""
+    s = s.lower().strip()
+    for suffix in _SERIES_SUFFIXES:
+        if s.endswith(suffix):
+            s = s[: -len(suffix)].strip()
+            break
+    return s
+
+
 def verify_analysis_for_chart(
     analysis_id: int,
     chart_series: list[str],
     project_id: int,
     reporting_plan_id: int,
     match_threshold: float = 0.6,
+    label_col_priority: tuple[str, ...] | list[str] | None = None,
 ) -> dict:
     """Verify that a Synapse analysis_id matches a chart's series names.
 
-    Fetches a small sample from Synapse, extracts the unique `option` values,
-    and computes the overlap with the chart's current series names.
+    Fetches a minimal sample from Synapse, dynamically picks a label column
+    (different analyses use different schemas — brand-cut uses alias_label,
+    rating-scale uses x_label/y_label, category uses option), normalizes both
+    sides (lowercase + strip wave/period suffixes like "Current" / "Prior"),
+    and scores via overlap coefficient — `|matched| / |chart_series|`. Overlap
+    is the right metric because a chart typically shows a subset of a broader
+    analysis's label universe (e.g. 3 of 9 brands); Jaccard penalizes this.
+
+    Args:
+        analysis_id, chart_series, project_id, reporting_plan_id: as before.
+        match_threshold: min overlap score to accept (default 0.6).
+        label_col_priority: columns to probe in order. Default handles the
+            common Synapse shapes; override for unusual schemas.
 
     Returns:
         {
-          "confirmed": True,
+          "confirmed": True/False,
           "analysis_id": <id>,
-          "matched": [...],       # series names found in both
+          "matched": [...],         # chart series that matched (original case)
           "score": 0.0–1.0,
-          "api_options": [...],   # all options returned by the API
-        }
-        or
-        {
-          "confirmed": False,
-          "analysis_id": <id>,
-          "score": 0.0–1.0,
-          "matched": [...],
-          "unmatched_chart": [...],   # chart series NOT found in API
-          "unmatched_api": [...],     # API options NOT in chart series
-          "api_options": [...],
+          "api_options": [...],     # raw values from the chosen label column
+          "label_column": "<name>", # which column matched (for diagnostics)
+          # Extra keys when rejected:
+          "unmatched_chart": [...], # chart series NOT in API
+          "unmatched_api":   [...], # API labels NOT in chart
           "message": "<human-readable explanation>",
         }
-
-    A score < match_threshold triggers confirmed=False, prompting the caller
-    to ask the user for a corrected analysis_id.
     """
     lineage = {
         "project_id": project_id,
         "reporting_plan_id": reporting_plan_id,
         "analysis_ids": [analysis_id],
         "segment_ids": [],
-        "dynamic_latest_n": 1,  # minimal fetch — just need option values
+        "dynamic_latest_n": 1,  # minimal fetch — just need label values
     }
     _, df = fetch_synapse_data(lineage)
 
-    if df.empty or "option" not in df.columns:
+    if df.empty:
         return {
             "confirmed": False,
             "analysis_id": analysis_id,
@@ -538,23 +555,39 @@ def verify_analysis_for_chart(
             "unmatched_chart": chart_series,
             "unmatched_api": [],
             "api_options": [],
+            "label_column": None,
+            "message": f"Analysis {analysis_id} returned no data.",
+        }
+
+    priority = tuple(label_col_priority) if label_col_priority else _DEFAULT_LABEL_COL_PRIORITY
+    label_col = next((c for c in priority if c in df.columns), None)
+    if label_col is None:
+        return {
+            "confirmed": False,
+            "analysis_id": analysis_id,
+            "score": 0.0,
+            "matched": [],
+            "unmatched_chart": chart_series,
+            "unmatched_api": [],
+            "api_options": [],
+            "label_column": None,
             "message": (
-                f"Analysis {analysis_id} returned no data or no 'option' column. "
-                "Please check the analysis_id."
+                f"Analysis {analysis_id} returned data but no known label column "
+                f"(tried {list(priority)}; got {list(df.columns)})."
             ),
         }
 
-    api_options = df["option"].dropna().unique().tolist()
-    api_set = {s.lower().strip() for s in api_options}
-    chart_set = {s.lower().strip() for s in chart_series}
+    api_options = df[label_col].dropna().astype(str).unique().tolist()
+    api_norm = {_normalize_label(v) for v in api_options}
+    chart_norm_map = {_normalize_label(s): s for s in chart_series}
 
-    matched = [s for s in chart_series if s.lower().strip() in api_set]
-    unmatched_chart = [s for s in chart_series if s.lower().strip() not in api_set]
-    unmatched_api = [s for s in api_options if s.lower().strip() not in chart_set]
+    matched_keys = set(chart_norm_map) & api_norm
+    matched = [s for s in chart_series if _normalize_label(s) in matched_keys]
+    unmatched_chart = [s for s in chart_series if _normalize_label(s) not in matched_keys]
+    unmatched_api = [v for v in api_options if _normalize_label(v) not in chart_norm_map]
 
-    # Score = Jaccard similarity between the two sets
-    union = len(api_set | chart_set)
-    score = len(api_set & chart_set) / union if union else 0.0
+    # Overlap coefficient: "is the chart covered by the API?"
+    score = len(matched_keys) / len(chart_norm_map) if chart_norm_map else 0.0
 
     if score >= match_threshold:
         return {
@@ -563,24 +596,25 @@ def verify_analysis_for_chart(
             "matched": matched,
             "score": round(score, 3),
             "api_options": api_options,
+            "label_column": label_col,
         }
-    else:
-        return {
-            "confirmed": False,
-            "analysis_id": analysis_id,
-            "score": round(score, 3),
-            "matched": matched,
-            "unmatched_chart": unmatched_chart,
-            "unmatched_api": unmatched_api,
-            "api_options": api_options,
-            "message": (
-                f"Analysis {analysis_id} has low overlap with chart series "
-                f"(score={score:.0%}). "
-                f"Chart expects: {chart_series}. "
-                f"API returned: {api_options}. "
-                "Please provide the correct analysis_id."
-            ),
-        }
+    return {
+        "confirmed": False,
+        "analysis_id": analysis_id,
+        "score": round(score, 3),
+        "matched": matched,
+        "unmatched_chart": unmatched_chart,
+        "unmatched_api": unmatched_api,
+        "api_options": api_options,
+        "label_column": label_col,
+        "message": (
+            f"Analysis {analysis_id} has low overlap with chart series "
+            f"(score={score:.0%}, label_col={label_col}). "
+            f"Chart expects: {chart_series}. "
+            f"API returned: {api_options}. "
+            "Please provide the correct analysis_id."
+        ),
+    }
 
 
 def propose_raw_configs(chart_shape: dict, df: pd.DataFrame) -> dict:
