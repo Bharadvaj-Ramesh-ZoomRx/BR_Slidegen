@@ -2302,8 +2302,10 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                     if cell_values:
                         try:
                             from copy import deepcopy
+                            import random
                             tbl_xml = tbl._tbl
                             ns_a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+                            ns_a16 = "{http://schemas.microsoft.com/office/drawing/2014/main}"
                             xml_rows = tbl_xml.findall(f"{ns_a}tr")
 
                             needed_rows = len(cell_values)
@@ -2312,6 +2314,12 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             # Add rows if needed (clone last row)
                             while current_rows < needed_rows:
                                 new_row = deepcopy(xml_rows[-1])
+                                # Generate a unique a16:rowId to prevent
+                                # Connector from treating cloned rows as
+                                # duplicates of the source row.
+                                row_id_el = new_row.find(f".//{ns_a16}rowId")
+                                if row_id_el is not None:
+                                    row_id_el.set("val", str(random.randint(1, 2**32 - 1)))
                                 tbl_xml.append(new_row)
                                 xml_rows = tbl_xml.findall(f"{ns_a}tr")
                                 current_rows = len(xml_rows)
