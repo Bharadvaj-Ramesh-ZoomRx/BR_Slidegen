@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Pradeep's Version
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. **This is the single source of truth** — do not rely on memory files, PS-Readme.md, or session notes.
 
 ## Project Overview
 
@@ -735,6 +735,419 @@ python -m slidegen.pipeline.orchestrator projects/jnj_rybrevant/config.yaml --fr
 Before any config modification, a timestamped backup is saved:
 - Location: `projects/{name}/config_history/config_{YYYYMMDD_HHMMSS}.yaml`
 - These are gitignored by default
+
+---
+
+# Intelligent Slide Refresh Pipeline
+
+## Overview
+
+The intelligent refresh pipeline (`slidegen/intelligent_refresh.py`) takes an **existing PPTX deck**, reads its chart/table structure, connects each component to Synapse data, and refreshes with live data. It handles two types of slides:
+
+- **Connected** — shapes already have Galen Connector tags (PivotConfig + MappingConfig in OOXML)
+- **Non-connected** — shapes have no tags; the pipeline infers the data mapping from the DataFrame
+
+Both paths converge: once a non-connected chart has its `raw_pivot_config` + `raw_mapping_config` derived, it is refreshed through the same engine as connected charts.
+
+## Workflow: Refresh an Existing Deck
+
+When the user says **"Refresh this deck"** or provides a PPTX to connect to Synapse:
+
+**ALWAYS follow these steps in order. ALWAYS regenerate the spec from scratch — never reuse old spec JSONs. All outputs go to `projects/{name}/output/`.**
+
+### Step 1: READ the slide
+
+```python
+from slidegen.intelligent_refresh import read_slide_context, format_slide_for_interpretation
+ctx = read_slide_context("path/to/deck.pptx", slide_index=0)
+print(format_slide_for_interpretation(ctx))
+```
+
+For EACH component, note:
+- **Charts**: `chart_pattern`, `series_names`, `categories`, current data range
+- **Tables**: column count, header names, whether it has a "Deliverable" row-label column, **value format: `#value` (counts) vs `%value` (percentages)**
+
+### Step 2: ASK USER for Synapse IDs
+
+For each chart/table, the user must provide:
+- `project_id`
+- `reporting_plan_id`
+- `analysis_id` (per chart — different charts can have different analyses)
+- `segment_ids` (default: none)
+- `dynamic_latest_n` (how many recent deliverables)
+- Which tables are simple vs complex vs static
+
+### Step 3: FETCH data + INFER pivot config
+
+```python
+from slidegen.intelligent_refresh import fetch_synapse_data, propose_pivot_config, propose_raw_configs
+
+# Fetch
+lineage = {"project_id": 523, "reporting_plan_id": 1143,
+           "analysis_ids": [641211], "segment_ids": [], "dynamic_latest_n": 4}
+records, df = fetch_synapse_data(lineage)
+
+# Infer — for charts (with chart_shape for Jaccard validation)
+result = propose_pivot_config(df, chart_shape)
+
+# Infer — for tables (no chart_shape, override value_field, optional computed columns)
+raw = propose_raw_configs(None, df, value_field="count", computed_columns=[{
+    "name": "PCPs",
+    "source_columns": ["Internal Medicine (PCP)", "Family Medicine (PCP)",
+                        "General Medicine / Practice (PCP)"],
+}])
+```
+
+**CRITICAL: Always check `#value` vs `%value` in source table before choosing value_field:**
+- `#value` → `value_field="count"`, format as `str(int(v))`
+- `%value` → `value_field="decimal"`, format as `f"{v:.0%}"`
+- The auto-inference defaults to `decimal` — **override explicitly for tables showing counts**
+
+### Step 4: SHOW USER proposed config and CONFIRM
+
+Present: row_field, series_column, value_field, confidence, derivation reasons for each component. Wait for user approval.
+
+### Step 5: BUILD the spec JSON
+
+Build a spec dict with `source_deck`, `data_sources`, and `slides` arrays. Save to `projects/{name}/output/<deck>_spec.json`.
+
+### Step 6: REFRESH
+
+```python
+python -m slidegen.intelligent_refresh refresh-deck --spec output/spec.json --output output/refreshed.pptx
+```
+
+### Step 7: VERIFY before stamping tags
+
+Read the output PPTX. Check: correct categories/periods, values match expected field, table headers preserved, all components processed.
+
+### Step 8: STAMP Connector tags
+
+```python
+from slidegen.intelligent_refresh import write_connector_tags
+
+shape_configs = [{"shape_name": "PS", "raw_pivot_config": {...},
+                  "raw_mapping_config": {...}, "analysis_id": 641211}]
+data_lineage = {"project_id": 523, "reporting_plan_id": 1143,
+                "segment_ids": [], "dynamic_latest_n": 4}
+
+write_connector_tags("output/refreshed.pptx", slide_index=0,
+                     shape_configs=shape_configs, data_lineage=data_lineage)
+```
+
+**Skip Connector tags for complex tables** (see table rules below).
+
+---
+
+## Function Reference: intelligent_refresh.py
+
+### Reading
+
+```python
+ctx = read_slide_context(pptx_path: str, slide_index: int) -> dict
+# Returns: {"pptx_path", "slide_index", "shapes": [{type, name, left, top, width, height,
+#           chart_pattern, series_names, categories, series_values,     # charts
+#           row_count, col_count, headers, all_rows,                    # tables (masked: #value/%value)
+#           text}]}                                                     # text boxes
+
+format_slide_for_interpretation(ctx: dict) -> str   # human-readable dump
+format_data_for_interpretation(df: DataFrame) -> str # human-readable data summary
+```
+
+### Data Fetching
+
+```python
+records, df = fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], DataFrame]
+# data_lineage: {"project_id": int, "reporting_plan_id": int,
+#                "analysis_ids": [int], "segment_ids": [int], "dynamic_latest_n": int}
+# Auth: resolved automatically via synapse-cli fallback chain (env var, cached JWT, Azure AD)
+# DataFrame columns: time_period_name, time_period_id, base, count, respondents,
+#                    source_analysis_id, code, option, decimal, percentage, value
+```
+
+### Inference
+
+```python
+result = propose_pivot_config(df: DataFrame, chart_shape: dict | None = None) -> dict
+# Returns: {"row_field", "series_column", "value_field", "val_format",
+#           "confidence": float, "derivation": {field: (col, reason)},
+#           "column_roles": {...}, "error": str | None}
+
+result = propose_raw_configs(
+    chart_shape: dict | None,     # from read_slide_context(); None for tables
+    df: DataFrame,
+    *,
+    value_field: str | None = None,  # "count", "decimal", "base" — override auto-inference
+    computed_columns: list[dict] | None = None,
+    # Each: {"name": "PCPs", "source_columns": ["col1", "col2", ...]}
+    # Formula is auto-computed from source_columns positions in sorted columnDefinitions
+) -> dict
+# Returns: {"raw_pivot_config": {...}, "raw_mapping_config": {...},
+#           "derivation": {...}, "confidence": float, "error": str | None}
+```
+
+### Verification
+
+```python
+result = verify_analysis_for_chart(
+    analysis_id: int, chart_series: list[str],
+    project_id: int, reporting_plan_id: int,
+    match_threshold: float = 0.6
+) -> dict
+# Returns: {"confirmed": bool, "score": float, "matched": [...],
+#           "api_options": [...], "message": str}
+```
+
+### Spec Management
+
+```python
+save_proposed_configs_to_spec(spec_path: str, slide_index: int, updates: list[dict]) -> dict
+# updates: [{"shape_name", "raw_pivot_config", "raw_mapping_config", "analysis_id", "data_lineage"}]
+# Creates data_source entries, supports per-component overrides
+```
+
+### Refresh
+
+```python
+results = refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: str = None) -> dict
+# Clones source PPTX, fetches data per data_source, refreshes each component
+# Routes: raw_pivot_config present → RAW CONNECTOR PATH (pivot_records_to_chart_data)
+#         data_mapping only → INTERPRETED PATH (pandas pivot_table)
+#         cell_values present on table → writes cells directly + dynamic row sizing
+#         static: true → skipped
+# Returns: {"slides": [...], "output": str}
+```
+
+### Connector Tag Stamping
+
+```python
+result = write_connector_tags(
+    pptx_path: str,         # modified in-place
+    slide_index: int,
+    shape_configs: list,    # [{"shape_name", "raw_pivot_config", "raw_mapping_config", "analysis_id"}]
+    data_lineage: dict,     # {"project_id", "reporting_plan_id", "segment_ids", "dynamic_latest_n"}
+    survey_id: int | None = None,  # auto-detected from PPTX if omitted
+) -> dict
+# Returns: {shape_name: {"action": "replaced"|"added", "tag": path}}
+# Writes only 8 essential tags — no extra DARWINVERSION/UPDATE/VISUALISATION_ID etc.
+```
+
+---
+
+## Spec JSON Format
+
+```json
+{
+  "source_deck": "../deck.pptx",
+  "data_sources": {
+    "p523_rp1143_a641211": {
+      "project_id": 523, "reporting_plan_id": 1143,
+      "analysis_ids": [641211], "segment_ids": [], "dynamic_latest_n": 4
+    }
+  },
+  "slides": [{
+    "slide_index": 0,
+    "data_source": null,
+    "components": [
+      {
+        "type": "chart",
+        "name": "PS",
+        "chart_pattern": "column_stacked_100_vertical",
+        "data_source": "p523_rp1143_a641211",
+        "raw_pivot_config": { "RowFields": ["time_period_name"], "ColumnFields": ["option"],
+                              "ValueFields": ["decimal"], "columnDefinitions": [...] },
+        "raw_mapping_config": { "selectedColumns": ["time_period_name", ...], "selectAllRows": true }
+      },
+      {
+        "type": "value_table",
+        "name": "Table 17",
+        "data_source": "p523_rp1143_a641205",
+        "table_description": "# of HCPs by specialty groups...",
+        "source_snapshot": { "headers": [...], "all_rows": [...] },
+        "cell_values": [["Gastros", "PCPs"], ["121", "64"], ...],
+        "raw_pivot_config": { ... },
+        "raw_mapping_config": { ... }
+      }
+    ]
+  }]
+}
+```
+
+### Component routing at refresh time
+
+| Config present | Refresh path | Engine |
+|---------------|--------------|--------|
+| `raw_pivot_config` + `raw_mapping_config` (chart) | RAW CONNECTOR PATH | `pivot_records_to_chart_data()` in `synapse_chart_mapper.py` |
+| `cell_values` (table) | CELL VALUES PATH | Direct cell write + dynamic row sizing via lxml |
+| `data_mapping` only | INTERPRETED MAPPING PATH | pandas `pivot_table()` |
+| `"static": true` | Skipped | No refresh |
+
+### Data source key format
+
+`p{project_id}_rp{reporting_plan_id}_a{analysis_id}` — component-level `data_source` overrides slide-level.
+
+---
+
+## Table Rules
+
+### Simple tables (Connector-taggable)
+
+All visible columns map to a single Connector pivot config.
+
+- Write `cell_values` to populate data
+- `selectedColumns` contains ONLY the visible data columns
+- For tables WITHOUT a "Deliverable" column: **exclude** `time_period_name` from `selectedColumns`
+- For tables WITH a "Deliverable" column: **include** `time_period_name` in `selectedColumns`
+- Column count in `selectedColumns` MUST match the physical table column count
+- Write Connector tags — Connector can refresh natively
+
+### Complex tables (no Connector tags)
+
+Table has columns outside the Connector mapping (e.g., NP/PAs from a different analysis, manually maintained columns, multiple header/row columns).
+
+- Write `cell_values` for mapped columns only
+- Unmapped numeric cells → `"xx"` (stale indicator)
+- Unmapped non-numeric cells (labels/headers) → retain as-is
+- Store `raw_pivot_config` + `raw_mapping_config` in spec (for data lineage)
+- Do NOT write Connector tags — Connector will garble the partial layout
+- Do NOT stamp dummy configs that pass the processing gate — use `cell_values` directly
+
+### Table cell_values format
+
+- `cell_values[0]` = header row (from source table — preserve original headers exactly)
+- `cell_values[1:]` = data rows
+- Dynamic row sizing: if data has more rows than the table, rows are cloned via lxml. If fewer, excess rows are removed.
+- Values must match `value_field`: `str(int(v))` for count, `f"{v:.0%}"` for decimal
+
+### Computed columns
+
+For tables that aggregate multiple series into one (e.g., PCPs = 3 specialties summed):
+
+```python
+propose_raw_configs(None, df, value_field="count", computed_columns=[{
+    "name": "PCPs",
+    "source_columns": ["Internal Medicine (PCP)", "Family Medicine (PCP)",
+                        "General Medicine / Practice (PCP)"],
+}])
+```
+
+- Auto-generates Excel formula (e.g., `=B2+D2+E2`) from source_columns positions in alphabetically sorted `columnDefinitions`
+- Adds `{"Alias": "PCPs", "Formula": "=B2+D2+E2", "IsDefaultAlias": false, "Name": "<blank:PCPs>"}` to columnDefinitions
+- `selectedColumns` uses `"<blank:PCPs>"` instead of the raw source columns
+
+---
+
+## DataFrame Column Reference
+
+| Column | Type | Example | Use for |
+|--------|------|---------|---------|
+| `decimal` | float 0-1 | 0.6525 | Percentage tables/charts (format: "0%") |
+| `percentage` | int 0-100 | 65 | Whole-number percentage display |
+| `count` | int | 92 | Raw count tables (`#value` in source) |
+| `base` | int | 141 | Sample size (same across options in a period) |
+| `respondents` | int | 141 | Same as base typically |
+| `value` | float | 0.652482 | Full-precision decimal (rarely used directly) |
+| `time_period_name` | str | "Jan'26" | Row labels / categories |
+| `time_period_id` | int | 15163 | Period ordering (**NOT chronological for all projects!**) |
+| `option` | str | "Gastroenterology" | Series names / column headers |
+| `code` | str | "A1" | Option code identifier |
+
+---
+
+## Column Classification Heuristics (propose_pivot_config)
+
+| Role | Detection | Examples |
+|------|-----------|----------|
+| **temporal** | Column name in `{time_period_name, period, quarter, wave, date}` OR values match `Q1'26, Jan'26, Wave 3` patterns | `time_period_name` |
+| **categorical** | String, 1-100 unique values, not temporal/identifier/label | `option`, `segment_1` |
+| **numeric** | Numeric dtype. Sub-types: `decimal` (0-1), `whole` (0-100), `integer` | `decimal`, `count` |
+| **identifier** | Name in `{analysis_id, project_id, ...}` OR numeric cardinality > 50 | `time_period_id` |
+| **label** | Name in `{y_label, product, brand, attribute, message}` | `y_label` |
+
+**Field assignment priority (no chart context):**
+- `value_field`: `decimal` > first 0-1 range > known name > first numeric. **Always override for tables based on `#value`/`%value`.**
+- `row_field`: Label column wins over single-value temporal. Temporal wins when higher cardinality.
+- `series_column`: Known name (`option`, `measure`, `segment`) > lowest-cardinality categorical (2-10 unique)
+
+**With chart context:** Jaccard overlap between column values and chart series/categories.
+
+---
+
+## Known Decisions and Gotchas
+
+1. **`time_period_id` is NOT chronological** — for some projects (e.g., CREON 523), 2026 IDs are in reverse order. Parse period names to sort chronologically instead.
+
+2. **`dynamic_latest_n` may not filter at API level** — the Synapse API may return all periods regardless. Filter client-side when computing `cell_values` for tables.
+
+3. **formatCode preservation** — `replace_data()` resets all formatCodes. The pipeline saves them before replacement and restores them after.
+
+4. **Category reordering** — pivot may return alphabetical order, but the source chart has Connector's order. The pipeline reorders to match source when sets are equal.
+
+5. **Per-component data_source** — charts on the same slide can have different analysis_ids.
+
+6. **Two parallel systems exist** — the JSON spec pipeline (`intelligent_refresh.py`) is active. The SlideSpec dataclass pipeline (`PS_slide_refresher.py`, `test_spec_refresh_pipeline.py`) is legacy/test-only. Do not mix.
+
+7. **All intermediary outputs go to `projects/{name}/output/`** — spec JSONs, refreshed PPTXs.
+
+8. **Connector tag minimalism** — only write 8 essential tags: `ANALYSISTYPE`, `COLUMNKEYLABELMAP`, `DATAFRAMECONFIGHASH`, `DATAFRAMECONFIGHASH_BACKUP`, `LASTREFRESHTIME`, `MAPPINGCONFIG`, `REPORTCONFIGHASH`, `REPORTCONFIGHASH_BACKUP`. Extra tags cause Connector to mishandle tables.
+
+9. **columnDefinitions sorted alphabetically** — required for computed column formulas to reference correct Excel column letters.
+
+10. **Table `selectedColumns`** — for charts, include `row_field`. For tables, exclude `row_field` unless the table has a visible "Deliverable" column. Column count must match physical table.
+
+11. **Null stripping** — Connector rejects `null` in MAPPINGCONFIG JSON. Strip all null-valued keys before tag stamping.
+
+12. **`cell_values` header row** — `cell_values[0]` is written to row 0 (the header row). Must include headers as first entry.
+
+13. **Table refresh path** — tables NEVER use the raw_connector pivot path for data. They use: `cell_values` (if present) → `source_restore` (fallback). `raw_pivot_config`/`raw_mapping_config` on tables are ONLY used for Connector tag stamping.
+
+14. **COLUMNKEYLABELMAP** — must include all standard Synapse API fields: `time_period_name: "Deliverable"`, `code: "Code"`, `option: "Option"`, `base: "Base"`, `count: "Count"`, `respondents: "Respondents"`, `decimal: "Value(%)"`.
+
+---
+
+## Intelligent Refresh CLI
+
+```bash
+# Read slide context
+python -m slidegen.intelligent_refresh read --pptx deck.pptx --slide 0
+
+# Refresh all slides from spec
+python -m slidegen.intelligent_refresh refresh-deck --spec output/spec.json
+
+# Refresh with explicit output
+python -m slidegen.intelligent_refresh refresh-deck --spec output/spec.json --output output/refreshed.pptx
+
+# Setup non-connected: verify + derive + stamp tags
+python -m slidegen.intelligent_refresh setup-nonconnected \
+    --spec output/spec.json --pptx deck.pptx --slide 0 \
+    --shapes '[{"shape_name":"PS","analysis_id":641211}]' \
+    --project-id 523 --reporting-plan-id 1143
+
+# Write headline
+python -m slidegen.intelligent_refresh headline --pptx deck.pptx --slide 0 --text "..."
+
+# Embed/show config
+python -m slidegen.intelligent_refresh embed-config --pptx deck.pptx
+python -m slidegen.intelligent_refresh show-config --pptx deck.pptx
+```
+
+---
+
+## Pre-flight Checklist (before any refresh)
+
+```
+1. READ source deck — note chart series/categories + table #value vs %value
+2. ASK user for project_id, reporting_plan_id, analysis_ids, segments, latest_n
+3. FETCH data and inspect numeric columns:
+   print(df[['time_period_name', 'option', 'decimal', 'count', 'base']].head(20))
+4. MATCH source values to DataFrame columns:
+   #value (92, 49)  → value_field = "count"
+   %value (65%, 35%) → value_field = "decimal"
+5. PROPOSE configs with explicit value_field for tables
+6. SHOW user and CONFIRM
+7. BUILD spec, REFRESH, VERIFY output
+8. STAMP tags (skip complex tables)
+```
 
 # currentDate
 Today's date is 2026-03-16.
