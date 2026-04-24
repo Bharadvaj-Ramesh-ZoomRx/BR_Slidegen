@@ -1,14 +1,18 @@
-"""Generate a refreshed-deck fixture for Eval #3.
+"""Generate a refreshed-deck fixture for Eval #3 via Vijay's dual-mode engine.
 
-Runs Vijay's test_spec_refresh_pipeline.py Stage 1 + Stage 2 against a
-user-specified source deck by monkey-patching the pipeline's module-level
-constants. Does NOT modify Vijay's file. Writes output into a per-deck
-folder under output/ so fixtures don't collide.
+Uses the new canonical path shipped in commit 1413212:
+  Connector specs -> full spec.json -> refresh_deck_from_spec()
+
+Earlier version of this script went through test_spec_refresh_pipeline.py's
+3-stage test (which uses synapse_chart_mapper.pivot_records_to_chart_data
+directly). That path predates the dual-mode engine and misses its fixes
+(static_time_period_names filtering, category reordering, XY scatter support).
 
 Usage:
     python scripts/gen_refreshed_fixture.py <deck_key>
 
 Where <deck_key> is a key in tests/evals/fixtures.py::FIXTURE_DECKS.
+Outputs to output/<deck_key>_refresh/<deck_key>_refreshed.pptx.
 """
 from __future__ import annotations
 
@@ -40,44 +44,115 @@ def main():
     work_dir = REPO_ROOT / "output" / f"{deck_key}_refresh"
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    dummy_pptx = work_dir / f"{deck_key}_dummy.pptx"
+    connector_specs_path = work_dir / f"{deck_key}_connector_specs.json"
+    full_spec_path = work_dir / f"{deck_key}_full_spec.json"
     refreshed_pptx = work_dir / f"{deck_key}_refreshed.pptx"
-    specs_json = work_dir / f"{deck_key}_specs.json"
 
-    # Generate specs up front (Stage 2 can read from disk faster than re-running extraction)
-    print(f"Generating specs for {deck_key}...")
+    # Step 1 — generate Connector specs via deck-reader
+    print(f"[1/4] Generating Connector specs for {deck_key}...")
     from slidegen.deck_reader.tag_reader import generate_config_specs
     from slidegen.slide_spec.schema import dump_spec
+    from pptx import Presentation
 
     specs, summary = generate_config_specs(str(source_pptx))
-    specs_json.write_text(
-        json.dumps([json.loads(dump_spec(s)) for s in specs], indent=2),
+    connector_specs = [json.loads(dump_spec(s)) for s in specs]
+    connector_specs_path.write_text(
+        json.dumps(connector_specs, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    print(f"  wrote {len(specs)} specs -> {specs_json.relative_to(REPO_ROOT)}")
-    print(f"  tagged shapes: {summary.tagged_shapes}, configs resolved: {summary.report_configs_resolved}")
+    print(f"     wrote {len(connector_specs)} specs, {summary.tagged_shapes} tagged shapes")
 
-    # Monkey-patch Vijay's pipeline constants
-    import tests.test_spec_refresh_pipeline as pipeline
-    pipeline.SOURCE_PPTX = source_pptx
-    pipeline.DUMMY_PPTX = dummy_pptx
-    pipeline.REFRESHED_PPTX = refreshed_pptx
-    pipeline.SPECS_JSON = specs_json
+    # Step 2 — build the full spec (data_sources + slides) using Vijay's helpers
+    print(f"[2/4] Building full spec.json...")
+    from tests.build_full_spec import build_data_sources, build_connected_slide
 
-    print(f"\nRunning Stage 1 — create dummy deck")
-    pipeline.stage1_create_dummy_deck()
+    data_sources = build_data_sources(connector_specs)
+    print(f"     {len(data_sources)} unique data sources")
 
-    print(f"\nRunning Stage 2 — refresh from Synapse")
-    ok = pipeline.stage2_refresh_from_specs()
-    if not ok:
-        print("\nStage 2 failed — check token / network. Output may be incomplete.")
-        sys.exit(1)
+    # Map slide_index -> data_source key
+    slide_to_ds = {}
+    for spec in connector_specs:
+        si = spec["slide_index"]
+        lin = spec.get("data_lineage", {})
+        pid = lin.get("project_id")
+        if not pid:
+            continue
+        rpid = lin.get("reporting_plan_id")
+        aids = tuple(lin.get("analysis_ids", []))
+        key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
+        slide_to_ds[si] = key
 
-    # Report paths for the caller
-    print(f"\n[OK] Refreshed deck ready at: {refreshed_pptx.relative_to(REPO_ROOT)}")
-    print(f"  size: {refreshed_pptx.stat().st_size / 1024:.0f} KB")
-    print(f"\nNext: register it in tests/evals/fixtures.py::REFRESHED_DECKS and")
-    print(f"      run `python -m tests.evals.end_to_end.generate_golden`.")
+    # Build slide entries and populate shape names from the PPTX
+    prs = Presentation(str(source_pptx))
+    slide_entries = []
+
+    for spec in connector_specs:
+        si = spec["slide_index"]
+        ds_key = slide_to_ds.get(si)
+        if not ds_key:
+            continue
+        slide_entry = build_connected_slide(spec, ds_key)
+
+        # Fill in shape names by position matching (Vijay's convention)
+        if si < len(prs.slides):
+            pptx_slide = prs.slides[si]
+            chart_shapes = sorted(
+                [s for s in pptx_slide.shapes if s.has_chart],
+                key=lambda x: (x.left or 0, x.top or 0),
+            )
+            table_shapes = sorted(
+                [s for s in pptx_slide.shapes if s.has_table],
+                key=lambda x: (x.left or 0, x.top or 0),
+            )
+            for comp in slide_entry["components"]:
+                pos = comp.get("position", {})
+                cl = pos.get("left", 0)
+                ct = pos.get("top", 0)
+                candidates = chart_shapes if comp["type"] == "chart" else table_shapes
+                for shape in candidates:
+                    sl = round(shape.left / 914400, 2) if shape.left else 0
+                    st = round(shape.top / 914400, 2) if shape.top else 0
+                    if abs(sl - cl) < 0.3 and abs(st - ct) < 0.3:
+                        comp["name"] = shape.name
+                        break
+
+        slide_entries.append(slide_entry)
+
+    full_spec = {
+        "source_deck": source_pptx.name,
+        "data_sources": data_sources,
+        "slides": slide_entries,
+    }
+    full_spec_path.write_text(
+        json.dumps(full_spec, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    n_raw_configs = sum(
+        1 for s in slide_entries for c in s.get("components", [])
+        if c.get("raw_pivot_config")
+    )
+    print(f"     wrote {full_spec_path.name}  slides={len(slide_entries)}  components with raw configs={n_raw_configs}")
+
+    # Step 3 — run dual-mode refresh
+    print(f"[3/4] Running dual-mode refresh...")
+    from slidegen.intelligent_refresh import refresh_deck_from_spec
+
+    result = refresh_deck_from_spec(
+        spec_path=str(full_spec_path),
+        pptx_path=str(source_pptx),
+        output_path=str(refreshed_pptx),
+    )
+
+    # Step 4 — summary
+    print(f"\n[4/4] Refresh complete")
+    if isinstance(result, dict):
+        for k, v in result.items():
+            if isinstance(v, (int, str, bool)):
+                print(f"     {k}: {v}")
+
+    print(f"\n[OK] Refreshed deck at: {refreshed_pptx.relative_to(REPO_ROOT)}")
+    print(f"     size: {refreshed_pptx.stat().st_size / 1024:.0f} KB")
+    print(f"\nNext: python -m tests.evals.end_to_end.generate_golden")
 
 
 if __name__ == "__main__":
