@@ -43,6 +43,19 @@ nul
 
 # ── Environment / secrets ────────────────────────────────────────────────────
 .env
+# OneDrive sync duplicates of .env (e.g. ".env (2).example") — never commit;
+# may carry live API keys despite the .example suffix.
+.env *
+.env *.example
+
+# ── User-authored documents (per Bharadvaj's request) ────────────────────────
+# PDFs, Word docs, ODT files etc. — keep local, don't track binaries authored
+# outside the codebase. Markdown notes (.md) and pptx fixtures stay tracked.
+*.pdf
+*.docx
+*.doc
+*.odt
+*.rtf
 
 # ── Experiments (reverse-engineering decks — not committed) ─────────────────
 experiments/deck_analysis/decks/*
