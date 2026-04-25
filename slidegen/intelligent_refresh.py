@@ -440,17 +440,36 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
 
     client = SynapseClient(base_url=base_url)
 
-    payload = {
-        "project_id": data_lineage["project_id"],
-        "reporting_plan_id": data_lineage["reporting_plan_id"],
-        "analysis_ids": data_lineage["analysis_ids"],
-        "segment_ids": data_lineage.get("segment_ids", []),
-        "setup_type": "DYNAMIC",
-        "dynamic_time_period": {
-            "latest_n_deliverables": data_lineage.get("dynamic_latest_n", 5),
-            "include_live_wave": True,
-        },
-    }
+    static_ids = list(data_lineage.get("static_time_period_ids") or [])
+    include_live = data_lineage.get("include_live_wave")
+    if include_live is None:
+        include_live = False if static_ids else True
+
+    if static_ids:
+        payload = {
+            "project_id": data_lineage["project_id"],
+            "reporting_plan_id": data_lineage["reporting_plan_id"],
+            "analysis_ids": data_lineage["analysis_ids"],
+            "segment_ids": data_lineage.get("segment_ids", []),
+            "setup_type": "STATIC",
+            "time_period_ids": static_ids,
+            "time_period_mode": "DELIVERABLE",
+            "include_overall": False,
+            "rollup_time_periods": False,
+            "include_live_wave": include_live,
+        }
+    else:
+        payload = {
+            "project_id": data_lineage["project_id"],
+            "reporting_plan_id": data_lineage["reporting_plan_id"],
+            "analysis_ids": data_lineage["analysis_ids"],
+            "segment_ids": data_lineage.get("segment_ids", []),
+            "setup_type": "DYNAMIC",
+            "dynamic_time_period": {
+                "latest_n_deliverables": data_lineage.get("dynamic_latest_n") or 5,
+                "include_live_wave": include_live,
+            },
+        }
 
     try:
         report = client.reports.generate(payload)
@@ -475,6 +494,17 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
     except Exception as e:
         print(f"  Synapse API exception: {e}")
         records = []
+
+    # Client-side latest_n filter — API ignores latest_n_deliverables on some
+    # endpoint configurations, so enforce it here when a dynamic latest_n is
+    # specified and we're not already constrained by static IDs.
+    latest_n = data_lineage.get("dynamic_latest_n")
+    if records and not static_ids and latest_n and latest_n > 0:
+        tp_ids = {r.get("time_period_id") for r in records if r.get("time_period_id") is not None}
+        if len(tp_ids) > latest_n:
+            keep_ids = sorted(tp_ids, reverse=True)[:latest_n]
+            keep_set = set(keep_ids)
+            records = [r for r in records if r.get("time_period_id") in keep_set]
 
     df = pd.DataFrame(records) if records else pd.DataFrame()
     return records, df
@@ -1715,8 +1745,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
             records_list = df.to_dict("records") if not df.empty else []
             _cl = data_sources.get(_comp_ds, {})
             lin_raw_static_names = (
-                slide_spec.get("static_time_period_names")
+                comp.get("static_time_period_names")
+                or slide_spec.get("static_time_period_names")
                 or _cl.get("static_time_period_names")
+            )
+            lin_raw_static_ids = (
+                comp.get("static_time_period_ids")
+                or slide_spec.get("static_time_period_ids")
+                or _cl.get("static_time_period_ids")
             )
 
             name = comp.get("name", "")
@@ -1756,6 +1792,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             split_order=split_order,
                             rows_per_object=rows_per_object,
                             top_n_rows=top_n_rows,
+                            static_time_period_ids=lin_raw_static_ids,
                         )
 
                         if not chart_data.success or not chart_data.categories:

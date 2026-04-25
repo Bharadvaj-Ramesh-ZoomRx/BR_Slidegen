@@ -121,8 +121,17 @@ def _resolve_value_field(val_field: str, df_columns: list[str]) -> str | None:
 
 
 def _normalize_key(k: str) -> str:
-    """Normalize compound column key: @:@ -> ' - '. Preserves aggregation suffixes."""
-    return k.replace(" @:@ ", " - ").replace("@:@", " - ")
+    """Normalize compound column key: @:@ -> ' - ', collapse whitespace.
+
+    Tag selectedColumns strings and pivot column values often disagree on
+    whitespace — newlines, double spaces, NBSP. Normalize both sides to a
+    single-space form so string matching succeeds.
+    """
+    import re
+    k = k.replace(" @:@ ", " - ").replace("@:@", " - ")
+    # Replace any whitespace run (incl. newlines, tabs, NBSP) with a single space
+    k = re.sub(r"\s+", " ", k)
+    return k.strip()
 
 
 def _match_pivot_col(sc_norm: str, pivot_columns) -> str | None:
@@ -189,6 +198,7 @@ def pivot_records_to_chart_data(
     split_order: int | None = None,
     rows_per_object: int | None = None,
     top_n_rows: int | None = None,
+    static_time_period_ids: list[int] | None = None,
 ) -> ChartRefreshData:
     """Transform flat Synapse records into chart categories + series.
 
@@ -210,12 +220,98 @@ def pivot_records_to_chart_data(
 
     df = pd.DataFrame(records)
 
+    # ── Wave-label normalization ──
+    # Some Synapse projects expose waves as "Project Wave N" while source decks
+    # display the shortened "Wave N". Since the underlying time_period_id is the
+    # same record, stripping the "Project " prefix is semantically safe — it's a
+    # display-label reconciliation, not a data change.
+    if "time_period_name" in df.columns:
+        df = df.copy()
+        df["time_period_name"] = df["time_period_name"].astype(str).str.replace(
+            r"^Project Wave ", "Wave ", regex=True
+        )
+
+    # Build name -> time_period_id map for chronological sorting later.
+    # Uses max id per name so renames that kept the id still sort correctly.
+    name_to_tp_id: dict[str, int] = {}
+    if "time_period_name" in df.columns and "time_period_id" in df.columns:
+        for name, group in df.groupby("time_period_name"):
+            try:
+                name_to_tp_id[str(name)] = int(group["time_period_id"].max())
+            except (ValueError, TypeError):
+                pass
+
+    # ── Filter to static time periods by ID (preferred) or name ──
+    # ID-based filter is safer than name-based because wave renames don't break it.
+    if static_time_period_ids and "time_period_id" in df.columns:
+        filtered = df[df["time_period_id"].isin(static_time_period_ids)]
+        if not filtered.empty:
+            df = filtered
+
     raw_row_fields = pivot_config.get("RowFields", [])
     raw_col_fields = pivot_config.get("ColumnFields", [])
     raw_val_fields = pivot_config.get("ValueFields", [])
     row_fields = [_remap_field(f) for f in raw_row_fields]
     col_fields = [_remap_field(f) for f in raw_col_fields]
     val_fields = [_remap_field(f) for f in raw_val_fields]
+
+    # ── Field-name fallback for cross-tab analyses ──
+    # The Connector tag names breakout dimensions "segment_1"/"segment_2" and
+    # "options", but cross-tab Synapse analyses return those axes as "x_label"/
+    # "x_code". When the requested field is absent but x_label is present,
+    # substitute. The "options" substitution is scoped to avoid creating a
+    # collision with the other axis — if both RowFields and ColumnFields would
+    # end up claiming x_label, leave "options" unsubstituted so the mapper
+    # returns success=False and the refresh pipeline preserves the source chart.
+    def _substitute_missing(field_list: list[str], *, allow_options: bool) -> list[str]:
+        out = []
+        for f in field_list:
+            if f in df.columns:
+                out.append(f)
+                continue
+            if f in ("segment_1", "segment_2") and "x_label" in df.columns and "x_label" not in out:
+                out.append("x_label")
+                continue
+            if f == "options" and allow_options and "x_label" in df.columns and "x_label" not in out:
+                out.append("x_label")
+                continue
+            out.append(f)  # keep unchanged; downstream handles missing
+        return out
+
+    # Decide whether "options" substitution is safe on each axis. It would
+    # collide if the OTHER axis already contains x_label or would gain it via
+    # segment_1/segment_2 substitution.
+    def _would_claim_x_label(fields: list[str]) -> bool:
+        for f in fields:
+            if f == "x_label":
+                return True
+            if f in ("segment_1", "segment_2") and f not in df.columns and "x_label" in df.columns:
+                return True
+        return False
+
+    row_allow_opts = not _would_claim_x_label(col_fields)
+    col_allow_opts = not _would_claim_x_label(row_fields)
+    row_fields = _substitute_missing(row_fields, allow_options=row_allow_opts)
+    col_fields = _substitute_missing(col_fields, allow_options=col_allow_opts)
+
+    # ── Collision-avoidance for cross-tab analyses ──
+    # Multiple Connector field names remap to "y_label" (e.g. "question", "value",
+    # "title"). When both RowFields and ColumnFields resolve to the same Synapse
+    # column, the pivot degenerates into a diagonal self-matrix. In cross-tab
+    # analyses the second axis lives in x_label / x_code — substitute when
+    # available. Preserves label↔label and code↔code alignment.
+    row_set = set(row_fields)
+    new_col_fields: list[str] = []
+    for cf in col_fields:
+        if cf in row_set:
+            if cf == "y_label" and "x_label" in df.columns:
+                new_col_fields.append("x_label")
+                continue
+            if cf == "y_code" and "x_code" in df.columns:
+                new_col_fields.append("x_code")
+                continue
+        new_col_fields.append(cf)
+    col_fields = new_col_fields
 
     if not row_fields or not val_fields:
         return ChartRefreshData(categories=[], series=[], success=False,
@@ -245,12 +341,22 @@ def pivot_records_to_chart_data(
     primary_row = valid_row_fields[0]
 
     # ── Apply PivotConfig.Filters ──
+    # Connector encodes multi-value IN filters by joining values with ";".
+    # When a semicolon is present we split and use isin() for inclusion
+    # (or ~isin() for exclusion). Falls back to the original single-value
+    # / first-word-contains behavior for atomic values.
     for filt in pivot_config.get("Filters", []):
         col_key = _remap_field(filt.get("ColumnKey", ""))
         fval = filt.get("Value", "")
         criteria = filt.get("filterCriteria", 1)
         if col_key and fval and col_key in df.columns:
-            if criteria == 2:
+            if ";" in fval:
+                values = [v.strip() for v in fval.split(";") if v.strip()]
+                if criteria == 2:
+                    df = df[~df[col_key].isin(values)]
+                else:
+                    df = df[df[col_key].isin(values)]
+            elif criteria == 2:
                 df = df[df[col_key] != fval]
             else:
                 if fval in df[col_key].values:
@@ -523,6 +629,22 @@ def pivot_records_to_chart_data(
                     order.append(ci)
             categories = [categories[i] for i in order]
             series = [(n, [v[i] for i in order]) for n, v in series]
+            rows_ordered = True
+
+    # ── Chronological wave sort ──
+    # If no explicit ordering was applied and every category is a time_period
+    # label, sort by its underlying time_period_id. Prevents the lex ordering
+    # "Wave 1, Wave 10, Wave 2, Wave 3, ..." on deep wave counts.
+    if not rows_ordered and name_to_tp_id and categories:
+        if all(cat in name_to_tp_id for cat in categories):
+            tp_order = sorted(
+                range(len(categories)),
+                key=lambda i: name_to_tp_id[categories[i]],
+            )
+            if tp_order != list(range(len(categories))):
+                categories = [categories[i] for i in tp_order]
+                series = [(n, [v[i] for i in tp_order if i < len(v)])
+                          for n, v in series]
 
     return ChartRefreshData(categories=categories, series=series)
 

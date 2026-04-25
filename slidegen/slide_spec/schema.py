@@ -239,6 +239,11 @@ class ChartDataMapping:
     raw_pivot_config: Optional[dict] = None      # DataFrameConfigHash JSON
     raw_mapping_config: Optional[dict] = None    # MappingConfig JSON
     raw_column_key_label_map: Optional[dict] = None  # ColumnKeyLabelMap JSON
+    # Per-shape data lineage (analysis_ids, static_time_period_ids, etc).
+    # When a slide has multiple charts pointing at different analyses, this
+    # carries each chart's own lineage — refresh emits a distinct data_source
+    # key per component instead of sharing the slide-level default.
+    raw_data_lineage: Optional[dict] = None
     # Split visualization — rowsPerObject splits pivot rows across chart shapes
     split_order: Optional[int] = None            # SPLITORDER tag (0-based index)
     rows_per_object: Optional[int] = None        # MappingConfig.rowsPerObject
@@ -274,6 +279,7 @@ class TableDataMapping:
     raw_pivot_config: Optional[dict] = None
     raw_mapping_config: Optional[dict] = None
     raw_column_key_label_map: Optional[dict] = None
+    raw_data_lineage: Optional[dict] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -40,35 +40,84 @@ DEFAULT_OUTPUT  = TESTS_DIR / "CREON.json"
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_data_sources(connector_specs: list[dict]) -> dict:
-    """Extract unique data sources from Connector specs."""
-    sources = {}
-    for spec in connector_specs:
-        lin = spec.get("data_lineage", {})
-        pid = lin.get("project_id")
-        if not pid:
-            continue
-        rpid = lin.get("reporting_plan_id")
-        aids = tuple(lin.get("analysis_ids", []))
-        sids = tuple(s.get("rule_id", 0) for s in lin.get("segments", []))
-        if not sids:
-            sids = tuple(lin.get("segment_ids", []))
+def _datasource_from_lineage(lin: dict, sources: dict) -> str | None:
+    """Add a data_source entry for one lineage dict and return its key.
 
-        key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
-        if key not in sources:
-            sources[key] = {
-                "project_id": pid,
-                "reporting_plan_id": rpid,
-                "analysis_ids": list(aids),
-                "segment_ids": list(sids),
-                "dynamic_latest_n": lin.get("dynamic_latest_n") or 5,
-            }
+    Handles union of static_time_period_ids/names across calls that hit the
+    same key (multiple slides or components can share an analysis).
+    """
+    pid = lin.get("project_id")
+    if not pid:
+        return None
+    rpid = lin.get("reporting_plan_id")
+    aids = tuple(lin.get("analysis_ids", []))
+    sids = tuple(s.get("rule_id", 0) for s in lin.get("segments", []))
+    if not sids:
+        sids = tuple(lin.get("segment_ids", []))
+
+    key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
+    if key not in sources:
+        sources[key] = {
+            "project_id": pid,
+            "reporting_plan_id": rpid,
+            "analysis_ids": list(aids),
+            "segment_ids": list(sids),
+            "dynamic_latest_n": lin.get("dynamic_latest_n") or 5,
+            "static_time_period_ids": [],
+            "static_time_period_names": [],
+            "include_live_wave": lin.get("include_live_wave"),
+        }
+    # Union static IDs/names across all lineages sharing this key.
+    existing_ids = set(sources[key]["static_time_period_ids"])
+    new_ids = set(lin.get("static_time_period_ids") or [])
+    sources[key]["static_time_period_ids"] = sorted(existing_ids | new_ids)
+    existing_names = set(sources[key]["static_time_period_names"])
+    new_names = set(lin.get("static_time_period_names") or [])
+    sources[key]["static_time_period_names"] = sorted(existing_names | new_names)
+    if lin.get("include_live_wave") is True:
+        sources[key]["include_live_wave"] = True
+    return key
+
+
+def build_data_sources(connector_specs: list[dict]) -> dict:
+    """Extract unique data sources from Connector specs.
+
+    Walks both slide-level data_lineage AND per-component raw_data_lineage
+    so every analysis any chart/table needs becomes its own data_source.
+    """
+    sources: dict = {}
+    for spec in connector_specs:
+        slide_lin = spec.get("data_lineage", {})
+        _datasource_from_lineage(slide_lin, sources)
+        # Component-level lineages (e.g. a slide with multiple charts pointing
+        # at different analyses — each chart's tag has its own ReportConfig).
+        for comp in spec.get("components", []):
+            dm = comp.get("data_mapping") or {}
+            comp_lin = dm.get("raw_data_lineage")
+            if comp_lin:
+                _datasource_from_lineage(comp_lin, sources)
     return sources
 
 
+def _lineage_ds_key(lin: dict) -> str | None:
+    pid = lin.get("project_id")
+    if not pid:
+        return None
+    rpid = lin.get("reporting_plan_id")
+    aids = lin.get("analysis_ids", [])
+    return f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
+
+
 def build_connected_slide(spec: dict, ds_key: str) -> dict:
-    """Build a spec.json slide entry from a Connector config spec."""
+    """Build a spec.json slide entry from a Connector config spec.
+
+    When a component's raw_data_lineage has a different analysis set than the
+    slide default, the component gets its own data_source key — so refresh
+    fetches the right analysis for that specific chart/table.
+    """
     components = []
+    slide_lin = spec.get("data_lineage", {})
+    slide_key = _lineage_ds_key(slide_lin)
     for comp in spec.get("components", []):
         ctype = comp.get("type")
         if ctype not in ("chart", "value_table", "label_table"):
@@ -83,6 +132,22 @@ def build_connected_slide(spec: dict, ds_key: str) -> dict:
             "name": "",  # filled from PPTX shape names below
             "position": comp.get("position", {}),
         }
+
+        # Per-component data_source override — only when analyses diverge from slide
+        comp_lin = dm.get("raw_data_lineage")
+        if comp_lin:
+            comp_key = _lineage_ds_key(comp_lin)
+            if comp_key and comp_key != slide_key:
+                entry["data_source"] = comp_key
+            # Carry slide-level static IDs from the component's own lineage
+            # (chart tag may have its own static_time_period_ids independent
+            # of the slide's default lineage).
+            cs_ids = comp_lin.get("static_time_period_ids")
+            if cs_ids:
+                entry["static_time_period_ids"] = list(cs_ids)
+            cs_names = comp_lin.get("static_time_period_names")
+            if cs_names:
+                entry["static_time_period_names"] = list(cs_names)
 
         if dm.get("raw_pivot_config") and dm.get("raw_mapping_config"):
             entry["raw_pivot_config"] = dm["raw_pivot_config"]
@@ -121,6 +186,9 @@ def build_connected_slide(spec: dict, ds_key: str) -> dict:
     stn = lin.get("static_time_period_names", [])
     if stn:
         slide_entry["static_time_period_names"] = stn
+    sti = lin.get("static_time_period_ids", [])
+    if sti:
+        slide_entry["static_time_period_ids"] = list(sti)
 
     return slide_entry
 

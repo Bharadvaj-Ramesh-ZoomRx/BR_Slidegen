@@ -1360,14 +1360,41 @@ def generate_config_specs(
                     pass
 
             # Build slide-level lineage from first tagged shape with Synapse IDs
+            shape_lineage: Optional[DataLineage] = None
             if report_config:
                 lineage = _build_config_lineage(report_config, tags)
+                shape_lineage = lineage
                 has_ids = lineage.project_id is not None or bool(lineage.analysis_ids)
                 if has_ids and not slide_has_synapse:
                     slide_lineage = lineage
                     slide_has_synapse = True
                 elif slide_lineage is None:
                     slide_lineage = lineage
+
+            # Per-shape lineage dict — emitted into data_mapping so the refresh
+            # pipeline can create component-level data_source keys when a
+            # chart's analysis_ids diverge from the slide default.
+            #
+            # EXCEPTION: split visualizations (multiple charts sharing a
+            # GROUPID with SPLITORDER 0..N) all share one pivot table by design
+            # — don't create per-chart data_sources for those, or the refresh
+            # tries to fetch the split analysis independently per shape and
+            # source/refresh diverge. Empirically: CREON slide 63 has 13 charts
+            # sharing GROUPID Group_25912087; their per-shape tags claim a
+            # different analysis than the slide default, but source was
+            # rendered from the slide default. Trust the slide default for
+            # split groups.
+            shape_lineage_dict = None
+            is_split_visualization = (
+                tags.get("GROUPID") is not None
+                and tags.get(TAG_SPLIT_ORDER) is not None
+            )
+            if shape_lineage is not None and not is_split_visualization:
+                from dataclasses import asdict as _asdict
+                try:
+                    shape_lineage_dict = _asdict(shape_lineage)
+                except Exception:
+                    shape_lineage_dict = None
 
             # Parse MappingConfig.selectedColumns for segment/series info
             selected_cols = mapping_config.get("selectedColumns", []) if mapping_config else []
@@ -1435,6 +1462,7 @@ def generate_config_specs(
                         raw_pivot_config=pivot_config,
                         raw_mapping_config=mapping_config,
                         raw_column_key_label_map=klm,
+                        raw_data_lineage=shape_lineage_dict,
                         split_order=split_order_val,
                         rows_per_object=rpo,
                         top_n_rows=top_n,
@@ -1479,6 +1507,7 @@ def generate_config_specs(
                     raw_pivot_config=pivot_config,
                     raw_mapping_config=mapping_config,
                     raw_column_key_label_map=klm,
+                    raw_data_lineage=shape_lineage_dict,
                 )
 
                 if n_cols <= 1:
