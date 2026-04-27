@@ -1,18 +1,13 @@
-"""Generate a refreshed-deck fixture for Eval #3 via Vijay's dual-mode engine.
+"""Generate the Step 2 "test connected" deck via the dual-mode refresh engine.
 
-Uses the new canonical path shipped in commit 1413212:
-  Connector specs -> full spec.json -> refresh_deck_from_spec()
-
-Earlier version of this script went through test_spec_refresh_pipeline.py's
-3-stage test (which uses synapse_chart_mapper.pivot_records_to_chart_data
-directly). That path predates the dual-mode engine and misses its fixes
-(static_time_period_names filtering, category reordering, XY scatter support).
+Pipeline:
+  source PPTX -> Connector specs -> full spec.json -> refresh_deck_from_spec()
+                                                   -> output/step2_test_connected/<deck_key>.pptx
 
 Usage:
     python scripts/gen_refreshed_fixture.py <deck_key>
 
 Where <deck_key> is a key in tests/evals/fixtures.py::FIXTURE_DECKS.
-Outputs to output/<deck_key>_refresh/<deck_key>_refreshed.pptx.
 """
 from __future__ import annotations
 
@@ -41,12 +36,12 @@ def main():
         print(f"ERROR: source deck not on disk: {source_pptx}")
         sys.exit(2)
 
-    work_dir = REPO_ROOT / "output" / f"{deck_key}_refresh"
+    work_dir = REPO_ROOT / "output" / "step2_test_connected"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     connector_specs_path = work_dir / f"{deck_key}_connector_specs.json"
     full_spec_path = work_dir / f"{deck_key}_full_spec.json"
-    refreshed_pptx = work_dir / f"{deck_key}_refreshed.pptx"
+    refreshed_pptx = work_dir / f"{deck_key}.pptx"
 
     # Step 1 — generate Connector specs via deck-reader
     print(f"[1/4] Generating Connector specs for {deck_key}...")
