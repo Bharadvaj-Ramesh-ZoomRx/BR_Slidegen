@@ -189,6 +189,68 @@ def _match_pivot_col(sc_norm: str, pivot_columns) -> str | None:
     return best_match
 
 
+# ── Fix L: wave-pinned selectedColumns rewrite ──
+# Some Connector tags pin specific wave labels (e.g. "Project Wave 12") into
+# selectedColumns when waves are the column axis. Non-connected inference
+# produces the same shape because it copies the source chart's column headers
+# into selectedColumns. When a refresh fetches different waves, those pinned
+# entries no longer match the pivot output and the chart silently falls back
+# to source-restore via the success=False path. The rewrite below replaces
+# wave-label entries with the actual fetched wave names so the refresh can
+# proceed.
+import re as _re_wave
+
+_WAVE_LABEL_PATTERNS = (
+    _re_wave.compile(r"^(?:Project )?Wave \d+$"),                    # Wave 12, Project Wave 12
+    _re_wave.compile(r"^[A-Z][a-z]{2}'\d{2}$"),                       # Jan'26
+    _re_wave.compile(r"^Q[1-4]'\d{2}$"),                              # Q1'26
+    _re_wave.compile(r"^Q[1-4] \d{4}$"),                              # Q1 2026
+)
+
+
+def _is_wave_label(s: str) -> bool:
+    return isinstance(s, str) and any(p.match(s) for p in _WAVE_LABEL_PATTERNS)
+
+
+def _rewrite_wave_pinned_selected_columns(
+    selected: list, df: pd.DataFrame,
+) -> tuple[list, int]:
+    """Replace wave-label entries in selectedColumns with the fetched wave names.
+
+    Returns (rewritten_list, n_dropped). When n_dropped is 0 the function is
+    a no-op. The returned list always has wave entries in chronological order
+    by `time_period_id` so cats/series ordering matches what the pivot will
+    produce.
+    """
+    if not selected or "time_period_name" not in df.columns:
+        return list(selected) if selected else selected, 0
+
+    rewritten: list = []
+    n_dropped = 0
+    for entry in selected:
+        if _is_wave_label(entry):
+            n_dropped += 1
+            continue
+        rewritten.append(entry)
+    if n_dropped == 0:
+        return rewritten, 0
+
+    if "time_period_id" in df.columns:
+        order = (df.groupby("time_period_name")["time_period_id"]
+                 .max().sort_values().index.tolist())
+    else:
+        order = list(dict.fromkeys(df["time_period_name"].astype(str)))
+    for w in order:
+        if w not in rewritten:
+            rewritten.append(str(w))
+
+    logger.info(
+        "Fix L: rewrote %d wave-pinned selectedColumns entries → %s",
+        n_dropped, [w for w in rewritten if _is_wave_label(w)],
+    )
+    return rewritten, n_dropped
+
+
 def pivot_records_to_chart_data(
     records: list[dict],
     pivot_config: dict,
@@ -422,7 +484,13 @@ def pivot_records_to_chart_data(
     # selectedColumns lists the row fields to include, then series columns.
     # The LAST RowField in selectedColumns is the display field for categories.
     # E.g. selectedCols=['y_label','alias5540','Q1 2026'] → display alias5540 values.
-    selected = mapping_config.get("selectedColumns", [])
+    # Apply Fix L: rewrite wave-pinned entries against the actually-fetched
+    # waves before any downstream consumer reads selectedColumns. No-op when
+    # selectedColumns has no wave-label entries — zero impact on charts where
+    # waves live in RowFields rather than ColumnFields.
+    selected, _n_wave_rewrites = _rewrite_wave_pinned_selected_columns(
+        mapping_config.get("selectedColumns", []), df,
+    )
     display_row_field = primary_row  # default: first RowField
 
     if selected and len(valid_row_fields) > 1:
