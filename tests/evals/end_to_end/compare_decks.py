@@ -121,8 +121,18 @@ def _extract_table_rows(shape) -> list[list[str]]:
     return rows
 
 
-def compare_decks(source_path: Path, refreshed_path: Path) -> DeckMatchReport:
-    """Run component-level comparison between source and refreshed decks."""
+def compare_decks(
+    source_path: Path,
+    refreshed_path: Path,
+    connected_slide_indices: set[int] | None = None,
+) -> DeckMatchReport:
+    """Run component-level comparison between source and refreshed decks.
+
+    `connected_slide_indices`: when provided, only slides whose 0-based index is
+    in this set are compared. Pass the indices from the Step 1 spec golden to
+    restrict comparison to connected (Connector-tagged) slides only — non-connected
+    slides are never refreshed and would trivially inflate match counts.
+    """
     source = Presentation(str(source_path))
     refreshed = Presentation(str(refreshed_path))
 
@@ -133,6 +143,8 @@ def compare_decks(source_path: Path, refreshed_path: Path) -> DeckMatchReport:
 
     n_slides = min(len(source.slides), len(refreshed.slides))
     for slide_idx in range(n_slides):
+        if connected_slide_indices is not None and slide_idx not in connected_slide_indices:
+            continue
         src_slide = source.slides[slide_idx]
         ref_slide = refreshed.slides[slide_idx]
 

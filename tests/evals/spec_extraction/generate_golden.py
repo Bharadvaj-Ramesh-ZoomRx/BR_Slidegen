@@ -28,9 +28,16 @@ GOLDEN_DIR = Path(__file__).parent / "goldens"
 
 
 def build_specs_snapshot(deck_path: Path) -> list[dict[str, Any]]:
-    """Run Path A on a deck and return the spec list as JSON-serializable dicts."""
+    """Run Path A on a deck and return connected-only specs as JSON-serializable dicts.
+
+    Connected slides have spec_completeness='complete' — they have Connector tags
+    with a full data_lineage (project_id, analysis_ids, wave config). Non-connected
+    slides (layout_complete_data_missing) are excluded; they are covered by Step 1b
+    and the non-connected refresh workflow, not this eval.
+    """
     specs, _summary = generate_config_specs(str(deck_path))
-    return [json.loads(dump_spec(s)) for s in specs]
+    all_dicts = [json.loads(dump_spec(s)) for s in specs]
+    return [s for s in all_dicts if s.get("spec_completeness") == "complete"]
 
 
 def compare_specs(

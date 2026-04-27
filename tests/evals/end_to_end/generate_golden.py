@@ -26,6 +26,21 @@ from tests.evals.end_to_end.compare_decks import compare_decks  # noqa: E402
 from tests.evals.fixtures import FIXTURE_DECKS, REFRESHED_DECKS  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).parent / "goldens"
+SPEC_GOLDEN_DIR = Path(__file__).resolve().parents[1] / "spec_extraction" / "goldens"
+
+
+def connected_slide_indices_for(deck_key: str) -> set[int] | None:
+    """Return the set of 0-based slide indices that have Connector tags.
+
+    Loaded from the Step 1 spec golden (connected slides only). Returns None
+    if the spec golden doesn't exist yet, which causes compare_decks to fall
+    back to comparing all slides.
+    """
+    spec_golden = SPEC_GOLDEN_DIR / f"{deck_key}_spec.json"
+    if not spec_golden.exists():
+        return None
+    specs = json.loads(spec_golden.read_text(encoding="utf-8"))
+    return {s["slide_index"] for s in specs}
 
 
 def main():
@@ -43,8 +58,11 @@ def main():
             print(f"[skip] {key}: refreshed fixture not found at {refreshed_path}")
             continue
 
+        connected = connected_slide_indices_for(key)
         print(f"[gen]  {key}: comparing {source_path.name} vs {refreshed_path.name}")
-        report = compare_decks(source_path, refreshed_path)
+        if connected is not None:
+            print(f"       restricting to {len(connected)} connected slides")
+        report = compare_decks(source_path, refreshed_path, connected_slide_indices=connected)
         report_dict = report.to_dict()
 
         out_file = GOLDEN_DIR / f"{key}_refresh.json"

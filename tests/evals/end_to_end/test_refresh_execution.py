@@ -33,7 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
 from tests.evals.end_to_end.compare_decks import compare_decks, compare_reports  # noqa: E402
-from tests.evals.end_to_end.generate_golden import GOLDEN_DIR  # noqa: E402
+from tests.evals.end_to_end.generate_golden import GOLDEN_DIR, connected_slide_indices_for  # noqa: E402
 from tests.evals.fixtures import FIXTURE_DECKS, REFRESHED_DECKS  # noqa: E402
 
 
@@ -58,7 +58,8 @@ def test_refresh_matches_golden(deck_key: str):
     )
     golden = json.loads(golden_file.read_text(encoding="utf-8"))
 
-    report = compare_decks(source_path, refreshed_path)
+    connected = connected_slide_indices_for(deck_key)
+    report = compare_decks(source_path, refreshed_path, connected_slide_indices=connected)
     actual = report.to_dict()
 
     errors = compare_reports(actual, golden)
