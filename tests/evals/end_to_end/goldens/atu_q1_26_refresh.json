@@ -5,18 +5,18 @@
       "kind": "chart",
       "note": "",
       "position": "(8.36,4.51)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 4,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(2.81,4.5)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 4,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -106,43 +106,43 @@
       "position": "(10.85,2.11)",
       "series_names_match": true,
       "slide_idx": 5,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(8.54,2.1)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 5,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(6.44,2.09)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 5,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(3.72,2.11)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 5,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(0.89,2.09)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 5,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -151,25 +151,25 @@
       "position": "(9.85,1.75)",
       "series_names_match": false,
       "slide_idx": 6,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(5.88,1.74)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 6,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
       "kind": "chart",
       "note": "",
       "position": "(1.86,1.74)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 6,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -212,12 +212,12 @@
       "kind": "chart",
       "note": "",
       "position": "(0.47,1.88)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 8,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.02,2.41)",
@@ -475,7 +475,7 @@
       "position": "(4.2,2.1)",
       "series_names_match": false,
       "slide_idx": 22,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -511,7 +511,7 @@
       "position": "(4.25,2.05)",
       "series_names_match": false,
       "slide_idx": 23,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -635,9 +635,9 @@
       "kind": "chart",
       "note": "",
       "position": "(10.07,2.0)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 25,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -761,7 +761,7 @@
       "kind": "chart",
       "note": "",
       "position": "(8.73,2.03)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 27,
       "values_match": false
     },
@@ -829,7 +829,7 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(6.55,1.67)",
@@ -838,7 +838,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.26,1.67)",
@@ -847,7 +847,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.04,1.67)",
@@ -856,7 +856,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.76,1.67)",
@@ -865,7 +865,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.04,1.67)",
@@ -889,7 +889,7 @@
       "position": "(9.53,1.68)",
       "series_names_match": false,
       "slide_idx": 29,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -907,7 +907,7 @@
       "position": "(3.91,1.68)",
       "series_names_match": false,
       "slide_idx": 29,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -934,7 +934,7 @@
       "position": "(11.42,1.68)",
       "series_names_match": false,
       "slide_idx": 29,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -946,31 +946,31 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(0.03,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.31,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.9,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -982,31 +982,31 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(1.54,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.35,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.79,2.55)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 32,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -1022,9 +1022,9 @@
       "kind": "chart",
       "note": "",
       "position": "(4.35,2.07)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 34,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -1033,7 +1033,7 @@
       "position": "(8.67,2.07)",
       "series_names_match": false,
       "slide_idx": 34,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1103,9 +1103,9 @@
       "kind": "chart",
       "note": "",
       "position": "(4.35,2.07)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 35,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -1114,7 +1114,7 @@
       "position": "(8.67,2.07)",
       "series_names_match": false,
       "slide_idx": 35,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1180,49 +1180,49 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.04,1.98)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 36,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.27,1.98)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 36,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(6.53,1.99)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 36,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.7,1.98)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 36,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(10.96,1.98)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 36,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1234,58 +1234,58 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.01,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.9,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.74,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.62,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.54,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.42,1.79)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 37,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1297,58 +1297,58 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.01,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.9,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.74,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.62,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.54,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.42,1.77)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 38,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1360,13 +1360,13 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.74,1.95)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 39,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -1531,103 +1531,103 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(0.14,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(1.17,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.2,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.33,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.36,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.39,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(6.48,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.46,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.44,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.61,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(10.57,2.71)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 43,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -1643,18 +1643,18 @@
       "kind": "chart",
       "note": "",
       "position": "(4.33,1.99)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 45,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.31,1.99)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 45,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -1663,7 +1663,7 @@
       "position": "(10.29,1.99)",
       "series_names_match": false,
       "slide_idx": 45,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1760,18 +1760,18 @@
       "kind": "chart",
       "note": "",
       "position": "(4.33,1.99)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 46,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.31,1.99)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 46,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
@@ -1780,7 +1780,7 @@
       "position": "(10.29,1.99)",
       "series_names_match": false,
       "slide_idx": 46,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1873,49 +1873,49 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(6.49,1.78)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 47,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.04,1.78)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 47,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.24,1.78)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 47,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.69,1.78)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 47,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(10.97,1.78)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 47,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1927,7 +1927,7 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.04,1.88)",
@@ -1936,7 +1936,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.92,1.88)",
@@ -1945,40 +1945,40 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.8,1.88)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 48,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.67,1.88)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 48,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.55,1.88)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 48,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.43,1.88)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 48,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -1990,7 +1990,7 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.04,1.9)",
@@ -1999,7 +1999,7 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.92,1.9)",
@@ -2008,40 +2008,40 @@
       "values_match": false
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.8,1.9)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 49,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.67,1.9)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 49,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(9.55,1.9)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 49,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(11.43,1.9)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 49,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2125,22 +2125,22 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(3.53,2.25)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 52,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.46,2.25)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 52,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": false,
@@ -2192,9 +2192,9 @@
       "kind": "chart",
       "note": "",
       "position": "(3.21,1.38)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 55,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2215,22 +2215,22 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(6.74,2.05)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 56,
-      "values_match": false
+      "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(4.89,2.05)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 56,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2251,13 +2251,13 @@
       "values_match": true
     },
     {
-      "categories_match": false,
+      "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.73,2.36)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 57,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2426,7 +2426,7 @@
       "kind": "chart",
       "note": "",
       "position": "(3.78,1.7)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 68,
       "values_match": false
     },
@@ -2471,7 +2471,7 @@
       "kind": "chart",
       "note": "",
       "position": "(3.78,1.7)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 69,
       "values_match": false
     },
@@ -2581,7 +2581,7 @@
       "position": "(4.46,1.7)",
       "series_names_match": false,
       "slide_idx": 74,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2660,18 +2660,18 @@
       "kind": "chart",
       "note": "",
       "position": "(8.99,1.4)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 83,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(2.65,1.4)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 83,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2716,7 +2716,7 @@
       "position": "(4.35,2.01)",
       "series_names_match": false,
       "slide_idx": 86,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -2746,13 +2746,13 @@
       "values_match": true
     }
   ],
-  "refreshed_deck": "ATU_refreshed.pptx",
+  "refreshed_deck": "atu_q1_26_refreshed.pptx",
   "source_deck": "ZoomRx_UC_ATU_Report_Q1_'26.pptx",
   "totals": {
-    "categories_match": 35,
+    "categories_match": 98,
     "components_compared": 305,
     "components_with_errors": 0,
-    "series_names_match": 2,
-    "values_match": 157
+    "series_names_match": 77,
+    "values_match": 242
   }
 }

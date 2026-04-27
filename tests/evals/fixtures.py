@@ -17,7 +17,7 @@ FIXTURE_DECKS = {
 # Used by Eval #3 (refresh execution) to compare source vs refreshed.
 # If a refreshed fixture is missing, the eval skips with guidance to generate it.
 REFRESHED_DECKS = {
-    "atu_q1_26": REPO_ROOT / "output" / "atu_refresh" / "ATU_refreshed.pptx",
+    "atu_q1_26": REPO_ROOT / "output" / "atu_q1_26_refresh" / "atu_q1_26_refreshed.pptx",
     "creon_pet_w33": REPO_ROOT / "output" / "creon_pet_w33_refresh" / "creon_pet_w33_refreshed.pptx",
 }
 
