@@ -17,6 +17,7 @@ keep its row labels but show wrong values. The values_match signal catches that.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,6 +25,31 @@ from pptx import Presentation
 
 VALUE_TOLERANCE = 1e-6  # absolute float tolerance for value comparison
 POSITION_TOLERANCE = 0.1  # inches — max drift for source/refreshed shape matching
+
+# Wave-label patterns. Used to decide if a chart dimension carries wave labels;
+# wave dims are exempt from strict count matching for dynamic charts because
+# their content legitimately rolls forward with dynamic_latest_n.
+_WAVE_PATTERNS = [
+    re.compile(r"^Wave\s*\d+", re.IGNORECASE),
+    re.compile(r"^W\d+\b"),
+    re.compile(r"^Q\d['’]?\d{2}", re.IGNORECASE),
+    re.compile(r"^[A-Z][a-z]{2,8}['’]\d{2}"),  # Jan'26, Feb'26
+    re.compile(r"^[A-Z][a-z]{2,8}-[A-Z][a-z]{2,8}\s+\d{4}"),  # Jan-Feb 2026
+    re.compile(r"^Project\s+Wave"),
+]
+
+
+def _looks_wave_like(label: str) -> bool:
+    s = str(label).strip()
+    if not s:
+        return False
+    return any(p.search(s) for p in _WAVE_PATTERNS)
+
+
+def _all_wave_like(labels: list[str]) -> bool:
+    if not labels:
+        return False
+    return all(_looks_wave_like(l) for l in labels)
 
 
 @dataclass
@@ -186,14 +212,27 @@ def compare_decks(
                 )
 
                 if mode == "dynamic":
-                    # Dynamic charts auto-roll forward — wave labels in
-                    # cats/series legitimately differ after refresh. Score
-                    # each dimension on STRUCTURE only:
-                    #   categories_match  = same cat count
-                    #   series_names_match = same series count
-                    #   values_match      = both counts preserved
-                    cats_ok = len(src_cats) == len(ref_cats)
-                    series_ok = len(src_series) == len(ref_series)
+                    # Dynamic charts auto-roll forward. For non-wave dims,
+                    # the mapper's source-canonical alignment makes counts
+                    # match exactly. For wave dims, count can grow/shrink to
+                    # match the configured dynamic_latest_n — exempt those
+                    # from the strict count check (Issue 6). When source side
+                    # is empty (e.g. a chart that had no cats yet), fall back
+                    # to checking the ref side for wave-likeness.
+                    src_series_names = [n for n, _ in src_series]
+                    ref_series_names = [n for n, _ in ref_series]
+                    cats_wave = _all_wave_like(src_cats) or (
+                        not src_cats and _all_wave_like(ref_cats)
+                    )
+                    series_wave = _all_wave_like(src_series_names) or (
+                        not src_series_names and _all_wave_like(ref_series_names)
+                    )
+                    cats_ok = (
+                        len(src_cats) == len(ref_cats) or cats_wave
+                    )
+                    series_ok = (
+                        len(src_series) == len(ref_series) or series_wave
+                    )
                     comp.categories_match = cats_ok
                     comp.series_names_match = series_ok
                     comp.values_match = cats_ok and series_ok
