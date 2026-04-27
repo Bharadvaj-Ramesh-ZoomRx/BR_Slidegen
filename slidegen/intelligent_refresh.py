@@ -2091,6 +2091,42 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
     # Cache fetched data by data_source key
     data_cache = {}
+    # Cache the full known-wave set per data_source — Fix L/M uses this for
+    # value-driven wave-label detection in selectedColumns. Computed lazily
+    # by stripping wave filters from the lineage and re-fetching once per ds.
+    known_waves_cache: dict[str, set[str]] = {}
+
+    def _get_known_wave_labels(ds_key: str) -> set[str]:
+        if ds_key in known_waves_cache:
+            return known_waves_cache[ds_key]
+        labels: set[str] = set()
+        lineage = data_sources.get(ds_key, {})
+        if lineage:
+            try:
+                _, full_df = fetch_synapse_data({
+                    "project_id": lineage.get("project_id"),
+                    "reporting_plan_id": lineage.get("reporting_plan_id"),
+                    "analysis_ids": list(lineage.get("analysis_ids") or []),
+                    "segment_ids": list(lineage.get("segment_ids") or []),
+                    "dynamic_latest_n": 0,
+                    "static_time_period_ids": [],
+                    "static_time_period_names": [],
+                    "include_live_wave": True,
+                })
+                if not full_df.empty and "time_period_name" in full_df.columns:
+                    raw = full_df["time_period_name"].astype(str).unique()
+                    labels = set(raw)
+                    # Mirror the mapper's "Project Wave " -> "Wave " strip so
+                    # rewrites that emit the stripped form still detect both.
+                    stripped = full_df["time_period_name"].astype(str).str.replace(
+                        r"^Project Wave ", "Wave ", regex=True,
+                    ).unique()
+                    labels |= set(stripped)
+            except Exception as exc:
+                print(f"  [warn] known-wave fetch failed for {ds_key}: {exc}")
+        known_waves_cache[ds_key] = labels
+        return labels
+
     all_results = {"slides": [], "output": output_path}
     ns_c = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 
@@ -2196,6 +2232,8 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             rows_per_object=rows_per_object,
                             top_n_rows=top_n_rows,
                             static_time_period_ids=lin_raw_static_ids,
+                            known_wave_labels=_get_known_wave_labels(_comp_ds)
+                                if _comp_ds else None,
                         )
 
                         if not chart_data.success or not chart_data.categories:

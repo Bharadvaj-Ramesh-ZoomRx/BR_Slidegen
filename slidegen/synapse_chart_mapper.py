@@ -189,15 +189,22 @@ def _match_pivot_col(sc_norm: str, pivot_columns) -> str | None:
     return best_match
 
 
-# ── Fix L: wave-pinned selectedColumns rewrite ──
-# Some Connector tags pin specific wave labels (e.g. "Project Wave 12") into
-# selectedColumns when waves are the column axis. Non-connected inference
-# produces the same shape because it copies the source chart's column headers
-# into selectedColumns. When a refresh fetches different waves, those pinned
-# entries no longer match the pivot output and the chart silently falls back
-# to source-restore via the success=False path. The rewrite below replaces
-# wave-label entries with the actual fetched wave names so the refresh can
-# proceed.
+# ── Fix L+M: wave-pinned selectedColumns rewrite (universal) ──
+# Connector tags freeze wave labels into selectedColumns when waves are the
+# column axis. Pradeep's non-connected inference produces the same shape
+# because it copies the source chart's column headers into selectedColumns.
+# When a refresh fetches different waves, those pinned entries no longer
+# match the pivot output and the chart silently falls back to source-restore.
+#
+# Two flavors are handled:
+#   Fix L — standalone wave entries: ["y_label", "Wave 12", "Wave 13"]
+#   Fix M — compound entries: ["Codes", "Feb'26 @:@ X", "Mar'26 @:@ X"]
+#                                          ^wave-prefix^^suffix^
+#
+# Wave detection is value-driven first (s in known_wave_labels — populated
+# by the refresh pipeline from the analysis's full wave set, ground-truth
+# regardless of project's wave naming convention) and falls back to a
+# pattern set for callers that don't supply known_wave_labels.
 import re as _re_wave
 
 _WAVE_LABEL_PATTERNS = (
@@ -207,46 +214,89 @@ _WAVE_LABEL_PATTERNS = (
     _re_wave.compile(r"^Q[1-4] \d{4}$"),                              # Q1 2026
 )
 
+_WAVE_TEMPLATE_SENTINEL = "\x00WAVE\x00"
+_COMPOUND_SEP = " @:@ "
 
-def _is_wave_label(s: str) -> bool:
-    return isinstance(s, str) and any(p.match(s) for p in _WAVE_LABEL_PATTERNS)
+
+def _is_wave_label(s: str, known_wave_labels: set[str] | None = None) -> bool:
+    if not isinstance(s, str):
+        return False
+    if known_wave_labels and s in known_wave_labels:
+        return True
+    return any(p.match(s) for p in _WAVE_LABEL_PATTERNS)
 
 
 def _rewrite_wave_pinned_selected_columns(
-    selected: list, df: pd.DataFrame,
+    selected: list,
+    df: pd.DataFrame,
+    known_wave_labels: set[str] | None = None,
 ) -> tuple[list, int]:
-    """Replace wave-label entries in selectedColumns with the fetched wave names.
+    """Replace wave-label entries (standalone or compound) with fetched waves.
+
+    Walks selectedColumns. For each entry, splits on the Connector compound
+    separator (" @:@ ") and detects wave-label parts. An entry with at least
+    one wave part is dropped; in its place, one new entry per fetched wave
+    is emitted, with the wave-part substituted in (other parts preserved).
+    Entries with no wave parts are kept unchanged in their original order.
+
+    Compound templates are deduplicated, so two source entries like
+    `"Feb'26 @:@ X"` and `"Mar'26 @:@ X"` collapse to one template
+    `"<wave> @:@ X"` and produce one new entry per fetched wave (not two
+    × number_of_waves).
 
     Returns (rewritten_list, n_dropped). When n_dropped is 0 the function is
-    a no-op. The returned list always has wave entries in chronological order
-    by `time_period_id` so cats/series ordering matches what the pivot will
-    produce.
+    a no-op. Wave entries are appended in chronological order by
+    `time_period_id`.
     """
     if not selected or "time_period_name" not in df.columns:
         return list(selected) if selected else selected, 0
 
-    rewritten: list = []
-    n_dropped = 0
-    for entry in selected:
-        if _is_wave_label(entry):
-            n_dropped += 1
-            continue
-        rewritten.append(entry)
-    if n_dropped == 0:
-        return rewritten, 0
-
     if "time_period_id" in df.columns:
-        order = (df.groupby("time_period_name")["time_period_id"]
-                 .max().sort_values().index.tolist())
+        fetched_waves = (df.groupby("time_period_name")["time_period_id"]
+                         .max().sort_values().index.tolist())
     else:
-        order = list(dict.fromkeys(df["time_period_name"].astype(str)))
-    for w in order:
-        if w not in rewritten:
-            rewritten.append(str(w))
+        fetched_waves = list(dict.fromkeys(df["time_period_name"].astype(str)))
+    fetched_waves = [str(w) for w in fetched_waves]
+    if not fetched_waves:
+        return list(selected), 0
+
+    non_wave_entries: list = []
+    ordered_templates: list[str] = []  # preserves first-seen order
+    seen_templates: set[str] = set()
+    n_dropped = 0
+
+    for entry in selected:
+        if not isinstance(entry, str):
+            non_wave_entries.append(entry)
+            continue
+        parts = entry.split(_COMPOUND_SEP)
+        wave_idxs = [i for i, p in enumerate(parts)
+                     if _is_wave_label(p, known_wave_labels)]
+        if not wave_idxs:
+            non_wave_entries.append(entry)
+            continue
+        # Build template with wave-part(s) replaced by sentinel
+        tmpl_parts = list(parts)
+        for i in wave_idxs:
+            tmpl_parts[i] = _WAVE_TEMPLATE_SENTINEL
+        template = _COMPOUND_SEP.join(tmpl_parts)
+        if template not in seen_templates:
+            ordered_templates.append(template)
+            seen_templates.add(template)
+        n_dropped += 1
+
+    if n_dropped == 0:
+        return list(selected), 0
+
+    rewritten: list = list(non_wave_entries)
+    for template in ordered_templates:
+        for w in fetched_waves:
+            rewritten.append(template.replace(_WAVE_TEMPLATE_SENTINEL, w))
 
     logger.info(
-        "Fix L: rewrote %d wave-pinned selectedColumns entries → %s",
-        n_dropped, [w for w in rewritten if _is_wave_label(w)],
+        "Fix L/M: dropped %d wave-pinned selectedColumns entries, expanded "
+        "%d template(s) over %d fetched waves",
+        n_dropped, len(ordered_templates), len(fetched_waves),
     )
     return rewritten, n_dropped
 
@@ -261,6 +311,7 @@ def pivot_records_to_chart_data(
     rows_per_object: int | None = None,
     top_n_rows: int | None = None,
     static_time_period_ids: list[int] | None = None,
+    known_wave_labels: set[str] | None = None,
 ) -> ChartRefreshData:
     """Transform flat Synapse records into chart categories + series.
 
@@ -484,12 +535,14 @@ def pivot_records_to_chart_data(
     # selectedColumns lists the row fields to include, then series columns.
     # The LAST RowField in selectedColumns is the display field for categories.
     # E.g. selectedCols=['y_label','alias5540','Q1 2026'] → display alias5540 values.
-    # Apply Fix L: rewrite wave-pinned entries against the actually-fetched
-    # waves before any downstream consumer reads selectedColumns. No-op when
-    # selectedColumns has no wave-label entries — zero impact on charts where
-    # waves live in RowFields rather than ColumnFields.
+    # Apply Fix L+M: rewrite wave-pinned entries (standalone or compound)
+    # against the actually-fetched waves before any downstream consumer reads
+    # selectedColumns. Detection is value-driven via known_wave_labels (the
+    # full wave set for this analysis, supplied by the refresh pipeline) with
+    # a regex fallback. No-op when selectedColumns has no wave-label entries.
     selected, _n_wave_rewrites = _rewrite_wave_pinned_selected_columns(
         mapping_config.get("selectedColumns", []), df,
+        known_wave_labels=known_wave_labels,
     )
     display_row_field = primary_row  # default: first RowField
 
