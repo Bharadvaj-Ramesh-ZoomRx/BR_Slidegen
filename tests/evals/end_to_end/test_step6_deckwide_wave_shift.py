@@ -80,7 +80,7 @@ def _values_identical(src_series, ref_series) -> bool:
 def test_deckwide_wave_shift(deck_key):
     cfg = SHIFT[deck_key]
     source_pptx = FIXTURE_DECKS[deck_key]
-    base_spec = REPO_ROOT / "output" / f"{deck_key}_refresh" / f"{deck_key}_full_spec.json"
+    base_spec = REPO_ROOT / "output" / "step2_test_connected" / f"{deck_key}_full_spec.json"
     if not source_pptx.exists():
         pytest.skip(f"source pptx missing: {source_pptx}")
     if not base_spec.exists():

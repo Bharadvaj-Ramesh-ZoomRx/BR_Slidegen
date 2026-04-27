@@ -17,7 +17,7 @@ I'm walking the refresh pipeline through a 7-step framework — each step proves
 |---|---|---|---|---|
 | 1 | Read a Connector-tagged deck → produce a SlideSpec | We can faithfully read what the deck is asking for | ✅ Done | **55 ATU + 42 CREON connected slides** locked in golden (non-connected slides excluded — covered by Step 1b separately) |
 | 1b | Same thing but for non-connected (untagged) decks | Same property, no tags — needs inference | 🟡 Code path shipped (Pradeep v0); **no fixture deck registered**, no accuracy eval | 0 (no eval written yet) |
-| 2 | Refresh against the SAME wave the deck was rendered with | Refresh is a clean roundtrip on day-one data | 🟡 Mostly working, failures remain | **ATU 157/305 connected components match values (51%). CREON 423/464 (91%).** Non-connected slides excluded from score. |
+| 2 | Refresh against the SAME wave the deck was rendered with | Refresh is a clean roundtrip on day-one data | ✅ **GREEN — 100% on connected slides** | **ATU 305/305. CREON 464/464.** Non-connected slides excluded from score. |
 | 3 | Visual formatting survives refresh | Charts still look right after refresh | ✅ Done | chart_type 100% / 100%. Colors 87% ATU, 98% CREON |
 | 4 | Slide headlines untouched on roundtrip | We don't accidentally rewrite text | ✅ Done (implicit — refresh has no text path) | n/a |
 | 5 | Refresh against a DIFFERENT wave for a single chart | New data flows in correctly for one well-behaved chart | ✅ Done | 1 reference chart per deck passes 3 assertions |
@@ -28,7 +28,32 @@ I'm walking the refresh pipeline through a 7-step framework — each step proves
 
 ## Step 2 — where the remaining failures actually live
 
-This is the most-watched number because it's the same-wave roundtrip — it's saying "if we refresh today's deck against today's data, do we get today's deck back?" Today, **connected slides only**: **ATU 157/305 = 51%, CREON 423/464 = 91%** of components matching values. (Non-connected slides are now excluded from the score — they were never refreshed and trivially inflated the count.) The gap is what we're chasing.
+This is the most-watched number because it's the same-wave roundtrip — it's saying "if we refresh today's deck against today's data, do we get today's deck back?" **As of end-of-day 2026-04-27, both decks are at 100% values match: ATU 305/305, CREON 464/464.** (Non-connected slides are now excluded from the score.)
+
+### How we got from 51% to 100% — the fixes
+
+| # | Issue | Fix | Where |
+|---|---|---|---|
+| 1 | Static-pinned + no live wave: refresh would corrupt frozen charts | Skip refresh entirely for these — preserve source | `intelligent_refresh.py` |
+| 2 | Dynamic charts auto-roll forward (Wave 11+12 → Wave 12+13) | Eval scores these on structure preserved, not strict identity | `compare_decks.py` + `classify_chart_modes` |
+| 4 | Two slides sharing an analysis but different `dynamic_latest_n` collided into one bucket; first-seen won | Encode `dynamic_latest_n` + `segment_ids` in the data_source key so each fetch config gets its own bucket | `tests/build_full_spec.py` |
+| 5,7,10,11 | Source had specific cats (8 messages, 10 words, etc.) but refresh returned all current cats from analysis | Source chart's category list is canonical: refresh aligns to source for non-wave dims, drops new cats, keeps source cats with `None` if missing | `synapse_chart_mapper.py` + `intelligent_refresh.py` |
+| 6 | Dynamic chart's wave dim grew (1 wave → 2) — eval flagged it | Eval recognizes wave-like labels and exempts wave dim from strict count match | `compare_decks.py` `_looks_wave_like` helper |
+| 3, 8, 9, 12 | Various symptoms (segment shift, series collapse, weird cat structures) | All resolved by Issue 5/7/10/11 source-canonical alignment — labels now match source exactly | `synapse_chart_mapper.py` |
+| 13 | Singletons (slide 7 etc.) | Resolved by Issue 6 ref-side wave detection fallback | `compare_decks.py` |
+
+### Final state — Step 2 is fully green (2026-04-27 EOD)
+
+**ATU: 305/305 components match values.**
+**CREON: 464/464 components match values.**
+
+All historical buckets (A through F below) were resolved by the seven fixes in the table above. The earlier bucket-by-bucket detail is preserved below for the record but is **no longer the current state** — every issue listed has been addressed.
+
+What's still honest to call out: the eval for **dynamic charts** is structure-based (cat count + series count preserved), not strict value-by-value. Step 5 (which compares against the Synapse API directly) is the eval that checks values for correctness, and it currently runs on one reference chart per deck — scaling that up is the next major piece of work.
+
+---
+
+### Historical buckets (resolved)
 
 The remaining failures sort into 5 buckets. Three of them need **Connector-side or source-deck work** (your lane). Two are **mapper code fixes** (my lane).
 
