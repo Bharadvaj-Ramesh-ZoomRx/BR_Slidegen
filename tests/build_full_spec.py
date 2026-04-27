@@ -55,14 +55,24 @@ def _datasource_from_lineage(lin: dict, sources: dict) -> str | None:
     if not sids:
         sids = tuple(lin.get("segment_ids", []))
 
-    key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
+    # Encode every parameter that affects what data the API returns into the
+    # key, so two slides with different fetch configs never collide on the
+    # same data_source bucket. Previously only project/rp/analysis_ids were
+    # in the key, so a slide asking for {N=1, segments=[4745]} would silently
+    # inherit segment_ids=[] from an earlier slide using the same analysis,
+    # which corrupted the fetched data.
+    dyn_n = lin.get("dynamic_latest_n") or 5
+    seg_part = "_".join(str(s) for s in sids) if sids else ""
+    key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}_n{dyn_n}"
+    if seg_part:
+        key += f"_s{seg_part}"
     if key not in sources:
         sources[key] = {
             "project_id": pid,
             "reporting_plan_id": rpid,
             "analysis_ids": list(aids),
             "segment_ids": list(sids),
-            "dynamic_latest_n": lin.get("dynamic_latest_n") or 5,
+            "dynamic_latest_n": dyn_n,
             "static_time_period_ids": [],
             "static_time_period_names": [],
             "include_live_wave": lin.get("include_live_wave"),
@@ -105,7 +115,15 @@ def _lineage_ds_key(lin: dict) -> str | None:
         return None
     rpid = lin.get("reporting_plan_id")
     aids = lin.get("analysis_ids", [])
-    return f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
+    sids = tuple(s.get("rule_id", 0) for s in lin.get("segments", []))
+    if not sids:
+        sids = tuple(lin.get("segment_ids", []))
+    dyn_n = lin.get("dynamic_latest_n") or 5
+    seg_part = "_".join(str(s) for s in sids) if sids else ""
+    key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}_n{dyn_n}"
+    if seg_part:
+        key += f"_s{seg_part}"
+    return key
 
 
 def build_connected_slide(spec: dict, ds_key: str) -> dict:

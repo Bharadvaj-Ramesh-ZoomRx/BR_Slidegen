@@ -725,36 +725,36 @@
       "kind": "chart",
       "note": "",
       "position": "(6.67,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 24,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.48,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 24,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.74,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 24,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.8,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 24,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -770,36 +770,36 @@
       "kind": "chart",
       "note": "",
       "position": "(6.67,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 25,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(7.74,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 25,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(8.8,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 25,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": true,
       "kind": "chart",
       "note": "",
       "position": "(5.48,1.66)",
-      "series_names_match": false,
+      "series_names_match": true,
       "slide_idx": 25,
-      "values_match": false
+      "values_match": true
     },
     {
       "categories_match": null,
@@ -4183,7 +4183,7 @@
     "categories_match": 336,
     "components_compared": 464,
     "components_with_errors": 0,
-    "series_names_match": 349,
-    "values_match": 434
+    "series_names_match": 357,
+    "values_match": 442
   }
 }

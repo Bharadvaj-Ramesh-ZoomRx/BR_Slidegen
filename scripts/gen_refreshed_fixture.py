@@ -64,18 +64,17 @@ def main():
     data_sources = build_data_sources(connector_specs)
     print(f"     {len(data_sources)} unique data sources")
 
-    # Map slide_index -> data_source key
+    # Map slide_index -> data_source key. Must match the keying logic in
+    # build_full_spec._lineage_ds_key so each slide points to the right
+    # bucket (encodes analysis ids, dynamic_latest_n, and segment_ids).
+    from tests.build_full_spec import _lineage_ds_key
     slide_to_ds = {}
     for spec in connector_specs:
         si = spec["slide_index"]
         lin = spec.get("data_lineage", {})
-        pid = lin.get("project_id")
-        if not pid:
-            continue
-        rpid = lin.get("reporting_plan_id")
-        aids = tuple(lin.get("analysis_ids", []))
-        key = f"p{pid}_rp{rpid}_a{'_'.join(str(a) for a in aids)}"
-        slide_to_ds[si] = key
+        key = _lineage_ds_key(lin)
+        if key:
+            slide_to_ds[si] = key
 
     # Build slide entries and populate shape names from the PPTX
     prs = Presentation(str(source_pptx))
