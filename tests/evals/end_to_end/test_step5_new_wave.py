@@ -48,49 +48,58 @@ WORK_DIR = REPO_ROOT / "output" / "_step5"
 #   - chart shape is stable across waves (same brand list, same options)
 REFERENCE = {
     "atu_q1_26": {
-        "data_source": "p981_rp2019_a411829",
+        # Reference chart on slide 4 (Practice setting n-1) — 2 series
+        # (Community, Academic) over wave categories. selectedColumns is
+        # wave-free so the variant override actually drives a refetch.
+        "data_source": "p981_rp2019_a406875",
         "project_id": 981,
         "reporting_plan_id": 2019,
-        "analysis_ids": [411829],
-        # 411829 returns waves 4-10, 12, 13 (wave 11 missing in this analysis)
+        "analysis_ids": [406875],
+        "segment_ids": [],
+        # 406875 returns waves 1-10, 12, 13 (12 distinct waves; wave 11 absent)
         "wave_a_ids": [23115, 23116],   # Wave 12 + Wave 13 (latest delivered)
-        "wave_b_ids": [23109, 23110],   # Wave 6  + Wave 7  (clearly older)
-        "reference": (28, (2.04, 1.67)),
+        "wave_b_ids": [23104, 23105],   # Wave 1  + Wave 2  (clearly older)
+        "reference": (4, (8.36, 4.51)),
     },
     "creon_pet_w33": {
-        "data_source": "p523_rp1143_a632091",
+        "data_source": "p523_rp1143_a689321",
         "project_id": 523,
         "reporting_plan_id": 1143,
-        "analysis_ids": [632091],
-        # 632091 returns Jan'25..Dec'25 (15163, 15178-15188) +
+        "analysis_ids": [689321],
+        # base spec filters this analysis by segment 2445 — match it on
+        # the API-truth side so multiset containment is meaningful.
+        "segment_ids": [2445],
+        # 689321 returns Jan'25..Dec'25 (15163, 15178-15188) +
         # Jan'26..Mar'26 (25375, 25374, 25373 — note reversed order).
         "wave_a_ids": [25374, 25373],   # Feb'26 + Mar'26 (newest)
         "wave_b_ids": [15184, 15185],   # Aug'25 + Sep'25 (older)
-        "reference": (10, (3.78, 1.6)),
+        "reference": (8, (3.28, 1.84)),
     },
 }
 
-VALUE_TOLERANCE = 1e-3  # API → chart precision typically 4 decimals
+VALUE_TOLERANCE = 6e-3  # absorbs chart's percentage-point rounding (chart
+# stores `percentage / 100` ≈ 2dp; API `decimal` is 4dp; max divergence is
+# under half a percentage point)
 
 
-def _values_match(refreshed_series, api_records, primary_value="decimal") -> tuple[bool, str]:
-    """Verify each refreshed value appears in the API records for the same key.
+def _values_match(refreshed_series, api_records) -> tuple[bool, str]:
+    """Verify each refreshed value appears in the API records.
 
-    Loose match: for every (cat, series_name, value) in the refreshed chart,
-    find a matching record in the API result with the same y_label/x_label
-    and a numerically equal value field. This handles the mapper's various
-    label-source variants (y_label / alias_label / x_label) without us
-    re-implementing the full pivot logic in the test.
+    Loose multiset containment: for every value in the refreshed chart, find
+    a matching value in the API records (within VALUE_TOLERANCE). The API
+    pool includes both `decimal` (4dp) and `percentage/100` (2dp) since the
+    mapper may use either depending on the chart's ValueFields.
     """
     api_values = []
     for r in api_records:
-        v = r.get(primary_value)
-        if v is None:
-            continue
-        try:
-            api_values.append(round(float(v), 4))
-        except (TypeError, ValueError):
-            continue
+        for key, scale in (("decimal", 1.0), ("percentage", 0.01)):
+            v = r.get(key)
+            if v is None:
+                continue
+            try:
+                api_values.append(round(float(v) * scale, 4))
+            except (TypeError, ValueError):
+                continue
 
     refreshed_values = []
     for _name, vals in refreshed_series:
@@ -167,11 +176,21 @@ def test_step5_new_wave_propagates(deck_key):
     )
 
     # ── Assertion 1: structural invariance ──
-    assert chart_a["cats"] == chart_b["cats"], (
-        f"cats differ between waves: A={chart_a['cats']!r} vs B={chart_b['cats']!r}"
+    # Waves are the cats on these reference charts (time_period_name in RowFields),
+    # so cat *labels* legitimately change with the override — only the *count* and
+    # the series shape should be invariant.
+    assert len(chart_a["cats"]) == len(chart_b["cats"]), (
+        f"cat count differs between waves: "
+        f"A={len(chart_a['cats'])} ({chart_a['cats']!r}) vs "
+        f"B={len(chart_b['cats'])} ({chart_b['cats']!r})"
     )
     assert len(chart_a["series"]) == len(chart_b["series"]), (
         f"series count differs: A={len(chart_a['series'])} vs B={len(chart_b['series'])}"
+    )
+    names_a = [n for n, _ in chart_a["series"]]
+    names_b = [n for n, _ in chart_b["series"]]
+    assert names_a == names_b, (
+        f"series names differ between waves: A={names_a!r} vs B={names_b!r}"
     )
 
     # ── Assertion 2: smell test (values differ) ──
@@ -189,12 +208,14 @@ def test_step5_new_wave_propagates(deck_key):
         reporting_plan_id=cfg["reporting_plan_id"],
         analysis_ids=cfg["analysis_ids"],
         static_time_period_ids=cfg["wave_a_ids"],
+        segment_ids=cfg.get("segment_ids", []),
     )
     api_b = fetch_api_truth(
         project_id=cfg["project_id"],
         reporting_plan_id=cfg["reporting_plan_id"],
         analysis_ids=cfg["analysis_ids"],
         static_time_period_ids=cfg["wave_b_ids"],
+        segment_ids=cfg.get("segment_ids", []),
     )
 
     ok_a, msg_a = _values_match(chart_a["series"], api_a)

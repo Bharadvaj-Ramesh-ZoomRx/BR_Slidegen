@@ -107,11 +107,14 @@ def fetch_api_truth(
     reporting_plan_id: int,
     analysis_ids: list[int],
     static_time_period_ids: list[int],
+    segment_ids: list[int] | None = None,
 ) -> list[dict]:
-    """Direct Synapse query for the (analysis × wave) pair.
+    """Direct Synapse query for the (analysis × wave [× segment]) tuple.
 
     Bypasses the mapper — returns raw records so the test can compare
-    refreshed values against the API source of truth.
+    refreshed values against the API source of truth. `segment_ids` must
+    match the base spec's segment filter on the same data_source so that
+    the API records are comparable to the refreshed chart values.
     """
     from slidegen.intelligent_refresh import fetch_synapse_data
 
@@ -119,7 +122,7 @@ def fetch_api_truth(
         "project_id": project_id,
         "reporting_plan_id": reporting_plan_id,
         "analysis_ids": list(analysis_ids),
-        "segment_ids": [],
+        "segment_ids": list(segment_ids) if segment_ids else [],
         "dynamic_latest_n": 0,
         "static_time_period_ids": list(static_time_period_ids),
         "include_live_wave": False,
