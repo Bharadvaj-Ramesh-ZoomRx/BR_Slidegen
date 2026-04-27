@@ -312,6 +312,8 @@ def pivot_records_to_chart_data(
     top_n_rows: int | None = None,
     static_time_period_ids: list[int] | None = None,
     known_wave_labels: set[str] | None = None,
+    source_categories: list[str] | None = None,
+    source_series_names: list[str] | None = None,
 ) -> ChartRefreshData:
     """Transform flat Synapse records into chart categories + series.
 
@@ -766,6 +768,44 @@ def pivot_records_to_chart_data(
                 categories = [categories[i] for i in tp_order]
                 series = [(n, [v[i] for i in tp_order if i < len(v)])
                           for n, v in series]
+
+    # ── Source-chart-canonical alignment for non-wave dimensions ──
+    # The source chart's category list defines what rows to show. After refresh,
+    # if a category that was in source no longer has data, keep the row with a
+    # placeholder (None → renders as blank/"-"). If new categories appear that
+    # weren't in source, drop them. Same for series. Only apply on dimensions
+    # that aren't waves — wave dims must respect dynamic_latest_n and grow/
+    # shrink as configured.
+    def _is_wave_dim(labels: list[str]) -> bool:
+        if not labels:
+            return False
+        return all(_is_wave_label(str(l), known_wave_labels) for l in labels)
+
+    if source_categories and not _is_wave_dim(source_categories):
+        cat_to_idx = {c: i for i, c in enumerate(categories)}
+        new_series = []
+        for sname, vals in series:
+            new_vals = []
+            for src_cat in source_categories:
+                if src_cat in cat_to_idx:
+                    j = cat_to_idx[src_cat]
+                    new_vals.append(vals[j] if j < len(vals) else None)
+                else:
+                    new_vals.append(None)
+            new_series.append((sname, new_vals))
+        categories = list(source_categories)
+        series = new_series
+
+    if source_series_names and not _is_wave_dim(source_series_names):
+        current_names = [n for n, _ in series]
+        name_to_idx = {n: i for i, n in enumerate(current_names)}
+        new_series = []
+        for src_name in source_series_names:
+            if src_name in name_to_idx:
+                new_series.append(series[name_to_idx[src_name]])
+            else:
+                new_series.append((src_name, [None] * len(categories)))
+        series = new_series
 
     return ChartRefreshData(categories=categories, series=series)
 

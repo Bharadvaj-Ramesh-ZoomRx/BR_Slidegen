@@ -2237,6 +2237,25 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                         slide_results["charts"].append({"name": name, "status": "not_found"})
                         continue
 
+                    # Read source chart's structure to use as the canonical
+                    # cat/series list (Issues 5/7/10/11). Refresh aligns its
+                    # output to source: drop new cats that weren't there,
+                    # keep cats with no current data filled with None.
+                    src_cats: list[str] | None = None
+                    src_series_names: list[str] | None = None
+                    try:
+                        for ss in src_prs.slides[si].shapes:
+                            if ss.has_chart and ss.name == name:
+                                _plot = ss.chart.plots[0]
+                                src_cats = [str(c) for c in (_plot.categories or [])]
+                                src_series_names = [
+                                    s.name if s.name else "" for s in _plot.series
+                                ]
+                                break
+                    except Exception:
+                        src_cats = None
+                        src_series_names = None
+
                     try:
                         chart_data = pivot_records_to_chart_data(
                             records_list, raw_pc, raw_mc,
@@ -2248,6 +2267,8 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             static_time_period_ids=lin_raw_static_ids,
                             known_wave_labels=_get_known_wave_labels(_comp_ds)
                                 if _comp_ds else None,
+                            source_categories=src_cats,
+                            source_series_names=src_series_names,
                         )
 
                         if not chart_data.success or not chart_data.categories:
