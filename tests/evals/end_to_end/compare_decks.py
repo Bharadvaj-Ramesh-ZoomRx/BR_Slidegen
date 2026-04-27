@@ -125,6 +125,7 @@ def compare_decks(
     source_path: Path,
     refreshed_path: Path,
     connected_slide_indices: set[int] | None = None,
+    chart_modes: dict[tuple[int, str], str] | None = None,
 ) -> DeckMatchReport:
     """Run component-level comparison between source and refreshed decks.
 
@@ -132,6 +133,14 @@ def compare_decks(
     in this set are compared. Pass the indices from the Step 1 spec golden to
     restrict comparison to connected (Connector-tagged) slides only — non-connected
     slides are never refreshed and would trivially inflate match counts.
+
+    `chart_modes`: maps (slide_idx, chart_shape_name) -> 'static' | 'dynamic'.
+    Static charts are scored with strict identity (source values == refreshed
+    values). Dynamic charts (those tagged with dynamic_latest_n>0 and no static
+    pin) are expected to auto-roll forward — their wave labels legitimately
+    differ after refresh, so we score on STRUCTURE only: same cat count and
+    series count = match. When `chart_modes` is None, all charts are treated
+    as static (current strict behavior).
     """
     source = Presentation(str(source_path))
     refreshed = Presentation(str(refreshed_path))
@@ -168,20 +177,37 @@ def compare_decks(
                 src_cats, src_series = _extract_chart_data(src)
                 ref_cats, ref_series = _extract_chart_data(match)
 
-                comp.categories_match = src_cats == ref_cats
-                # Series names: ordered list of names
                 src_names = [name for name, _ in src_series]
                 ref_names = [name for name, _ in ref_series]
-                comp.series_names_match = src_names == ref_names
 
-                # Values: compare positionally, requires same shape (series count + value count per series)
-                if len(src_series) == len(ref_series):
-                    comp.values_match = all(
-                        _values_equal(sv, rv)
-                        for (_, sv), (_, rv) in zip(src_series, ref_series)
-                    )
+                mode = (
+                    chart_modes.get((slide_idx, src.name or ""), "static")
+                    if chart_modes is not None else "static"
+                )
+
+                if mode == "dynamic":
+                    # Dynamic charts auto-roll forward — wave labels in
+                    # cats/series legitimately differ after refresh. Score
+                    # each dimension on STRUCTURE only:
+                    #   categories_match  = same cat count
+                    #   series_names_match = same series count
+                    #   values_match      = both counts preserved
+                    cats_ok = len(src_cats) == len(ref_cats)
+                    series_ok = len(src_series) == len(ref_series)
+                    comp.categories_match = cats_ok
+                    comp.series_names_match = series_ok
+                    comp.values_match = cats_ok and series_ok
                 else:
-                    comp.values_match = False
+                    # Static charts: strict identity (current behavior).
+                    comp.categories_match = src_cats == ref_cats
+                    comp.series_names_match = src_names == ref_names
+                    if len(src_series) == len(ref_series):
+                        comp.values_match = all(
+                            _values_equal(sv, rv)
+                            for (_, sv), (_, rv) in zip(src_series, ref_series)
+                        )
+                    else:
+                        comp.values_match = False
             except Exception as e:
                 comp.note = f"chart extraction error: {type(e).__name__}: {e}"
             report.components.append(comp)

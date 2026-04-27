@@ -2201,6 +2201,20 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 slide_results["tables"].append({"name": name, "status": "static_skipped"})
                 continue
 
+            # ── Static-pinned + no live wave → skip refresh ──
+            # When the user pinned specific waves (static_time_period_ids set)
+            # and explicitly opted out of auto-rolling forward (include_live_wave
+            # False), the chart is "frozen": refreshing wouldn't add new wave
+            # data, and could introduce drift if the API has changed for those
+            # exact waves. Leave the source chart untouched.
+            ds_include_live = _cl.get("include_live_wave", True)
+            if lin_raw_static_ids and not ds_include_live:
+                bucket = "charts" if ctype == "chart" else "tables"
+                slide_results[bucket].append({
+                    "name": name, "status": "static_pinned_skipped",
+                })
+                continue
+
             raw_pc = comp.get("raw_pivot_config")
             raw_mc = comp.get("raw_mapping_config")
 

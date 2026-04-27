@@ -27,6 +27,7 @@ from tests.evals.fixtures import FIXTURE_DECKS, REFRESHED_DECKS  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).parent / "goldens"
 SPEC_GOLDEN_DIR = Path(__file__).resolve().parents[1] / "spec_extraction" / "goldens"
+FULL_SPEC_DIR = Path(__file__).resolve().parents[3] / "output" / "step2_test_connected"
 
 
 def connected_slide_indices_for(deck_key: str) -> set[int] | None:
@@ -41,6 +42,48 @@ def connected_slide_indices_for(deck_key: str) -> set[int] | None:
         return None
     specs = json.loads(spec_golden.read_text(encoding="utf-8"))
     return {s["slide_index"] for s in specs}
+
+
+def classify_chart_modes(deck_key: str) -> dict[tuple[int, str], str] | None:
+    """Read the deck's full_spec.json and classify each chart as 'dynamic' or 'static'.
+
+    Used by compare_decks to apply the right success criterion per chart:
+      - 'static':  strict identity comparison (source values == refreshed values).
+                   Includes charts with static_time_period_ids set, OR charts
+                   without dynamic_latest_n.
+      - 'dynamic': structural comparison only. Wave labels legitimately differ
+                   after auto-roll-forward (Wave 11+12 -> Wave 12+13 is correct
+                   product behavior, not a refresh bug).
+
+    Returns dict mapping (slide_index, chart_shape_name) -> mode.
+    Returns None if the full_spec is missing — compare_decks then falls back
+    to strict comparison for everything (current behavior).
+    """
+    full_spec_path = FULL_SPEC_DIR / f"{deck_key}_full_spec.json"
+    if not full_spec_path.exists():
+        return None
+    spec = json.loads(full_spec_path.read_text(encoding="utf-8"))
+    data_sources = spec.get("data_sources", {})
+    modes: dict[tuple[int, str], str] = {}
+    for slide in spec.get("slides", []):
+        si = slide["slide_index"]
+        slide_ds_key = slide.get("data_source")
+        for comp in slide.get("components", []):
+            if comp.get("type") != "chart":
+                continue
+            name = comp.get("name") or ""
+            if not name:
+                continue
+            ds_key = comp.get("data_source") or slide_ds_key
+            ds = data_sources.get(ds_key, {})
+            sids = ds.get("static_time_period_ids") or []
+            snames = ds.get("static_time_period_names") or []
+            dyn = ds.get("dynamic_latest_n") or 0
+            if sids or snames or not dyn:
+                modes[(si, name)] = "static"
+            else:
+                modes[(si, name)] = "dynamic"
+    return modes
 
 
 def main():
@@ -59,10 +102,19 @@ def main():
             continue
 
         connected = connected_slide_indices_for(key)
+        chart_modes = classify_chart_modes(key)
         print(f"[gen]  {key}: comparing {source_path.name} vs {refreshed_path.name}")
         if connected is not None:
             print(f"       restricting to {len(connected)} connected slides")
-        report = compare_decks(source_path, refreshed_path, connected_slide_indices=connected)
+        if chart_modes is not None:
+            n_dyn = sum(1 for m in chart_modes.values() if m == "dynamic")
+            n_stat = sum(1 for m in chart_modes.values() if m == "static")
+            print(f"       chart modes: {n_dyn} dynamic, {n_stat} static")
+        report = compare_decks(
+            source_path, refreshed_path,
+            connected_slide_indices=connected,
+            chart_modes=chart_modes,
+        )
         report_dict = report.to_dict()
 
         out_file = GOLDEN_DIR / f"{key}_refresh.json"
