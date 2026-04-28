@@ -177,7 +177,10 @@ def compute_one_wave_back_shift(
 
     overrides: dict[str, list[int]] = {}
     skipped: list[tuple[str, str]] = []
-    cache: dict[int, list[int]] = {}  # analysis_id -> chronologically-ordered tp_ids
+    # Cache key is (analysis_id, sorted_segment_ids_tuple) — the wave order
+    # depends on which segment context we ask the API about, since some
+    # waves don't have data within a particular segment cut.
+    cache: dict[tuple, list[int]] = {}
 
     for ds_key, ds in spec.get("data_sources", {}).items():
         if ds.get("project_id") != project_id:
@@ -188,13 +191,27 @@ def compute_one_wave_back_shift(
             continue
         aid = aids[0]
 
-        if aid not in cache:
+        # Per Bharadvaj's guidance: static ds (static_time_period_ids set)
+        # are static by configuration. Welding is correct behavior — skip.
+        static_ids = ds.get("static_time_period_ids") or []
+        dyn_n = ds.get("dynamic_latest_n") or 0
+        if static_ids:
+            skipped.append((ds_key, "static configuration — not refreshed by design"))
+            continue
+        if not dyn_n:
+            skipped.append((ds_key, f"a{aid}: no dynamic_latest_n configured"))
+            continue
+
+        seg_ids = tuple(sorted(ds.get("segment_ids") or []))
+        cache_key = (aid, seg_ids)
+
+        if cache_key not in cache:
             try:
                 _, df = fetch_synapse_data({
                     "project_id": project_id,
                     "reporting_plan_id": ds.get("reporting_plan_id"),
                     "analysis_ids": [aid],
-                    "segment_ids": ds.get("segment_ids") or [],
+                    "segment_ids": list(seg_ids),
                     "dynamic_latest_n": 0,
                     "static_time_period_ids": [],
                     "static_time_period_names": [],
@@ -202,47 +219,34 @@ def compute_one_wave_back_shift(
                 })
             except Exception as exc:
                 skipped.append((ds_key, f"a{aid}: fetch failed: {exc}"))
-                cache[aid] = []
+                cache[cache_key] = []
                 continue
             if df.empty or "time_period_id" not in df.columns:
-                cache[aid] = []
+                cache[cache_key] = []
             else:
-                cache[aid] = (df.groupby("time_period_name")["time_period_id"]
-                              .max().sort_values().tolist())
-        order = cache[aid]
+                cache[cache_key] = (df.groupby("time_period_name")["time_period_id"]
+                                    .max().sort_values().tolist())
+        order = cache[cache_key]
         if not order:
-            skipped.append((ds_key, f"a{aid}: no waves available"))
+            skipped.append((ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: no waves available"))
             continue
 
-        static_ids = ds.get("static_time_period_ids") or []
-        dyn_n = ds.get("dynamic_latest_n") or 0
-
-        if static_ids:
-            shifted: list[int] = []
-            failure = None
-            for sid in static_ids:
-                try:
-                    idx = order.index(sid)
-                except ValueError:
-                    failure = f"id {sid} not in chronological order"
-                    break
-                if idx == 0:
-                    failure = f"id {sid} is oldest, cannot shift back"
-                    break
-                shifted.append(order[idx - 1])
-            if failure is None:
-                overrides[ds_key] = shifted
-            else:
-                skipped.append((ds_key, f"a{aid}: {failure}"))
-        elif dyn_n > 0:
-            if dyn_n + 1 > len(order):
-                skipped.append(
-                    (ds_key, f"a{aid}: only {len(order)} waves, need >={dyn_n + 1}")
-                )
-            else:
-                overrides[ds_key] = order[-(dyn_n + 1):-1]
+        # Dynamic-N backward shift: we want the N waves that "would have been
+        # the latest N, one wave earlier" — i.e., positions [-N-1 : -1] in
+        # chronological order. The order list already excludes waves with no
+        # data for this analysis × segment combo (per the fetch above), so
+        # picking from it naturally implements the per-wave fallback the user
+        # described: missing-data waves never enter the candidate set.
+        if dyn_n + 1 > len(order):
+            # Backend doesn't have enough history to do a clean backward
+            # shift while still showing N points. Skip — there's no earlier
+            # wave to fall back to.
+            skipped.append(
+                (ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: only "
+                 f"{len(order)} waves with data, need >={dyn_n + 1}")
+            )
         else:
-            skipped.append((ds_key, f"a{aid}: no static ids and no dynamic_latest_n"))
+            overrides[ds_key] = order[-(dyn_n + 1):-1]
 
     return overrides, skipped
 
@@ -274,7 +278,7 @@ def compute_one_wave_forward_shift(
 
     overrides: dict[str, list[int]] = {}
     skipped: list[tuple[str, str]] = []
-    cache: dict[int, list[int]] = {}
+    cache: dict[tuple, list[int]] = {}
 
     for ds_key, ds in spec.get("data_sources", {}).items():
         if ds.get("project_id") != project_id:
@@ -285,13 +289,26 @@ def compute_one_wave_forward_shift(
             continue
         aid = aids[0]
 
-        if aid not in cache:
+        # Static ds: skip per Bharadvaj's guidance.
+        static_ids = ds.get("static_time_period_ids") or []
+        dyn_n = ds.get("dynamic_latest_n") or 0
+        if static_ids:
+            skipped.append((ds_key, "static configuration — not refreshed by design"))
+            continue
+        if not dyn_n:
+            skipped.append((ds_key, f"a{aid}: no dynamic_latest_n configured"))
+            continue
+
+        seg_ids = tuple(sorted(ds.get("segment_ids") or []))
+        cache_key = (aid, seg_ids)
+
+        if cache_key not in cache:
             try:
                 _, df = fetch_synapse_data({
                     "project_id": project_id,
                     "reporting_plan_id": ds.get("reporting_plan_id"),
                     "analysis_ids": [aid],
-                    "segment_ids": ds.get("segment_ids") or [],
+                    "segment_ids": list(seg_ids),
                     "dynamic_latest_n": 0,
                     "static_time_period_ids": [],
                     "static_time_period_names": [],
@@ -299,48 +316,25 @@ def compute_one_wave_forward_shift(
                 })
             except Exception as exc:
                 skipped.append((ds_key, f"a{aid}: fetch failed: {exc}"))
-                cache[aid] = []
+                cache[cache_key] = []
                 continue
             if df.empty or "time_period_id" not in df.columns:
-                cache[aid] = []
+                cache[cache_key] = []
             else:
-                cache[aid] = (df.groupby("time_period_name")["time_period_id"]
-                              .max().sort_values().tolist())
-        order = cache[aid]
+                cache[cache_key] = (df.groupby("time_period_name")["time_period_id"]
+                                    .max().sort_values().tolist())
+        order = cache[cache_key]
         if not order:
-            skipped.append((ds_key, f"a{aid}: no waves available"))
+            skipped.append((ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: no waves available"))
             continue
 
-        static_ids = ds.get("static_time_period_ids") or []
-        dyn_n = ds.get("dynamic_latest_n") or 0
-        last_idx = len(order) - 1
-
-        if static_ids:
-            shifted: list[int] = []
-            failure = None
-            for sid in static_ids:
-                try:
-                    idx = order.index(sid)
-                except ValueError:
-                    failure = f"id {sid} not in chronological order"
-                    break
-                if idx == last_idx:
-                    failure = f"id {sid} is newest, cannot shift forward"
-                    break
-                shifted.append(order[idx + 1])
-            if failure is None:
-                overrides[ds_key] = shifted
-            else:
-                skipped.append((ds_key, f"a{aid}: {failure}"))
-        elif dyn_n > 0:
-            if dyn_n > len(order):
-                skipped.append(
-                    (ds_key, f"a{aid}: only {len(order)} waves, need >={dyn_n}")
-                )
-            else:
-                overrides[ds_key] = order[-dyn_n:]
+        if dyn_n > len(order):
+            skipped.append(
+                (ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: only "
+                 f"{len(order)} waves with data, need >={dyn_n}")
+            )
         else:
-            skipped.append((ds_key, f"a{aid}: no static ids and no dynamic_latest_n"))
+            overrides[ds_key] = order[-dyn_n:]
 
     return overrides, skipped
 
