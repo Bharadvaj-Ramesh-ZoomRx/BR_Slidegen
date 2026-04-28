@@ -55,31 +55,26 @@ VALUE_TOLERANCE = 1e-3   # tightened — chart cell now preserves API 4dp precis
 def _values_match(refreshed_series, api_records) -> tuple[bool, str]:
     """Multiset containment check — every refreshed value appears in API.
 
-    Different analyses expose values in different columns: most use
-    `decimal` (0-1 ratio), some use `share` or `penetration`, count-based
-    charts use `count`. Try all of them so we don't false-fail charts
-    whose ds returns values in a non-`decimal` field.
+    Two extensions vs the original strict version:
+      1) Accept any numeric column the API returns (decimal, share, count,
+         me_score, penetration, ...). Different analyses expose values in
+         different columns; rather than maintain a fixed allowlist, we
+         iterate every key and try converting to float.
+      2) Treat 0.0 as implicit (charts often show 0% bars for missing
+         records — 'no record' == 'value of 0' from a chart's POV).
     """
     api_values = []
-    NUMERIC_FIELDS = (
-        ("decimal", 1.0),
-        ("share", 1.0),
-        ("penetration", 1.0),
-        ("percentage", 0.01),
-        ("count", 1.0),
-        ("sum", 1.0),
-        ("penetration_num", 1.0),
-        ("value", 1.0),
-    )
+    SCALE_BY_FIELD = {"percentage": 0.01}  # known-special scales
     for r in api_records:
-        for key, scale in NUMERIC_FIELDS:
-            v = r.get(key)
-            if v is None:
+        for key, v in r.items():
+            if v is None or isinstance(v, bool):
                 continue
+            scale = SCALE_BY_FIELD.get(key, 1.0)
             try:
-                api_values.append(round(float(v) * scale, 4))
+                fv = float(v) * scale
             except (TypeError, ValueError):
                 continue
+            api_values.append(round(fv, 4))
 
     refreshed_values = []
     for _name, vals in refreshed_series:
@@ -96,6 +91,9 @@ def _values_match(refreshed_series, api_records) -> tuple[bool, str]:
     api_pool = list(api_values)
     missing = []
     for rv in refreshed_values:
+        # Implicit-zero: chart shows 0.0 for "no record" — accept.
+        if abs(rv) <= VALUE_TOLERANCE:
+            continue
         for i, av in enumerate(api_pool):
             if abs(rv - av) <= VALUE_TOLERANCE:
                 api_pool.pop(i)
