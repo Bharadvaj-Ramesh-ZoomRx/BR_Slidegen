@@ -2353,7 +2353,13 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                                 s = cd.add_series(sname)
                                 for rank, oi in enumerate(order):
                                     raw = vals[oi] if oi < len(vals) else None
-                                    x_val = round(raw, 2) if raw is not None else 0.0
+                                    # Preserve API precision in the underlying
+                                    # cell; PowerPoint formatCode handles
+                                    # display rounding (e.g. '0%' -> nearest
+                                    # whole percent). Round to 4dp only to
+                                    # eliminate float-wobble artifacts.
+                                    x_val = (round(raw, 4) if raw is not None
+                                             else 0.0)
                                     y_val = float(n_cats - rank)
                                     s.add_data_point(x_val, y_val)
                         else:
@@ -2361,12 +2367,15 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             cd = CategoryChartData()
                             cd.categories = cats
                             for sname, vals in series_data:
-                                # None-safe round: pass None through to
-                                # python-pptx, which renders it as a missing
-                                # data point. Only round actual numbers.
+                                # Preserve API precision (4dp) in the cell
+                                # value; PowerPoint formatCode controls how
+                                # the number is displayed. Don't round to
+                                # 2dp here — that would lose the underlying
+                                # precision (e.g. 0.2562 -> 0.26 destroys
+                                # the 25.62% the API delivered).
                                 cd.add_series(
                                     sname,
-                                    [round(v, 2) if v is not None else None
+                                    [round(v, 4) if v is not None else None
                                      for v in vals],
                                 )
 

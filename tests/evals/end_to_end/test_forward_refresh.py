@@ -49,7 +49,7 @@ DECKS = {
     "creon_pet_w33": {"project_id": 523},
 }
 
-VALUE_TOLERANCE = 6e-3
+VALUE_TOLERANCE = 1e-3   # tightened — chart cell now preserves API 4dp precision
 
 
 def _values_match(refreshed_series, api_records) -> tuple[bool, str]:
