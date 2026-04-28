@@ -2336,8 +2336,15 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             if series_data and series_data[0][1]:
                                 order = sorted(
                                     range(n_cats),
-                                    key=lambda i: (series_data[0][1][i]
-                                                   if i < len(series_data[0][1]) else 0),
+                                    # None-safe: treat missing values as 0 for
+                                    # sort-only purposes; the actual data
+                                    # point still uses the original (or 0
+                                    # if None — see x_val below).
+                                    key=lambda i: (
+                                        (series_data[0][1][i]
+                                         if i < len(series_data[0][1]) else 0)
+                                        or 0
+                                    ),
                                     reverse=True,
                                 )
                             else:
@@ -2345,7 +2352,8 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             for sname, vals in series_data:
                                 s = cd.add_series(sname)
                                 for rank, oi in enumerate(order):
-                                    x_val = round(vals[oi], 2) if oi < len(vals) else 0.0
+                                    raw = vals[oi] if oi < len(vals) else None
+                                    x_val = round(raw, 2) if raw is not None else 0.0
                                     y_val = float(n_cats - rank)
                                     s.add_data_point(x_val, y_val)
                         else:
@@ -2353,7 +2361,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             cd = CategoryChartData()
                             cd.categories = cats
                             for sname, vals in series_data:
-                                cd.add_series(sname, [round(v, 2) for v in vals])
+                                # None-safe round: pass None through to
+                                # python-pptx, which renders it as a missing
+                                # data point. Only round actual numbers.
+                                cd.add_series(
+                                    sname,
+                                    [round(v, 2) if v is not None else None
+                                     for v in vals],
+                                )
 
                         shape.chart.replace_data(cd)
 

@@ -137,6 +137,15 @@ def main():
         output_path=str(refreshed_pptx),
     )
 
+    # Save per-chart refresh status sidecar so evals can distinguish
+    # "mapper succeeded but data didn't move" from "mapper failed".
+    refresh_status_path = work_dir / f"{deck_key}_refresh_status.json"
+    refresh_status_path.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    print(f"     refresh status sidecar -> {refresh_status_path.relative_to(REPO_ROOT)}")
+
     # Step 4 — summary
     print(f"\n[4/4] Refresh complete")
     if isinstance(result, dict):

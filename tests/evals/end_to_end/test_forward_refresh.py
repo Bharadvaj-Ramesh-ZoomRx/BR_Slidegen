@@ -139,6 +139,20 @@ def test_forward_refresh(deck_key):
 
     spec_dict = json.loads(base_spec.read_text(encoding="utf-8"))
 
+    # Read the refresh status sidecar (per-chart mapper status from
+    # gen_refreshed_fixture). If present, prefer it over the heuristic
+    # api-waves-vs-source-labels classification — it's the authoritative
+    # signal for "did the mapper actually fail?".
+    refresh_status_path = REPO_ROOT / "output" / "step2_test_connected" / f"{deck_key}_refresh_status.json"
+    chart_status_by_pos: dict[tuple, str] = {}
+    if refresh_status_path.exists():
+        rs = json.loads(refresh_status_path.read_text(encoding="utf-8"))
+        for slide_res in rs.get("slides", []):
+            s_idx = slide_res.get("slide_index")
+            for c in slide_res.get("charts", []):
+                # Match by name; positional fallback handled in main loop
+                chart_status_by_pos[(s_idx, c.get("name", ""))] = c.get("status", "")
+
     # Index spec components → ds_key (only connected charts)
     comp_ds_by_name: dict[tuple, str] = {}
     comp_ds_by_pos: dict[int, list[tuple[float, float, str]]] = {}
@@ -290,18 +304,32 @@ def test_forward_refresh(deck_key):
 
             # Did the refresh actually move values?
             if _series_eq(src_series, ref_series):
-                # Distinguish case 1 (no new data) from case 2 (mapper failed):
-                # check if the API's wave window matches what source already shows.
-                src_labels = list(src_cats) + [n for n, _ in src_series]
-                api_waves = _api_wave_names(ds_key)
-                if _all_api_waves_in_source(api_waves, src_labels):
+                # Authoritative: ask the refresh status sidecar what the
+                # mapper said for this chart. status 'ok' = mapper succeeded
+                # and produced data identical to source (no new data); any
+                # other status = mapper failed → safety net welded the chart.
+                mapper_status = chart_status_by_pos.get((s_idx, shape_name), "")
+                if mapper_status == "ok":
                     welded_no_new_data.append((s_idx, shape_name, ds_key))
-                else:
+                elif mapper_status in ("static_pinned_skipped",):
+                    welded_static.append((s_idx, shape_name, ds_key))
+                elif mapper_status:
                     welded_mapper_failed.append({
                         "slide": s_idx, "name": shape_name, "ds": ds_key,
-                        "api_waves": sorted(api_waves)[:8],
-                        "src_labels_sample": src_labels[:6],
+                        "mapper_status": mapper_status,
                     })
+                else:
+                    # No sidecar entry — fall back to the api-waves heuristic
+                    src_labels = list(src_cats) + [n for n, _ in src_series]
+                    api_waves = _api_wave_names(ds_key)
+                    if _all_api_waves_in_source(api_waves, src_labels):
+                        welded_no_new_data.append((s_idx, shape_name, ds_key))
+                    else:
+                        welded_mapper_failed.append({
+                            "slide": s_idx, "name": shape_name, "ds": ds_key,
+                            "api_waves": sorted(api_waves)[:8],
+                            "src_labels_sample": src_labels[:6],
+                        })
                 continue
 
             # Refreshed and structure intact — verify API correctness
