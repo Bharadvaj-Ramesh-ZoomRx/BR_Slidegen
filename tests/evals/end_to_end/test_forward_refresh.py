@@ -206,10 +206,40 @@ def test_forward_refresh(deck_key):
     refreshed_ok: list = []
     refreshed_wrong: list = []
     welded_static: list = []
-    welded_dynamic: list = []
+    welded_no_new_data: list = []     # case 1: API returned same waves as source
+    welded_mapper_failed: list = []   # case 2: API returned new waves but mapper couldn't apply
     structural_drift: list = []
     extract_failed: list = []
     not_in_spec: list = []
+
+    # Cache: ds_key -> set of distinct time_period_name values from API
+    api_wave_names_cache: dict[str, set] = {}
+
+    def _api_wave_names(ds_key: str) -> set:
+        if ds_key in api_wave_names_cache:
+            return api_wave_names_cache[ds_key]
+        records = _api_truth(ds_key)
+        names: set = set()
+        for r in records:
+            n = r.get("time_period_name")
+            if n is not None:
+                names.add(str(n))
+                # Also store the "Project Wave N" → "Wave N" stripped form,
+                # since the mapper sometimes strips this prefix
+                stripped = str(n).replace("Project Wave ", "Wave ")
+                if stripped != str(n):
+                    names.add(stripped)
+        api_wave_names_cache[ds_key] = names
+        return names
+
+    def _all_api_waves_in_source(api_waves: set, src_labels: list[str]) -> bool:
+        """True if every API-returned wave name appears as a substring of
+        some source label (cats or series). Means the source already shows
+        all the waves the API has — refresh is a structural no-op."""
+        if not api_waves:
+            return False  # API returned nothing — different problem
+        haystack = " | ".join(str(s) for s in src_labels)
+        return all(w in haystack for w in api_waves)
 
     for s_idx, (s_slide, r_slide) in enumerate(zip(src.slides, ref.slides)):
         src_charts = [s for s in s_slide.shapes if s.has_chart]
@@ -227,7 +257,7 @@ def test_forward_refresh(deck_key):
                 extract_failed.append((s_idx, shape_name, "no ref match"))
                 continue
             try:
-                _, src_series = _extract_chart_data(src_shape)
+                src_cats, src_series = _extract_chart_data(src_shape)
                 _, ref_series = _extract_chart_data(ref_shape)
             except Exception as exc:
                 extract_failed.append((s_idx, shape_name, str(exc)))
@@ -256,7 +286,18 @@ def test_forward_refresh(deck_key):
 
             # Did the refresh actually move values?
             if _series_eq(src_series, ref_series):
-                welded_dynamic.append((s_idx, shape_name, ds_key))
+                # Distinguish case 1 (no new data) from case 2 (mapper failed):
+                # check if the API's wave window matches what source already shows.
+                src_labels = list(src_cats) + [n for n, _ in src_series]
+                api_waves = _api_wave_names(ds_key)
+                if _all_api_waves_in_source(api_waves, src_labels):
+                    welded_no_new_data.append((s_idx, shape_name, ds_key))
+                else:
+                    welded_mapper_failed.append({
+                        "slide": s_idx, "name": shape_name, "ds": ds_key,
+                        "api_waves": sorted(api_waves)[:8],
+                        "src_labels_sample": src_labels[:6],
+                    })
                 continue
 
             # Refreshed and structure intact — verify API correctness
@@ -276,13 +317,15 @@ def test_forward_refresh(deck_key):
             "refreshed_ok": len(refreshed_ok),
             "refreshed_wrong": len(refreshed_wrong),
             "welded_static": len(welded_static),
-            "welded_dynamic": len(welded_dynamic),
+            "welded_no_new_data": len(welded_no_new_data),
+            "welded_mapper_failed": len(welded_mapper_failed),
             "structural_drift": len(structural_drift),
             "extract_failed": len(extract_failed),
             "not_in_spec": len(not_in_spec),
         },
         "refreshed_wrong_detail": refreshed_wrong[:20],
         "structural_drift_detail": structural_drift[:20],
+        "welded_mapper_failed_detail": welded_mapper_failed[:30],
     }
     (work / "summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False),
@@ -290,13 +333,15 @@ def test_forward_refresh(deck_key):
     )
 
     refreshed_total = len(refreshed_ok) + len(refreshed_wrong)
-    welded_total = len(welded_static) + len(welded_dynamic)
+    welded_total = (len(welded_static) + len(welded_no_new_data)
+                    + len(welded_mapper_failed))
 
     print(f"\n=== {deck_key} | forward refresh ===")
-    print(f"  REFRESHED · OK    (values updated + match API): {len(refreshed_ok)}")
-    print(f"  REFRESHED · WRONG (values updated, don't match API): {len(refreshed_wrong)}")
-    print(f"  WELDED · STATIC   (static ds, correctly preserved): {len(welded_static)}")
-    print(f"  WELDED · DYNAMIC  (dynamic ds, no value change): {len(welded_dynamic)}")
+    print(f"  REFRESHED · OK         (values updated + match API): {len(refreshed_ok)}")
+    print(f"  REFRESHED · WRONG      (values updated, don't match API): {len(refreshed_wrong)}")
+    print(f"  WELDED · STATIC        (static ds, correctly preserved): {len(welded_static)}")
+    print(f"  WELDED · NO NEW DATA   (API returned same waves as source — correct): {len(welded_no_new_data)}")
+    print(f"  WELDED · MAPPER FAILED (API has new waves, mapper couldn't apply): {len(welded_mapper_failed)}")
     print(f"  STRUCTURAL DRIFT: {len(structural_drift)}")
     print(f"  EXTRACT FAILED: {len(extract_failed)}, NOT IN SPEC: {len(not_in_spec)}")
     if refreshed_total:
@@ -311,6 +356,12 @@ def test_forward_refresh(deck_key):
         print("  first 5 refreshed_wrong:")
         for d in refreshed_wrong[:5]:
             print(f"    slide {d['slide']} {d['name']!r}: {d['reason']}")
+    if welded_mapper_failed:
+        print("  first 5 mapper_failed:")
+        for d in welded_mapper_failed[:5]:
+            print(f"    slide {d['slide']} {d['name']!r} ({d['ds']})")
+            print(f"      API waves: {d['api_waves']}")
+            print(f"      source labels sample: {d['src_labels_sample']}")
 
     # Soft gate: at least one chart refreshed correctly proves the path works.
     # Welded counts are reported for visibility but don't gate.

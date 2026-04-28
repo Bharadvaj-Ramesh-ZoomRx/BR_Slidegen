@@ -43,16 +43,18 @@ WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 PRIORITY = {
     "STRUCTURAL_DRIFT": 0,
-    "WELDED_DYNAMIC": 1,
-    "REFRESHED": 2,
-    "WELDED_STATIC": 3,
-    "NONE": 4,
+    "MAPPER_FAILED":    1,   # dynamic chart, API has new waves but mapper couldn't apply
+    "REFRESHED":        2,
+    "NO_NEW_DATA":      3,   # dynamic chart, API returned same waves as source — correct
+    "WELDED_STATIC":    4,
+    "NONE":             5,
 }
 
 _BADGE = {
     "REFRESHED":          (GREEN, "REFRESHED"),
     "WELDED_STATIC":      (TEAL,  "WELDED · STATIC CONFIG"),
-    "WELDED_DYNAMIC":     (AMBER, "WELDED · NO NEW DATA"),
+    "NO_NEW_DATA":        (TEAL,  "WELDED · NO NEW DATA"),
+    "MAPPER_FAILED":      (AMBER, "WELDED · MAPPER FAILED"),
     "STRUCTURAL_DRIFT":   (RED,   "STRUCTURAL DRIFT"),
     "NONE":               (GREY,  "NON-CONNECTED"),
 }
@@ -84,6 +86,7 @@ def _series_eq(a_series, b_series):
 
 def _classify_slides(deck_key: str) -> dict[int, str]:
     from tests.evals.end_to_end.compare_decks import _extract_chart_data, _find_match
+    from slidegen.intelligent_refresh import fetch_synapse_data
     src_path_map = {
         "atu_q1_26": REPO_ROOT / "projects" / "J&J Rybrevant PET" / "Template" / "ZoomRx_UC_ATU_Report_Q1_'26.pptx",
         "creon_pet_w33": REPO_ROOT / "projects" / "J&J Rybrevant PET" / "Template" / "CREON Share of Voice Study - W33.pptx",
@@ -127,6 +130,42 @@ def _classify_slides(deck_key: str) -> dict[int, str]:
     src = Presentation(str(src_path))
     ref = Presentation(str(ref_path))
 
+    api_wave_cache: dict[str, set] = {}
+
+    def _api_wave_names(ds_key: str) -> set:
+        if ds_key in api_wave_cache:
+            return api_wave_cache[ds_key]
+        ds = spec["data_sources"].get(ds_key, {})
+        try:
+            records, _ = fetch_synapse_data({
+                "project_id": ds.get("project_id"),
+                "reporting_plan_id": ds.get("reporting_plan_id"),
+                "analysis_ids": list(ds.get("analysis_ids") or []),
+                "segment_ids": list(ds.get("segment_ids") or []),
+                "dynamic_latest_n": ds.get("dynamic_latest_n") or 0,
+                "static_time_period_ids": ds.get("static_time_period_ids") or [],
+                "static_time_period_names": [],
+                "include_live_wave": bool(ds.get("include_live_wave", False)),
+            })
+        except Exception:
+            records = []
+        names: set = set()
+        for r in records:
+            n = r.get("time_period_name")
+            if n is not None:
+                names.add(str(n))
+                stripped = str(n).replace("Project Wave ", "Wave ")
+                if stripped != str(n):
+                    names.add(stripped)
+        api_wave_cache[ds_key] = names
+        return names
+
+    def _all_api_waves_in_source(api_waves: set, src_labels: list[str]) -> bool:
+        if not api_waves:
+            return False
+        haystack = " | ".join(str(s) for s in src_labels)
+        return all(w in haystack for w in api_waves)
+
     slide_status: dict[int, str] = {}
     for s_idx in range(len(src.slides)):
         if s_idx not in spec_slide_idx:
@@ -144,13 +183,13 @@ def _classify_slides(deck_key: str) -> dict[int, str]:
                 continue
             ref_shape = _find_match(src_shape, r_charts)
             if ref_shape is None:
-                statuses.append("WELDED_DYNAMIC")
+                statuses.append("MAPPER_FAILED")
                 continue
             try:
-                _, src_series = _extract_chart_data(src_shape)
+                src_cats, src_series = _extract_chart_data(src_shape)
                 _, ref_series = _extract_chart_data(ref_shape)
             except Exception:
-                statuses.append("WELDED_DYNAMIC")
+                statuses.append("MAPPER_FAILED")
                 continue
             if ds_key in static_ds:
                 if _series_eq(src_series, ref_series):
@@ -163,7 +202,13 @@ def _classify_slides(deck_key: str) -> dict[int, str]:
                 statuses.append("STRUCTURAL_DRIFT")
                 continue
             if _series_eq(src_series, ref_series):
-                statuses.append("WELDED_DYNAMIC")
+                # Welded dynamic — split case 1 vs case 2 using API wave check
+                src_labels = list(src_cats) + [n for n, _ in src_series]
+                api_waves = _api_wave_names(ds_key)
+                if _all_api_waves_in_source(api_waves, src_labels):
+                    statuses.append("NO_NEW_DATA")
+                else:
+                    statuses.append("MAPPER_FAILED")
             else:
                 statuses.append("REFRESHED")
 
