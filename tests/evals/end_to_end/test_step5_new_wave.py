@@ -139,7 +139,7 @@ def test_step5_new_wave_propagates(deck_key):
     """Refresh against two wave variants → assert values change + match API."""
     cfg = REFERENCE[deck_key]
     source_pptx = FIXTURE_DECKS[deck_key]
-    base_spec = REPO_ROOT / "output" / f"{deck_key}_refresh" / f"{deck_key}_full_spec.json"
+    base_spec = REPO_ROOT / "output" / "step2_test_connected" / f"{deck_key}_full_spec.json"
     if not base_spec.exists():
         pytest.skip(f"base spec missing — run scripts/gen_refreshed_fixture.py {deck_key}")
 

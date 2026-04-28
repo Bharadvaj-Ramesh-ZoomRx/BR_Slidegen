@@ -52,6 +52,7 @@ def build_wave_variant_spec(
     ds["static_time_period_names"] = []  # let the mapper resolve names from IDs
     ds["dynamic_latest_n"] = 0
     ds["include_live_wave"] = False
+    ds["force_refresh"] = True  # bypass static_pinned_skipped — this IS a deliberate wave shift
     out_spec_path.write_text(
         json.dumps(spec, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -86,6 +87,7 @@ def build_deckwide_wave_variant_spec(
         ds["static_time_period_names"] = []
         ds["dynamic_latest_n"] = 0
         ds["include_live_wave"] = False
+        ds["force_refresh"] = True  # bypass static_pinned_skipped guard
         overridden += 1
     if overridden == 0:
         raise ValueError(
@@ -129,6 +131,7 @@ def build_deckwide_per_ds_variant_spec(
         ds["static_time_period_names"] = []
         ds["dynamic_latest_n"] = 0
         ds["include_live_wave"] = False
+        ds["force_refresh"] = True  # bypass static_pinned_skipped guard
 
     if clear_table_cell_values:
         for slide in spec.get("slides", []):

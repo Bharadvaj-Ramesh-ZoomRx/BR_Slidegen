@@ -2207,8 +2207,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
             # False), the chart is "frozen": refreshing wouldn't add new wave
             # data, and could introduce drift if the API has changed for those
             # exact waves. Leave the source chart untouched.
+            #
+            # Exception: wave-shift evals (Steps 5/6) set static_time_period_ids
+            # to a DIFFERENT wave set than source and explicitly want a refresh.
+            # They opt in via `force_refresh: true` on the data_source, which
+            # bypasses this guard.
             ds_include_live = _cl.get("include_live_wave", True)
-            if lin_raw_static_ids and not ds_include_live:
+            ds_force_refresh = bool(_cl.get("force_refresh", False))
+            if lin_raw_static_ids and not ds_include_live and not ds_force_refresh:
                 bucket = "charts" if ctype == "chart" else "tables"
                 slide_results[bucket].append({
                     "name": name, "status": "static_pinned_skipped",
