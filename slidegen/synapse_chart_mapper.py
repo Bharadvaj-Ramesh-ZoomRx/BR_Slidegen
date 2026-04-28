@@ -815,14 +815,24 @@ def pivot_records_to_chart_data(
             return False
         return all(_is_wave_label(str(l), known_wave_labels) for l in labels)
 
+    # Match labels case-insensitively + whitespace-normalized so source
+    # 'NO' / 'YES' aligns with mapper 'No' / 'Yes' from y_label values.
+    # Without this normalization, a casing mismatch in the source deck
+    # (uppercase title-cased vs API mixed-case y_label) nulls out the
+    # entire chart even though the data is present.
+    def _norm_label(s) -> str:
+        s = str(s) if s is not None else ""
+        return _re_wave.sub(r"\s+", " ", s).strip().lower()
+
     if source_categories and not _is_wave_dim(source_categories):
-        cat_to_idx = {c: i for i, c in enumerate(categories)}
+        norm_to_idx = {_norm_label(c): i for i, c in enumerate(categories)}
         new_series = []
         for sname, vals in series:
             new_vals = []
             for src_cat in source_categories:
-                if src_cat in cat_to_idx:
-                    j = cat_to_idx[src_cat]
+                key = _norm_label(src_cat)
+                if key in norm_to_idx:
+                    j = norm_to_idx[key]
                     new_vals.append(vals[j] if j < len(vals) else None)
                 else:
                     new_vals.append(None)
@@ -832,11 +842,14 @@ def pivot_records_to_chart_data(
 
     if source_series_names and not _is_wave_dim(source_series_names):
         current_names = [n for n, _ in series]
-        name_to_idx = {n: i for i, n in enumerate(current_names)}
+        norm_to_idx = {_norm_label(n): i for i, n in enumerate(current_names)}
         new_series = []
         for src_name in source_series_names:
-            if src_name in name_to_idx:
-                new_series.append(series[name_to_idx[src_name]])
+            key = _norm_label(src_name)
+            if key in norm_to_idx:
+                # Keep source's display name; use mapper's values
+                _, mapper_vals = series[norm_to_idx[key]]
+                new_series.append((src_name, mapper_vals))
             else:
                 new_series.append((src_name, [None] * len(categories)))
         series = new_series

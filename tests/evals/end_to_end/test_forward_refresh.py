@@ -53,10 +53,26 @@ VALUE_TOLERANCE = 6e-3
 
 
 def _values_match(refreshed_series, api_records) -> tuple[bool, str]:
-    """Multiset containment check — every refreshed value appears in API."""
+    """Multiset containment check — every refreshed value appears in API.
+
+    Different analyses expose values in different columns: most use
+    `decimal` (0-1 ratio), some use `share` or `penetration`, count-based
+    charts use `count`. Try all of them so we don't false-fail charts
+    whose ds returns values in a non-`decimal` field.
+    """
     api_values = []
+    NUMERIC_FIELDS = (
+        ("decimal", 1.0),
+        ("share", 1.0),
+        ("penetration", 1.0),
+        ("percentage", 0.01),
+        ("count", 1.0),
+        ("sum", 1.0),
+        ("penetration_num", 1.0),
+        ("value", 1.0),
+    )
     for r in api_records:
-        for key, scale in (("decimal", 1.0), ("percentage", 0.01), ("count", 1.0)):
+        for key, scale in NUMERIC_FIELDS:
             v = r.get(key)
             if v is None:
                 continue
