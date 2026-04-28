@@ -843,12 +843,71 @@ def pivot_records_to_chart_data(
     if source_series_names and not _is_wave_dim(source_series_names):
         current_names = [n for n, _ in series]
         norm_to_idx = {_norm_label(n): i for i, n in enumerate(current_names)}
-        new_series = []
+
+        def _split_compound(label: str) -> list[str]:
+            """Normalize then split a compound label into parts.
+            Tries " @:@ " first (Connector default), then " - " (Pradeep
+            inferred). Returns the parts list."""
+            s = _norm_label(label)
+            for sep in (" @:@ ", " - "):
+                if sep in s:
+                    return [p.strip() for p in s.split(sep) if p.strip()]
+            return [s]
+
+        # Build prefix index: a tuple of leading-N parts → index for fuzzy
+        # match when exact normalized fails (e.g., source has hardcoded
+        # display alias on the last part that differs from mapper's raw
+        # measure name: 'Feb'26 - ZENPEP ME - Average of Message
+        # Effectiveness(%)' vs mapper 'Feb'26 - ZENPEP ME - Average of
+        # me_score' should match on the first 2 parts).
+        prefix_idx: dict[tuple, list[int]] = {}
+        for i, n in enumerate(current_names):
+            parts = _split_compound(n)
+            for plen in range(1, len(parts)):
+                prefix = tuple(parts[:plen])
+                prefix_idx.setdefault(prefix, []).append(i)
+
+        def _fuzzy_lookup(src_name: str) -> int | None:
+            parts = _split_compound(src_name)
+            for plen in range(len(parts) - 1, 0, -1):
+                prefix = tuple(parts[:plen])
+                hits = prefix_idx.get(prefix, [])
+                if len(hits) == 1:
+                    return hits[0]
+            return None
+
+        # Resolve each source name → index into mapper series.
+        matched: list[int | None] = []
         for src_name in source_series_names:
             key = _norm_label(src_name)
             if key in norm_to_idx:
-                # Keep source's display name; use mapper's values
-                _, mapper_vals = series[norm_to_idx[key]]
+                matched.append(norm_to_idx[key])
+            else:
+                matched.append(_fuzzy_lookup(src_name))
+
+        # Positional fallback: when the source's series count exactly matches
+        # the mapper's series count, and one or more source names couldn't be
+        # resolved by name, line them up positionally against the leftover
+        # mapper series. Handles two common source-deck quirks:
+        #   (a) source series with empty label '' (slide 26 'Chart 29' family)
+        #   (b) source label that's a stale literal (e.g. 'Project Wave - 8949'
+        #       on slide 8 'Chart 27', a Connector pre-render artifact)
+        if (len(source_series_names) == len(current_names)
+                and any(m is None for m in matched)):
+            used = {m for m in matched if m is not None}
+            leftover = [i for i in range(len(current_names)) if i not in used]
+            leftover_iter = iter(leftover)
+            for k, m in enumerate(matched):
+                if m is None:
+                    try:
+                        matched[k] = next(leftover_iter)
+                    except StopIteration:
+                        pass
+
+        new_series = []
+        for src_name, m in zip(source_series_names, matched):
+            if m is not None and m < len(series):
+                _, mapper_vals = series[m]
                 new_series.append((src_name, mapper_vals))
             else:
                 new_series.append((src_name, [None] * len(categories)))

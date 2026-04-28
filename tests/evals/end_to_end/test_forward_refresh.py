@@ -371,7 +371,7 @@ def test_forward_refresh(deck_key):
             "extract_failed": len(extract_failed),
             "not_in_spec": len(not_in_spec),
         },
-        "refreshed_wrong_detail": refreshed_wrong[:20],
+        "refreshed_wrong_detail": refreshed_wrong[:200],
         "structural_drift_detail": structural_drift[:20],
         "welded_mapper_failed_detail": welded_mapper_failed[:30],
     }
