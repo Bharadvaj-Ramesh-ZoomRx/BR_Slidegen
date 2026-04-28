@@ -247,6 +247,104 @@ def compute_one_wave_back_shift(
     return overrides, skipped
 
 
+def compute_one_wave_forward_shift(
+    spec: dict, project_id: int,
+) -> tuple[dict[str, list[int]], list[tuple[str, str]]]:
+    """Per-data_source: shift each wave FORWARD by one in chronological order.
+
+    Mirror of compute_one_wave_back_shift. Used for the round-trip eval:
+    backward shift produces a synthesized "older" deck; forward shift on
+    that deck should reconstruct the original wave window. Together they
+    test the production case (a new wave lands → refresh forward).
+
+    Strategy per data_source:
+      - If `static_time_period_ids` is set, shift each ID forward by one
+        position in the analysis's chronological wave order. If any ID is
+        at the last position (no newer wave), skip this data_source.
+      - Else if `dynamic_latest_n=K`, return the K most-recent waves
+        (positions [-K:]) — same as the source default if source already
+        used the latest K. Use this only when the synthesized deck pinned
+        an older static window via backward shift; the forward step then
+        re-pins to a newer window.
+      - Else, skip.
+
+    Returns (overrides, skipped) where overrides maps ds_key → shifted_tp_ids.
+    """
+    from slidegen.intelligent_refresh import fetch_synapse_data
+
+    overrides: dict[str, list[int]] = {}
+    skipped: list[tuple[str, str]] = []
+    cache: dict[int, list[int]] = {}
+
+    for ds_key, ds in spec.get("data_sources", {}).items():
+        if ds.get("project_id") != project_id:
+            continue
+        aids = ds.get("analysis_ids") or []
+        if not aids:
+            skipped.append((ds_key, "no analysis_ids"))
+            continue
+        aid = aids[0]
+
+        if aid not in cache:
+            try:
+                _, df = fetch_synapse_data({
+                    "project_id": project_id,
+                    "reporting_plan_id": ds.get("reporting_plan_id"),
+                    "analysis_ids": [aid],
+                    "segment_ids": ds.get("segment_ids") or [],
+                    "dynamic_latest_n": 0,
+                    "static_time_period_ids": [],
+                    "static_time_period_names": [],
+                    "include_live_wave": False,
+                })
+            except Exception as exc:
+                skipped.append((ds_key, f"a{aid}: fetch failed: {exc}"))
+                cache[aid] = []
+                continue
+            if df.empty or "time_period_id" not in df.columns:
+                cache[aid] = []
+            else:
+                cache[aid] = (df.groupby("time_period_name")["time_period_id"]
+                              .max().sort_values().tolist())
+        order = cache[aid]
+        if not order:
+            skipped.append((ds_key, f"a{aid}: no waves available"))
+            continue
+
+        static_ids = ds.get("static_time_period_ids") or []
+        dyn_n = ds.get("dynamic_latest_n") or 0
+        last_idx = len(order) - 1
+
+        if static_ids:
+            shifted: list[int] = []
+            failure = None
+            for sid in static_ids:
+                try:
+                    idx = order.index(sid)
+                except ValueError:
+                    failure = f"id {sid} not in chronological order"
+                    break
+                if idx == last_idx:
+                    failure = f"id {sid} is newest, cannot shift forward"
+                    break
+                shifted.append(order[idx + 1])
+            if failure is None:
+                overrides[ds_key] = shifted
+            else:
+                skipped.append((ds_key, f"a{aid}: {failure}"))
+        elif dyn_n > 0:
+            if dyn_n > len(order):
+                skipped.append(
+                    (ds_key, f"a{aid}: only {len(order)} waves, need >={dyn_n}")
+                )
+            else:
+                overrides[ds_key] = order[-dyn_n:]
+        else:
+            skipped.append((ds_key, f"a{aid}: no static ids and no dynamic_latest_n"))
+
+    return overrides, skipped
+
+
 def refresh_with_variant(
     spec_path: Path,
     source_pptx: Path,

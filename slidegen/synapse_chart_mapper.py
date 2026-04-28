@@ -216,6 +216,10 @@ _WAVE_LABEL_PATTERNS = (
 
 _WAVE_TEMPLATE_SENTINEL = "\x00WAVE\x00"
 _COMPOUND_SEP = " @:@ "
+# Some non-Connector / Pradeep-inferred selectedColumns use " - " as the
+# compound separator instead (e.g. "Overall Efficacy - HIT - Project Wave 13").
+# We try " @:@ " first; if no wave parts emerge, we try " - " as a fallback.
+_COMPOUND_SEP_ALT = " - "
 
 
 def _is_wave_label(s: str, known_wave_labels: set[str] | None = None) -> bool:
@@ -265,31 +269,60 @@ def _rewrite_wave_pinned_selected_columns(
     seen_templates: set[str] = set()
     n_dropped = 0
 
+    # Track templates with their separator so we re-emit using the right one.
+    # `ordered_templates` items are (separator, template_string) tuples.
+    # `seen_templates` mirrors that for dedup.
+    ordered_templates: list[tuple[str, str]] = []  # (sep, template)
+    seen_templates: set[tuple[str, str]] = set()
+
     for entry in selected:
         if not isinstance(entry, str):
             non_wave_entries.append(entry)
             continue
-        parts = entry.split(_COMPOUND_SEP)
-        wave_idxs = [i for i, p in enumerate(parts)
-                     if _is_wave_label(p, known_wave_labels)]
+        # Try " @:@ " first (the Connector default), then " - " (Pradeep-
+        # inferred / non-Connector decks). Pick whichever yields wave parts.
+        # Fall through to whole-entry standalone check if neither does.
+        chosen_sep: str | None = None
+        chosen_parts: list[str] = []
+        wave_idxs: list[int] = []
+        for try_sep in (_COMPOUND_SEP, _COMPOUND_SEP_ALT):
+            if try_sep not in entry:
+                continue
+            try_parts = entry.split(try_sep)
+            try_wave_idxs = [i for i, p in enumerate(try_parts)
+                             if _is_wave_label(p, known_wave_labels)]
+            if try_wave_idxs:
+                chosen_sep = try_sep
+                chosen_parts = try_parts
+                wave_idxs = try_wave_idxs
+                break
         if not wave_idxs:
-            non_wave_entries.append(entry)
-            continue
+            # No compound wave parts. Standalone wave-label?
+            if _is_wave_label(entry, known_wave_labels):
+                chosen_sep = ""  # empty sep == standalone (single part)
+                chosen_parts = [entry]
+                wave_idxs = [0]
+            else:
+                non_wave_entries.append(entry)
+                continue
         # Build template with wave-part(s) replaced by sentinel
-        tmpl_parts = list(parts)
+        tmpl_parts = list(chosen_parts)
         for i in wave_idxs:
             tmpl_parts[i] = _WAVE_TEMPLATE_SENTINEL
-        template = _COMPOUND_SEP.join(tmpl_parts)
-        if template not in seen_templates:
-            ordered_templates.append(template)
-            seen_templates.add(template)
+        # Standalone (chosen_sep == "") joins to just the sentinel
+        template = (chosen_sep.join(tmpl_parts) if chosen_sep
+                    else tmpl_parts[0])
+        key = (chosen_sep or "", template)
+        if key not in seen_templates:
+            ordered_templates.append(key)
+            seen_templates.add(key)
         n_dropped += 1
 
     if n_dropped == 0:
         return list(selected), 0
 
     rewritten: list = list(non_wave_entries)
-    for template in ordered_templates:
+    for _sep, template in ordered_templates:
         for w in fetched_waves:
             rewritten.append(template.replace(_WAVE_TEMPLATE_SENTINEL, w))
 
