@@ -191,15 +191,19 @@ def compute_one_wave_back_shift(
             continue
         aid = aids[0]
 
-        # Per Bharadvaj's guidance: static ds (static_time_period_ids set)
-        # are static by configuration. Welding is correct behavior — skip.
+        # Per Bharadvaj's guidance: ds with static_time_period_ids set in the
+        # ORIGINAL spec are static by configuration → don't refresh. But ds
+        # in a wave-shifted spec ALSO have static_time_period_ids set (the
+        # shift override), distinguished by force_refresh=True. Skip only
+        # the production-static case.
         static_ids = ds.get("static_time_period_ids") or []
         dyn_n = ds.get("dynamic_latest_n") or 0
-        if static_ids:
+        force_refresh = bool(ds.get("force_refresh", False))
+        if static_ids and not force_refresh:
             skipped.append((ds_key, "static configuration — not refreshed by design"))
             continue
-        if not dyn_n:
-            skipped.append((ds_key, f"a{aid}: no dynamic_latest_n configured"))
+        if not dyn_n and not (static_ids and force_refresh):
+            skipped.append((ds_key, f"a{aid}: no shift target (no dyn_n, no override)"))
             continue
 
         seg_ids = tuple(sorted(ds.get("segment_ids") or []))
@@ -229,6 +233,30 @@ def compute_one_wave_back_shift(
         order = cache[cache_key]
         if not order:
             skipped.append((ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: no waves available"))
+            continue
+
+        # Wave-shifted spec (force_refresh + static_ids set) — shift each
+        # static_id back one position in order. This is how a round-trip
+        # eval's forward leg becomes the back leg of the next iteration,
+        # and how forward refresh on a synthesized older deck reconstructs
+        # the original wave window.
+        if static_ids and force_refresh:
+            shifted_ids: list[int] = []
+            failure: str | None = None
+            for sid in static_ids:
+                try:
+                    idx = order.index(sid)
+                except ValueError:
+                    failure = f"id {sid} not in order"
+                    break
+                if idx == 0:
+                    failure = f"id {sid} is oldest, cannot shift back further"
+                    break
+                shifted_ids.append(order[idx - 1])
+            if failure is None:
+                overrides[ds_key] = shifted_ids
+            else:
+                skipped.append((ds_key, f"a{aid}: {failure}"))
             continue
 
         # Dynamic-N backward shift: we want the N waves that "would have been
@@ -289,14 +317,15 @@ def compute_one_wave_forward_shift(
             continue
         aid = aids[0]
 
-        # Static ds: skip per Bharadvaj's guidance.
+        # Same static-vs-override gating as backward shift.
         static_ids = ds.get("static_time_period_ids") or []
         dyn_n = ds.get("dynamic_latest_n") or 0
-        if static_ids:
+        force_refresh = bool(ds.get("force_refresh", False))
+        if static_ids and not force_refresh:
             skipped.append((ds_key, "static configuration — not refreshed by design"))
             continue
-        if not dyn_n:
-            skipped.append((ds_key, f"a{aid}: no dynamic_latest_n configured"))
+        if not dyn_n and not (static_ids and force_refresh):
+            skipped.append((ds_key, f"a{aid}: no shift target (no dyn_n, no override)"))
             continue
 
         seg_ids = tuple(sorted(ds.get("segment_ids") or []))
@@ -326,6 +355,27 @@ def compute_one_wave_forward_shift(
         order = cache[cache_key]
         if not order:
             skipped.append((ds_key, f"a{aid} seg{list(seg_ids) or '∅'}: no waves available"))
+            continue
+
+        # Wave-shifted spec — shift each static_id forward one position
+        if static_ids and force_refresh:
+            shifted_ids: list[int] = []
+            failure: str | None = None
+            last_idx = len(order) - 1
+            for sid in static_ids:
+                try:
+                    idx = order.index(sid)
+                except ValueError:
+                    failure = f"id {sid} not in order"
+                    break
+                if idx == last_idx:
+                    failure = f"id {sid} is newest, cannot shift forward further"
+                    break
+                shifted_ids.append(order[idx + 1])
+            if failure is None:
+                overrides[ds_key] = shifted_ids
+            else:
+                skipped.append((ds_key, f"a{aid}: {failure}"))
             continue
 
         if dyn_n > len(order):
