@@ -2278,8 +2278,23 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                         )
 
                         if not chart_data.success or not chart_data.categories:
+                            # Pattern 4: distinguish "no data was fetched" from
+                            # "fetch returned data but mapper couldn't fit it".
+                            # The first means the shifted wave window has no
+                            # data for this analysis × segment combo — chart
+                            # legitimately can't be refreshed; preserve source
+                            # and emit a visible warning so the eval can
+                            # classify separately from genuine mapper failures.
+                            if df.empty:
+                                status = "no_data_for_shifted_window"
+                                if ds_force_refresh:
+                                    print(f"  [warn] slide {si} {name!r} ({_comp_ds}): "
+                                          f"shifted-wave fetch returned no records — "
+                                          f"preserving source values")
+                            else:
+                                status = "empty"
                             slide_results["charts"].append({
-                                "name": name, "status": "empty",
+                                "name": name, "status": status,
                                 "error": chart_data.error,
                             })
                             continue

@@ -209,6 +209,7 @@ import re as _re_wave
 
 _WAVE_LABEL_PATTERNS = (
     _re_wave.compile(r"^(?:Project )?Wave \d+$"),                    # Wave 12, Project Wave 12
+    _re_wave.compile(r"^W\d+$"),                                      # W28 (short form)
     _re_wave.compile(r"^[A-Z][a-z]{2}'\d{2}$"),                       # Jan'26
     _re_wave.compile(r"^Q[1-4]'\d{2}$"),                              # Q1'26
     _re_wave.compile(r"^Q[1-4] \d{4}$"),                              # Q1 2026
