@@ -2249,6 +2249,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                     # keep cats with no current data filled with None.
                     src_cats: list[str] | None = None
                     src_series_names: list[str] | None = None
+                    src_series_values: list[list] | None = None
                     try:
                         for ss in src_prs.slides[si].shapes:
                             if ss.has_chart and ss.name == name:
@@ -2257,10 +2258,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                                 src_series_names = [
                                     s.name if s.name else "" for s in _plot.series
                                 ]
+                                src_series_values = [
+                                    list(s.values) for s in _plot.series
+                                ]
                                 break
                     except Exception:
                         src_cats = None
                         src_series_names = None
+                        src_series_values = None
 
                     try:
                         chart_data = pivot_records_to_chart_data(
@@ -2275,6 +2280,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                                 if _comp_ds else None,
                             source_categories=src_cats,
                             source_series_names=src_series_names,
+                            source_series_values=src_series_values,
                         )
 
                         if not chart_data.success or not chart_data.categories:
@@ -2285,7 +2291,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             # legitimately can't be refreshed; preserve source
                             # and emit a visible warning so the eval can
                             # classify separately from genuine mapper failures.
-                            if df.empty:
+                            err = chart_data.error or ""
+                            if "alignment_failed" in err:
+                                # API returned records but no source series
+                                # could be aligned — chart kept at source
+                                # values (mapper preserves them). Worth its own
+                                # status so the eval can audit recoverability.
+                                status = "alignment_failed"
+                            elif df.empty:
                                 status = "no_data_for_shifted_window"
                                 if ds_force_refresh:
                                     print(f"  [warn] slide {si} {name!r} ({_comp_ds}): "

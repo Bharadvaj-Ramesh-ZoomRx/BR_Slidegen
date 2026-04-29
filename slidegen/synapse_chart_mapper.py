@@ -348,6 +348,7 @@ def pivot_records_to_chart_data(
     known_wave_labels: set[str] | None = None,
     source_categories: list[str] | None = None,
     source_series_names: list[str] | None = None,
+    source_series_values: list[list] | None = None,
 ) -> ChartRefreshData:
     """Transform flat Synapse records into chart categories + series.
 
@@ -904,14 +905,61 @@ def pivot_records_to_chart_data(
                     except StopIteration:
                         pass
 
+        # When alignment fails for a series, prefer source values over Nones
+        # so the chart visibly retains its previous state instead of
+        # rendering empty. Per user contract: "if no usable new data, slide
+        # stays untouched." Falling back to source values is only safe when
+        # source values are aligned to the same category order we now have —
+        # i.e., when source_categories was provided and accepted.
+        can_preserve = bool(
+            source_series_values
+            and source_categories
+            and len(categories) == len(source_categories)
+        )
+
         new_series = []
-        for src_name, m in zip(source_series_names, matched):
+        n_aligned = 0
+        n_preserved = 0
+        for k, (src_name, m) in enumerate(zip(source_series_names, matched)):
             if m is not None and m < len(series):
                 _, mapper_vals = series[m]
                 new_series.append((src_name, mapper_vals))
+                n_aligned += 1
+                continue
+            if can_preserve and k < len(source_series_values):
+                preserved = list(source_series_values[k])
+                if len(preserved) < len(categories):
+                    preserved += [None] * (len(categories) - len(preserved))
+                elif len(preserved) > len(categories):
+                    preserved = preserved[: len(categories)]
+                new_series.append((src_name, preserved))
+                n_preserved += 1
             else:
                 new_series.append((src_name, [None] * len(categories)))
         series = new_series
+
+        # If no series aligned at all, signal alignment failure so the caller
+        # can preserve the entire source chart (status=alignment_failed) rather
+        # than write a chart of all-preserved values that's identical to source.
+        if n_aligned == 0 and n_preserved > 0:
+            return ChartRefreshData(
+                categories=categories, series=series, success=False,
+                error="alignment_failed: no API series aligned with source",
+            )
+
+    # Chart-level safety net: if every series ended up all-None across all
+    # categories (e.g. category alignment dropped every value because the API
+    # cats and source cats are disjoint), don't write that empty data into
+    # the chart — signal alignment failure so the caller preserves source.
+    # This catches the second class of all-None corruption that the series
+    # preserve path doesn't cover (per-category misses inside aligned series).
+    if series and all(
+        all(v is None for v in vals) for _name, vals in series
+    ):
+        return ChartRefreshData(
+            categories=categories, series=series, success=False,
+            error="alignment_failed: refreshed values are entirely None",
+        )
 
     return ChartRefreshData(categories=categories, series=series)
 
