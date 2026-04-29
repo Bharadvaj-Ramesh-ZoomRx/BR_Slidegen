@@ -18,7 +18,8 @@ Usage:
         out_pptx="path/to/refreshed_with_new_headlines.pptx",
     )
 
-Requires: pip install anthropic, env var ANTHROPIC_API_KEY.
+Requires: pip install anthropic python-dotenv. Reads LLM_API_KEY and
+LLM_API_BASE from docs/.env (LiteLLM gateway, Anthropic-compatible).
 
 Approach:
   1. Iterate connected slides (slides in the spec).
@@ -32,11 +33,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+from dotenv import load_dotenv
+load_dotenv(REPO_ROOT / "docs" / ".env")
 
 
 @dataclass
@@ -48,31 +53,96 @@ class HeadlineUpdate:
     status: str  # 'updated' | 'unchanged' | 'no_chart' | 'no_headline' | 'api_error'
 
 
+_NARRATIVE_VERBS = {
+    # Movement
+    "rose", "fell", "grew", "dropped", "increased", "decreased", "declined",
+    "rebounded", "improved", "worsened", "lost", "gained", "expanded",
+    "contracted", "lifted", "trended",
+    # Comparison / position
+    "outperformed", "underperformed", "led", "topped", "exceeded", "lagged",
+    "trailed", "matched", "dominated", "ranked",
+    # Stability
+    "remained", "held", "retained", "continued", "stayed",
+    # Change
+    "shifted", "moved",
+    # Reporting / observation
+    "showed", "saw", "reported", "reached", "captured",
+    # Perception / association
+    "preferred", "favored", "associated", "linked", "perceived", "viewed",
+    "described", "characterized", "considered", "rated", "regarded",
+}
+
+_CLAIM_KEYWORDS = [r"\bhighest\b", r"\blowest\b"]
+
+# Real headlines live near the top of the slide; footnote/disclaimer text
+# lives near the bottom. ~2 inches tolerates banner-then-headline stacking.
+_HEADLINE_TOP_LIMIT_EMU = 2 * 914400  # 2 inches in English Metric Units
+
+
+def _looks_like_data_narrative(text: str) -> bool:
+    """Return True only if text reads like a data-driven claim.
+
+    A narrative either uses a comparison/movement verb (rose, declined,
+    outperformed, retained...) or contains an explicit highest/lowest
+    claim. Chart subtitles, section labels, and methodology footnotes
+    typically have none.
+    """
+    if len(text) < 40:
+        return False
+    lower = text.lower()
+    if any(re.search(rf"\b{v}\b", lower) for v in _NARRATIVE_VERBS):
+        return True
+    if any(re.search(p, lower) for p in _CLAIM_KEYWORDS):
+        return True
+    return False
+
+
 def _find_headline_shape(slide):
-    """Pick the slide's headline text frame.
+    """Pick the slide's data-narrative headline.
 
     Heuristic order:
-      1. Shape named 'Title' or 'Headline' (case-insensitive)
-      2. zrx_<slide:03d>_001 (SlideGen's first-shape convention)
-      3. Top-most shape with a non-empty text frame and >10 chars of text
+      1. Shape named 'Title*' or 'Headline*' — among these, prefer the
+         topmost one whose text reads like a data narrative. (Some Google
+         Slides decks have multiple Title shapes; the methodology footnote
+         is also styled as Title.)
+      2. zrx_<slide:03d>_001 (SlideGen pipeline's first-shape convention).
+      3. Top-most text frame in the upper portion of the slide whose
+         content looks like a data narrative.
+
+    Returns None if no candidate qualifies — caller marks the slide
+    'no_headline' and skips. By design, slides that never had a narrative
+    headline stay untouched after refresh.
     """
+    title_candidates = []
     candidates = []
     for shape in slide.shapes:
         if not shape.has_text_frame:
             continue
-        name = (shape.name or "").lower()
-        if name in ("title", "headline"):
-            return shape
+        name = (shape.name or "").lower().strip()
+        text = (shape.text_frame.text or "").strip()
+        if not text:
+            continue
+        top = shape.top or 0
+        if name.startswith("title") or name.startswith("headline"):
+            title_candidates.append((top, shape, text))
+            continue
         if name.startswith("zrx_") and name.endswith("_001"):
             return shape
-        text = (shape.text_frame.text or "").strip()
-        if len(text) > 10:
-            top = shape.top or 0
-            candidates.append((top, shape))
-    if not candidates:
-        return None
+        if len(text) > 10 and top < _HEADLINE_TOP_LIMIT_EMU:
+            candidates.append((top, shape, text))
+
+    if title_candidates:
+        title_candidates.sort(key=lambda t: t[0])
+        for _top, shape, text in title_candidates:
+            if _looks_like_data_narrative(text):
+                return shape
+        return None  # Title* shapes exist but none are narrative — slide has no headline
+
     candidates.sort(key=lambda t: t[0])
-    return candidates[0][1]
+    for _top, shape, text in candidates:
+        if _looks_like_data_narrative(text):
+            return shape
+    return None
 
 
 def _largest_chart(slide):
@@ -103,9 +173,9 @@ def _summarize_chart(shape) -> str:
 
 def _build_prompt(old_headline: str, src_chart_summary: str,
                   ref_chart_summary: str, slide_context: str = "") -> str:
-    return f"""You are updating a PowerPoint slide headline after a data refresh.
+    return f"""You are updating a PowerPoint slide headline after a data refresh. The output you produce will be written verbatim into the slide's title shape — there is no editor in between.
 
-The chart on this slide has been updated with new survey-wave data. Rewrite the headline to reflect the new values, while preserving the original headline's voice, structure, length, and tone.
+Rewrite the headline to reflect the new values, preserving the original's voice, structure, and tone. The headline is a VERDICT — a 2-3 line claim about what mattered — not a data summary or analysis.
 
 ORIGINAL HEADLINE
 {old_headline}
@@ -119,21 +189,43 @@ NEW CHART DATA (after refresh)
 CONTEXT
 {slide_context or '(none)'}
 
-INSTRUCTIONS
-- Output ONE headline.
-- Match the original's word count within ~20% and structural style.
-- Reflect actual values from the NEW data — be specific and accurate.
-- If a value moved meaningfully vs original, describe the change with a concrete number ("rose 6 points", "dropped 4 points", "held steady"). Treat moves under 1 point as flat.
+INSTRUCTIONS — STRICT
+- Output ONLY the headline text. It will be written verbatim into the title shape.
+- LENGTH: 2-3 lines maximum. Match the original's word count within ~20%.
+- A headline is a VERDICT — what mattered, expressed as a claim. Not a data inventory.
+- Reflect actual values from the NEW data with concrete movement words ("rose 6 points", "dropped 4 points", "held steady"). Treat moves under 1 point as flat.
+- If the new data is empty / all-None / clearly corrupted, output the ORIGINAL headline unchanged.
 - Don't invent context that wasn't in the original.
-- Don't add disclaimers, commentary, or "[updated]" tags.
-- Output ONLY the headline text. No quotes, no preamble, no trailing notes.
+
+DO NOT include any of the following in your output:
+- "Looking at the new data:" or any analytical preamble
+- Bullet points, **bold**, or markdown formatting
+- "Key shift:", "Summary:", or section headers
+- "---" separators or dividers
+- Per-series breakdowns (e.g. "RINVOQ: 23%, Tremfya: 6%, No difference: 41%")
+- Meta-commentary about the rewrite ("here's the updated headline...")
+- Disclaimers, "[updated]" tags, or attribution
+
+EXAMPLE OF WRONG OUTPUT:
+Looking at the new data:
+**RINVOQ:** 23% significantly better
+**Tremfya:** 6% significantly better
+Key shift: RINVOQ's lead has narrowed.
+---
+HCPs see most UC attributes as differentiated between RINVOQ and Tremfya.
+
+EXAMPLE OF CORRECT OUTPUT:
+HCPs see most UC attributes as differentiated between RINVOQ and Tremfya, with RINVOQ retaining an edge on rapid symptom relief and bio-experienced efficacy.
 """
 
 
-def _call_claude(prompt: str, model: str = "claude-sonnet-4-6") -> str:
-    """Single Claude API call. Caller must have ANTHROPIC_API_KEY set."""
+def _call_claude(prompt: str, model: str = "anthropic/claude-sonnet-4-6") -> str:
+    """Single Claude API call via LiteLLM gateway. Reads LLM_API_KEY + LLM_API_BASE."""
     import anthropic
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(
+        api_key=os.environ["LLM_API_KEY"],
+        base_url=os.environ["LLM_API_BASE"],
+    )
     resp = client.messages.create(
         model=model,
         max_tokens=400,
@@ -144,6 +236,17 @@ def _call_claude(prompt: str, model: str = "claude-sonnet-4-6") -> str:
         if hasattr(block, "text"):
             text += block.text
     return text.strip()
+
+
+def _all_none(series) -> bool:
+    """True if every value in every series is None — refresh produced empty data."""
+    if not series:
+        return False
+    for _name, vals in series:
+        for v in vals:
+            if v is not None:
+                return False
+    return True
 
 
 def _values_eq(src_series, ref_series, tol=1e-3) -> bool:
@@ -168,7 +271,7 @@ def refresh_headlines(
     spec_path: str,
     out_pptx: str,
     only_slides: Optional[list[int]] = None,
-    model: str = "claude-sonnet-4-6",
+    model: str = "anthropic/claude-sonnet-4-6",
     dry_run: bool = False,
 ) -> list[HeadlineUpdate]:
     """Rewrite headlines for connected slides whose chart values moved.
@@ -179,9 +282,9 @@ def refresh_headlines(
     from pptx import Presentation
     from tests.evals.end_to_end.compare_decks import _extract_chart_data
 
-    if not dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
+    if not dry_run and not os.environ.get("LLM_API_KEY"):
         raise RuntimeError(
-            "ANTHROPIC_API_KEY not set. Add it to .env or export it."
+            "LLM_API_KEY not set. Add it to docs/.env or export it."
         )
 
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
@@ -211,6 +314,12 @@ def refresh_headlines(
         if _values_eq(src_series, ref_series):
             updates.append(HeadlineUpdate(
                 s_idx, "", "", "values unchanged", "unchanged"))
+            continue
+        if _all_none(ref_series) and not _all_none(src_series):
+            # Refresh corrupted the chart (all values None). Don't ask the LLM
+            # to write a headline against empty data — preserve the original.
+            updates.append(HeadlineUpdate(
+                s_idx, "", "", "refreshed values all-None (corrupted)", "unchanged"))
             continue
 
         headline_shape = _find_headline_shape(r_slide)
@@ -265,7 +374,7 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--slide", type=int, action="append", default=None,
                         help="0-based slide indices to process (repeatable).")
-    parser.add_argument("--model", default="claude-sonnet-4-6")
+    parser.add_argument("--model", default="anthropic/claude-sonnet-4-6")
     args = parser.parse_args()
 
     src_path_map = {
@@ -294,13 +403,25 @@ if __name__ == "__main__":
         print(f"  {k}: {n}")
     if not args.dry_run:
         print(f"\nWrote: {out.relative_to(REPO_ROOT)}")
+        sidecar = out.with_name(out.stem + "_status.json")
+        sidecar.write_text(json.dumps(
+            {"updates": [{"slide_idx": u.slide_idx, "status": u.status,
+                          "old_headline": u.old_headline,
+                          "new_headline": u.new_headline,
+                          "summary": u.chart_summary} for u in updates]},
+            indent=2,
+        ), encoding="utf-8")
+        print(f"Wrote: {sidecar.relative_to(REPO_ROOT)}")
+    def _safe(s: str) -> str:
+        return (s or "").encode("ascii", "replace").decode("ascii")
+
     print(f"\nSamples (first 5 updated):")
     n = 0
     for u in updates:
         if u.status == "updated":
             print(f"\nSlide {u.slide_idx + 1}:")
-            print(f"  OLD: {u.old_headline}")
-            print(f"  NEW: {u.new_headline}")
+            print(f"  OLD: {_safe(u.old_headline)}")
+            print(f"  NEW: {_safe(u.new_headline)}")
             n += 1
             if n >= 5:
                 break
