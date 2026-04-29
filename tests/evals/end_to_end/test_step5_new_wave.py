@@ -51,7 +51,7 @@ REFERENCE = {
         # Reference chart on slide 4 (Practice setting n-1) — 2 series
         # (Community, Academic) over wave categories. selectedColumns is
         # wave-free so the variant override actually drives a refetch.
-        "data_source": "p981_rp2019_a406875",
+        "data_source": "p981_rp2019_a406875_n2",
         "project_id": 981,
         "reporting_plan_id": 2019,
         "analysis_ids": [406875],
@@ -62,7 +62,7 @@ REFERENCE = {
         "reference": (4, (8.36, 4.51)),
     },
     "creon_pet_w33": {
-        "data_source": "p523_rp1143_a689321",
+        "data_source": "p523_rp1143_a689321_n5",
         "project_id": 523,
         "reporting_plan_id": 1143,
         "analysis_ids": [689321],
