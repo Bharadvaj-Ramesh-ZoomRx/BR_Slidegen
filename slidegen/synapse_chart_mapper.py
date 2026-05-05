@@ -49,11 +49,18 @@ def _remap_field(name: str) -> str:
 
 @dataclass
 class ChartRefreshData:
-    """Data ready to write into a chart via replace_data()."""
+    """Data ready to write into a chart via replace_data().
+
+    `notes` carries non-fatal annotations the caller surfaces via slide
+    badges and per-shape Connector tags. Each entry is a dict with keys:
+        kind:    "tag_mismatch" | "partial_alignment" | ...
+        detail:  short human-readable string for the badge / tag value
+    """
     categories: list[str]
     series: list[tuple[str, list[float]]]  # [(series_name, values), ...]
     success: bool = True
     error: str = ""
+    notes: list[dict] = field(default_factory=list)
 
 
 def fetch_synapse_report(
@@ -208,11 +215,16 @@ def _match_pivot_col(sc_norm: str, pivot_columns) -> str | None:
 import re as _re_wave
 
 _WAVE_LABEL_PATTERNS = (
-    _re_wave.compile(r"^(?:Project )?Wave \d+$"),                    # Wave 12, Project Wave 12
+    _re_wave.compile(r"^(?:Project )?Wave \d+$"),                     # Wave 12, Project Wave 12
     _re_wave.compile(r"^W\d+$"),                                      # W28 (short form)
-    _re_wave.compile(r"^[A-Z][a-z]{2}'\d{2}$"),                       # Jan'26
-    _re_wave.compile(r"^Q[1-4]'\d{2}$"),                              # Q1'26
+    # MMM'YY — accept straight ' and curly '/' (PowerPoint smart quotes).
+    _re_wave.compile(r"^[A-Z][a-z]{2}['’‘]\d{2}$"),                  # Jan'26 / Jan'26
+    _re_wave.compile(r"^Q[1-4]['’‘]\d{2}$"),                         # Q1'26
     _re_wave.compile(r"^Q[1-4] \d{4}$"),                              # Q1 2026
+    # Rolling-period labels: e.g. "Oct'25 - Dec'25" or "Jan'26 - Mar'26".
+    _re_wave.compile(
+        r"^[A-Z][a-z]{2}['’‘]\d{2}\s*[-–]\s*[A-Z][a-z]{2}['’‘]\d{2}$"
+    ),
 )
 
 _WAVE_TEMPLATE_SENTINEL = "\x00WAVE\x00"
@@ -229,6 +241,68 @@ def _is_wave_label(s: str, known_wave_labels: set[str] | None = None) -> bool:
     if known_wave_labels and s in known_wave_labels:
         return True
     return any(p.match(s) for p in _WAVE_LABEL_PATTERNS)
+
+
+def _all_wave_like(labels, known_wave_labels: set[str] | None = None) -> bool:
+    """True iff every label in the iterable is recognized as a wave label."""
+    if not labels:
+        return False
+    return all(_is_wave_label(str(l), known_wave_labels) for l in labels)
+
+
+_CHRONO_MONTH = {m: i for i, m in enumerate(
+    ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"], start=1)}
+
+
+def _wave_chrono_key(label: str) -> tuple:
+    """Sortable key for a wave label so chronologically-later waves sort later.
+
+    Mirrors `intelligent_refresh._chronological_wave_key` but local to the
+    mapper. Handles MMM'YY (incl. curly quotes), MMM'YY-MMM'YY rolling,
+    Q[1-4]'YY, Q[1-4] YYYY, Wave N, W N, Project Wave N. Unknown formats
+    sort to the front.
+    """
+    s = (str(label) if label is not None else "").strip()
+    if not s:
+        return (-1, 0, s)
+    s_norm = s.replace("’", "'").replace("‘", "'")
+    m = _re_wave.match(r"^[A-Za-z]+'?\d{2}\s*[-–]\s*([A-Za-z]+)'?(\d{2})$", s_norm)
+    if m:
+        mon = m.group(1).lower()[:3]
+        yy = int(m.group(2))
+        return (2000 + yy if yy < 80 else 1900 + yy, _CHRONO_MONTH.get(mon, 0), 0)
+    m = _re_wave.match(r"^([A-Za-z]+)'?(\d{2})$", s_norm)
+    if m:
+        mon = m.group(1).lower()[:3]
+        yy = int(m.group(2))
+        if mon in _CHRONO_MONTH:
+            return (2000 + yy if yy < 80 else 1900 + yy, _CHRONO_MONTH[mon], 0)
+    m = _re_wave.match(r"^Q([1-4])'?(\d{2})$", s_norm)
+    if m:
+        q = int(m.group(1)); yy = int(m.group(2))
+        return (2000 + yy if yy < 80 else 1900 + yy, q * 3, 0)
+    m = _re_wave.match(r"^Q([1-4])\s+(\d{4})$", s_norm)
+    if m:
+        return (int(m.group(2)), int(m.group(1)) * 3, 0)
+    m = _re_wave.match(r"^(?:Project\s+)?Wave\s+(\d+)$", s_norm, _re_wave.IGNORECASE)
+    if m:
+        return (10000, int(m.group(1)), 0)
+    m = _re_wave.match(r"^W(\d+)$", s_norm)
+    if m:
+        return (10000, int(m.group(1)), 0)
+    # Layer 2: year-less quarter (Q1, Q2, ..., Q10).
+    m = _re_wave.match(r"^Q(\d+)$", s_norm, _re_wave.IGNORECASE)
+    if m:
+        return (10000, int(m.group(1)), "q")
+    # Layer 3: generic prefix-N (Period 1, M1, etc.). Trailing int is sort
+    # key; leading prefix is tiebreaker for mixed-prefix charts. Already-dated
+    # labels were caught above and won't reach here.
+    m = _re_wave.match(r"^([A-Za-z][A-Za-z\s_\-]*?)\s*(\d+)$", s_norm)
+    if m:
+        prefix = m.group(1).strip().lower()
+        n = int(m.group(2))
+        return (10000, n, prefix)
+    return (-1, 0, s)
 
 
 def _rewrite_wave_pinned_selected_columns(
@@ -512,10 +586,34 @@ def pivot_records_to_chart_data(
                 if fval in df[col_key].values:
                     df = df[df[col_key] == fval]
                 else:
-                    mask = df[col_key].astype(str).str.contains(
-                        fval.split()[0], case=False, na=False)
-                    if mask.any():
-                        df = df[mask]
+                    # Compound filter values: source decks sometimes carry
+                    # "Speciality - Gastro" while the API now returns just
+                    # "Gastro". Try matching each compound part (split on
+                    # " - " or " @:@ ") against actual values; prefer the
+                    # most specific (last part), then fall back to first-
+                    # word substring match.
+                    parts = []
+                    for sep in (" - ", " @:@ "):
+                        if sep in fval:
+                            parts = [p.strip() for p in fval.split(sep) if p.strip()]
+                            break
+                    matched = False
+                    for part in reversed(parts):  # most specific first
+                        if part in df[col_key].values:
+                            df = df[df[col_key] == part]
+                            matched = True
+                            break
+                        # Case-insensitive exact match
+                        ci_mask = df[col_key].astype(str).str.lower() == part.lower()
+                        if ci_mask.any():
+                            df = df[ci_mask]
+                            matched = True
+                            break
+                    if not matched:
+                        mask = df[col_key].astype(str).str.contains(
+                            fval.split()[0], case=False, na=False)
+                        if mask.any():
+                            df = df[mask]
 
     if df.empty:
         df = pd.DataFrame(records)
@@ -549,6 +647,42 @@ def pivot_records_to_chart_data(
     if not resolved_val_fields:
         resolved_val_fields = [(primary_val, primary_val)]
     has_multi_vals = len(resolved_val_fields) > 1
+
+    # ── Pre-aggregated metric switch ──
+    # When the spec says ValueFields=['decimal'] but the data has a
+    # pre-aggregated metric column (me_score, share, penetration, etc.)
+    # AND the chart's pivot dimensions exclude the dim that decimal varies
+    # on (typically x_label for ME charts), Connector internally switches
+    # to the pre-aggregated column. Replicate that here.
+    #
+    # Trigger: x_label is in df with multiple distinct values, neither
+    # RowFields nor ColumnFields includes x_label, and decimal varies
+    # across x_label within the same (row × col) group while a pre-
+    # aggregated column is constant within that group → use the pre-
+    # aggregated column.
+    _PRE_AGG_BY_VARIANCE_DIM = {
+        # variance_dim → preferred pre-aggregated column when present
+        "x_label": "me_score",
+    }
+    if (primary_val == "decimal" and not has_multi_vals
+            and len(df) > 0):
+        for var_dim, pre_agg_col in _PRE_AGG_BY_VARIANCE_DIM.items():
+            if (var_dim in df.columns
+                    and pre_agg_col in df.columns
+                    and var_dim not in row_fields
+                    and var_dim not in col_fields
+                    and df[var_dim].nunique() > 1):
+                # Verify pre-agg is constant within (row × col) groups while
+                # decimal varies — that's the signature of a pre-aggregated
+                # metric folded across the variance dim.
+                group_keys = [k for k in (row_fields + col_fields) if k in df.columns]
+                if group_keys:
+                    g = df.groupby(group_keys, dropna=False)
+                    if (g[pre_agg_col].nunique().max() == 1
+                            and g["decimal"].nunique().max() > 1):
+                        primary_val = pre_agg_col
+                        resolved_val_fields = [(pre_agg_col, pre_agg_col)]
+                        break
 
     # Build column prefix from ColumnFields
     if len(valid_col_fields) >= 2:
@@ -610,6 +744,23 @@ def pivot_records_to_chart_data(
     use_compound = len(valid_row_fields) > 1 and display_row_field != valid_row_fields[0]
     pivot_index = valid_row_fields if use_compound else display_row_field
 
+    # Honor PivotConfig.AggregationType for cells with multiple source rows
+    # (e.g. ME chart's ColumnFields excludes x_label so multiple x_label
+    # rows collapse into one cell per Code+wave+alias). AggregationType
+    # convention in the Connector tag:
+    #   0  Sum
+    #   1  Average  (Connector default)
+    #   2  Count
+    #   3  Min
+    #   4  Max
+    # Source-deck inferred specs sometimes encode "first" semantics — fall
+    # back to mean if AggregationType=1, sum if 0, etc. The previous
+    # `aggfunc="first"` silently picked the alphabetically-first row of each
+    # group, which produced wrong values for ME charts (slide 25/26 issue).
+    _agg_map = {0: "sum", 1: "mean", 2: "count", 3: "min", 4: "max"}
+    _agg_type = pivot_config.get("AggregationType", 1)
+    _aggfunc = _agg_map.get(_agg_type, "mean")
+
     try:
         if has_multi_vals:
             pivot_frames = []
@@ -621,7 +772,7 @@ def pivot_records_to_chart_data(
                     index=pivot_index,
                     columns="_col_key",
                     values=df_col,
-                    aggfunc="first",
+                    aggfunc=_aggfunc,
                 )
                 pivot_frames.append(sub_pivot)
             pivot = pd.concat(pivot_frames, axis=1)
@@ -630,7 +781,7 @@ def pivot_records_to_chart_data(
                 index=pivot_index,
                 columns="_col_key",
                 values=primary_val,
-                aggfunc="first",
+                aggfunc=_aggfunc,
             )
     except Exception as e:
         return ChartRefreshData(categories=[], series=[], success=False,
@@ -654,16 +805,56 @@ def pivot_records_to_chart_data(
             continue
         series_columns.append(sc)
 
+    _selected_columns_unmatched: list[str] | None = None
     if series_columns:
-        # Keep only columns that match selectedColumns entries
+        # Keep only columns that match selectedColumns entries.
         cols_to_keep = []
+        unmatched = []
         for sc in series_columns:
             sc_norm = _normalize_key(sc)
             matched = _match_pivot_col(sc_norm, pivot.columns)
             if matched is not None:
                 cols_to_keep.append(matched)
+            else:
+                unmatched.append(sc)
         if cols_to_keep:
             pivot = pivot[cols_to_keep]
+            # When SOME selectedColumns matched but others didn't, the source's
+            # filter intent partially survives. Surface the unmatched ones.
+            if unmatched:
+                _selected_columns_unmatched = unmatched
+        elif series_columns:
+            # ZERO matches → segment dim or column structure changed at the
+            # API since the deck was rendered. Don't silently leak all pivot
+            # columns into the chart; record so the caller can surface a
+            # tag-mismatch/partial_alignment note.
+            _selected_columns_unmatched = list(series_columns)
+
+    # ── Pre-split row reorder per columnDefinitions[row_field].sortCriteria.CustomList ──
+    # Connector applies the CustomList from the row field's columnDefinition
+    # to the pivot rows BEFORE slicing for split_order. Without this, pivot
+    # rows arrive in groupby/alphabetical order and split_order=0 picks the
+    # alphabetically-first y_label instead of the user-intended first row
+    # (e.g. "Improves symptoms" listed first in the source table). The
+    # downstream split_order=N then misaligns chart shapes vs the table.
+    if rows_per_object and split_order is not None and len(valid_row_fields) >= 1:
+        primary_rf = display_row_field if not use_compound else valid_row_fields[0]
+        col_def = next(
+            (cd for cd in pivot_config.get("columnDefinitions", [])
+             if cd.get("Name") == primary_rf),
+            None,
+        )
+        if col_def:
+            custom_list = (col_def.get("sortCriteria") or {}).get("CustomList") or []
+            if custom_list:
+                order_map = {str(it): i for i, it in enumerate(custom_list)}
+                existing_idx = list(pivot.index)
+                sorted_idx = sorted(
+                    existing_idx,
+                    key=lambda x: order_map.get(str(x), len(custom_list) + 1),
+                )
+                if sorted_idx != existing_idx:
+                    pivot = pivot.reindex(sorted_idx)
 
     # ── Step 1b: Apply topNRows + rowsPerObject/splitOrder (split visualization) ──
     # Connector's SplitVisualizationService splits pivot rows across chart shapes.
@@ -672,10 +863,67 @@ def pivot_records_to_chart_data(
         pivot = pivot.iloc[:top_n_rows]
 
     if rows_per_object and rows_per_object > 0 and split_order is not None:
-        start = split_order * rows_per_object
-        end = start + rows_per_object
-        if start < len(pivot):
-            pivot = pivot.iloc[start:min(end, len(pivot))]
+        # Source-driven row selection: when the source chart shape's series
+        # name (passed as the only entry in source_series_names for split-
+        # viz) maps to a row in the pivot, pick THAT row instead of indexing
+        # by split_order. Preserves the user contract: "each chart shape
+        # keeps the message it had pre-refresh" — no surprise reassignment.
+        #
+        # Connector charts often display y_code (e.g. "CR6") as the series
+        # label while pivoting on y_label (the full message text). When a
+        # direct name match fails, try translating via the data's
+        # code↔label columns.
+        used_source_match = False
+        if (rows_per_object == 1
+                and source_series_names
+                and len(source_series_names) == 1):
+            target = str(source_series_names[0]).strip()
+            target_low = target.lower()
+            # Pass 1: direct match on pivot.index
+            for idx_val in pivot.index:
+                if (str(idx_val).strip() == target
+                        or str(idx_val).strip().lower() == target_low):
+                    pivot = pivot.loc[[idx_val]]
+                    used_source_match = True
+                    break
+            # Pass 2: code↔label translation. If the source's series name
+            # looks like a y_code value but pivot indexes on y_label (or vice
+            # versa), translate via the source df.
+            if not used_source_match:
+                code_label_pairs = [
+                    ("y_code", "y_label"), ("y_label", "y_code"),
+                    ("Codes", "y_label"), ("y_label", "Codes"),
+                    ("y_code", "Codes"), ("Codes", "y_code"),
+                ]
+                for from_col, to_col in code_label_pairs:
+                    if from_col not in df.columns or to_col not in df.columns:
+                        continue
+                    matches = df[df[from_col].astype(str).str.strip() == target]
+                    if matches.empty:
+                        matches = df[df[from_col].astype(str).str.strip().str.lower()
+                                     == target_low]
+                    if not matches.empty:
+                        translated = str(matches[to_col].iloc[0]).strip()
+                        translated_low = translated.lower()
+                        for idx_val in pivot.index:
+                            if (str(idx_val).strip() == translated
+                                    or str(idx_val).strip().lower() == translated_low):
+                                pivot = pivot.loc[[idx_val]]
+                                used_source_match = True
+                                break
+                    if used_source_match:
+                        break
+            # When source-driven match succeeded, also relabel the pivot row
+            # to the source's series name (e.g. "CR6") so the post-transpose
+            # series.name matches what the source chart had — keeps table-row
+            # and chart-shape attributes aligned per user contract.
+            if used_source_match and source_series_names:
+                pivot.index = [source_series_names[0]] * len(pivot.index)
+        if not used_source_match:
+            start = split_order * rows_per_object
+            end = start + rows_per_object
+            if start < len(pivot):
+                pivot = pivot.iloc[start:min(end, len(pivot))]
 
     # ── Step 2: Apply transpose (Connector: VisualizationService at render time) ──
     # After transpose, column names become categories.
@@ -721,25 +969,64 @@ def pivot_records_to_chart_data(
     select_all = mapping_config.get("selectAllRows", True)
     selected_rows_raw = mapping_config.get("selectedRows", [])
     rows_ordered = False
+    _row_drop_note: dict | None = None
 
     if not select_all and selected_rows_raw:
-        # selectedRows may use @:@ separator for compound keys
+        # selectedRows may use @:@ separator for compound keys.
+        # Match case-insensitively + whitespace-normalized so source code
+        # 'C10' aligns with pivot value 'C10 ' or 'c10' without dropping rows.
+        def _norm_row(s):
+            return str(s).strip().lower() if s is not None else ""
+
+        cat_norm = [_norm_row(c) for c in categories]
         row_order = []
+        sr_dropped: list[str] = []
         for sr in selected_rows_raw:
-            sr_norm = _normalize_key(sr)
-            sr_parts = [p.strip() for p in sr_norm.split(" - ")]
-            for ci, cat in enumerate(categories):
-                # Match: exact, or last part matches, or cat is in any part
-                if (cat == sr_norm or cat in sr_parts or
-                        any(cat == p or p in cat or cat in p for p in sr_parts)):
-                    if ci not in row_order:
-                        row_order.append(ci)
+            sr_str = str(sr)
+            sr_norm = _norm_row(_normalize_key(sr_str))
+            sr_parts = [_norm_row(p) for p in sr_norm.split(" - ")]
+            matched_ci = None
+            # Pass 1: exact match (cat == sr_norm). Prevents 'C1' from
+            # incorrectly substring-matching 'C10', 'C11', 'C17' which
+            # silently dropped 4 codes on slide 25.
+            for ci, cn in enumerate(cat_norm):
+                if cn == sr_norm and ci not in row_order:
+                    matched_ci = ci
                     break
+            # Pass 2: cat is one of the compound parts (entire-part match).
+            # E.g. cat='c10' matches sr_parts=['x', 'c10']; but does NOT
+            # match sr_parts=['c1'] because 'c10' != 'c1'.
+            if matched_ci is None:
+                for ci, cn in enumerate(cat_norm):
+                    if cn in sr_parts and ci not in row_order:
+                        matched_ci = ci
+                        break
+            if matched_ci is not None:
+                row_order.append(matched_ci)
+            else:
+                sr_dropped.append(sr_str)
         if row_order:
             categories = [categories[i] for i in row_order]
             series = [(name, [vals[i] for i in row_order if i < len(vals)])
                       for name, vals in series]
             rows_ordered = True
+        if sr_dropped:
+            # Stash on a local list — combined with cat/series notes at the
+            # end of the function so the slide badge + REFRESH_NOTE tag sees
+            # both row-drop and partial_alignment together.
+            sample = sr_dropped[:5]
+            more = len(sr_dropped) - len(sample)
+            suffix = "..." if more > 0 else ""
+            _row_drop_note = {
+                "kind": "rows_dropped",
+                "detail": (
+                    f"{len(sr_dropped)} of {len(selected_rows_raw)} "
+                    f"selectedRows had no match in API output: "
+                    f"{', '.join(sample)}{suffix}"
+                ),
+            }
+        else:
+            _row_drop_note = None
 
     # ── Apply moveRowsToFirst / moveRowsToLast ──
     move_first = mapping_config.get("moveRowsToFirst", [])
@@ -754,7 +1041,13 @@ def pivot_records_to_chart_data(
             else:
                 mi.append(ci)
         new_order = fi + mi + li
-        if new_order:
+        # Only honor the move when at least one cat actually matched a
+        # move_first/move_last directive. If fi and li are both empty, the
+        # directive doesn't apply to the current cat set (e.g. "Feb'26" was
+        # listed in moveRowsToLast but Feb is no longer in the wave window).
+        # Without this guard the no-op reorder set rows_ordered=True and
+        # suppressed the chronological wave sort downstream.
+        if new_order and (fi or li):
             categories = [categories[i] for i in new_order]
             series = [(n, [v[i] for i in new_order if i < len(v)])
                       for n, v in series]
@@ -782,26 +1075,53 @@ def pivot_records_to_chart_data(
                         if ci not in order:
                             order.append(ci)
                         break
-            for ci in range(len(categories)):
-                if ci not in order:
-                    order.append(ci)
-            categories = [categories[i] for i in order]
-            series = [(n, [v[i] for i in order]) for n, v in series]
-            rows_ordered = True
+            # Only honor CustomList when at least one item matched. Post-
+            # transpose, the CustomList may target the original axis (e.g.
+            # y_label) while categories are now the OTHER axis (waves) —
+            # no matches means the CustomList doesn't apply to this view.
+            # Without this guard the fallback "append unmatched" branch
+            # produced a no-op reorder while still setting rows_ordered=True,
+            # which suppressed the chronological wave sort downstream.
+            if order:
+                for ci in range(len(categories)):
+                    if ci not in order:
+                        order.append(ci)
+                categories = [categories[i] for i in order]
+                series = [(n, [v[i] for i in order]) for n, v in series]
+                rows_ordered = True
 
-    # ── Chronological wave sort ──
-    # If no explicit ordering was applied and every category is a time_period
-    # label, sort by its underlying time_period_id. Prevents the lex ordering
-    # "Wave 1, Wave 10, Wave 2, Wave 3, ..." on deep wave counts.
-    if not rows_ordered and name_to_tp_id and categories:
-        if all(cat in name_to_tp_id for cat in categories):
-            tp_order = sorted(
-                range(len(categories)),
-                key=lambda i: name_to_tp_id[categories[i]],
-            )
-            if tp_order != list(range(len(categories))):
-                categories = [categories[i] for i in tp_order]
-                series = [(n, [v[i] for i in tp_order if i < len(v)])
+    # ── Chronological wave sort with direction preservation ──
+    # Universal rule: whichever slot held the LATEST source wave still holds
+    # the latest post-refresh. Practical effect: if source had Feb on LHS and
+    # Mar on RHS (latest on RHS → ascending), refresh produces [Mar, Apr]. If
+    # source had Mar on LHS and Feb on RHS (latest on LHS → descending),
+    # refresh produces [Apr, Mar]. time_period_id is NOT chronological
+    # (CLAUDE.md gotcha) — parse names instead.
+    #
+    # This block runs even when rows_ordered=True (i.e. CustomList or moveRows
+    # already touched the order) because for wave dimensions the chronological
+    # order with direction inferred from source is canonical. CustomLists in
+    # source decks frequently encode stale "Feb, Mar" pairs that do not match
+    # the actual rendered direction; trusting them blindly leaves the chart
+    # with refreshed values in the wrong slots.
+    if categories and _all_wave_like(categories, known_wave_labels):
+        descending = False
+        if (source_categories
+                and len(source_categories) >= 2
+                and _all_wave_like(source_categories, known_wave_labels)):
+            src_keys = [_wave_chrono_key(c) for c in source_categories]
+            # Position of the chronologically-latest source wave
+            latest_pos = max(range(len(src_keys)), key=lambda i: src_keys[i])
+            if latest_pos == 0:
+                descending = True
+        tp_order = sorted(
+            range(len(categories)),
+            key=lambda i: _wave_chrono_key(categories[i]),
+            reverse=descending,
+        )
+        if tp_order != list(range(len(categories))):
+            categories = [categories[i] for i in tp_order]
+            series = [(n, [v[i] for i in tp_order if i < len(v)])
                           for n, v in series]
 
     # ── Source-chart-canonical alignment for non-wave dimensions ──
@@ -825,7 +1145,53 @@ def pivot_records_to_chart_data(
         s = str(s) if s is not None else ""
         return _re_wave.sub(r"\s+", " ", s).strip().lower()
 
-    if source_categories and not _is_wave_dim(source_categories):
+    # Snapshot the API-fetched data BEFORE source-canonical mutates it.
+    # Used for (a) tag_mismatch detection — when source and API have zero
+    # overlap on both axes, write API data faithfully per user contract
+    # rather than preserve source (Bucket A: review tag or move to non-
+    # connected); and (b) end-of-block notes (dynamic_added when the tag is
+    # dynamic and new items flowed in; partial_alignment when the tag is
+    # static and API extras exist that the user may want to opt into).
+    api_cats_pre = list(categories)
+    api_series_pre = [(n, list(v)) for n, v in series]
+
+    # Dynamic vs static: if the tag pins specific time periods, treat the
+    # whole chart as static — source-canonical alignment locks cat/series
+    # structure to the slide. Otherwise the tag is dynamic and new items
+    # from the API are allowed to flow into the slide on refresh.
+    is_dynamic = not bool(static_time_period_ids)
+
+    # Tag-mismatch detection: both axes have structure on both sides AND
+    # no labels overlap → tag points at a different analysis than what was
+    # rendered. Skip source-canonical, return API data with a note.
+    # Fires regardless of dynamic/static — the diagnosis is the same.
+    if (api_cats_pre and api_series_pre
+            and (source_categories and not _is_wave_dim(source_categories))
+            and (source_series_names and not _is_wave_dim(source_series_names))):
+        api_cat_set = {_norm_label(c) for c in api_cats_pre}
+        src_cat_set = {_norm_label(c) for c in source_categories}
+        api_ser_set = {_norm_label(n) for n, _ in api_series_pre}
+        src_ser_set = {_norm_label(n) for n in source_series_names}
+        if (api_cat_set and src_cat_set and api_ser_set and src_ser_set
+                and not (api_cat_set & src_cat_set)
+                and not (api_ser_set & src_ser_set)):
+            return ChartRefreshData(
+                categories=api_cats_pre,
+                series=api_series_pre,
+                success=True,
+                notes=[{
+                    "kind": "tag_mismatch",
+                    "detail": (
+                        f"Tag fetched {len(api_cats_pre)} cats / "
+                        f"{len(api_series_pre)} series with no overlap to source "
+                        f"({len(source_categories)} / {len(source_series_names)}). "
+                        "Review tag or move to non-connected path."
+                    ),
+                }],
+            )
+
+    if (source_categories and not _is_wave_dim(source_categories)
+            and not is_dynamic):
         norm_to_idx = {_norm_label(c): i for i, c in enumerate(categories)}
         new_series = []
         for sname, vals in series:
@@ -841,7 +1207,8 @@ def pivot_records_to_chart_data(
         categories = list(source_categories)
         series = new_series
 
-    if source_series_names and not _is_wave_dim(source_series_names):
+    if (source_series_names and not _is_wave_dim(source_series_names)
+            and not is_dynamic):
         current_names = [n for n, _ in series]
         norm_to_idx = {_norm_label(n): i for i, n in enumerate(current_names)}
 
@@ -961,7 +1328,72 @@ def pivot_records_to_chart_data(
             error="alignment_failed: refreshed values are entirely None",
         )
 
-    return ChartRefreshData(categories=categories, series=series)
+    # ── Annotation notes for downstream slide badges + Connector tags ──
+    # When API has more items than source on a non-wave dim, two cases:
+    #   - Dynamic tag → items already flowed in (we skipped source-canonical).
+    #     Emit `dynamic_added` so the slide visibly reflects the additions.
+    #   - Static tag → items were dropped (source-canonical kept slide order).
+    #     Emit `partial_alignment` so the user can opt in if desired.
+    note_kind = "dynamic_added" if is_dynamic else "partial_alignment"
+    notes: list[dict] = []
+
+    def _format_note(api_only: list[str], dim: str) -> dict:
+        sample = api_only[:3]
+        more = len(api_only) - len(sample)
+        suffix = "..." if more > 0 else ""
+        noun = (
+            "category" if (dim == "cats" and len(api_only) == 1)
+            else "categories" if dim == "cats"
+            else "series"
+        )
+        verb = "flowed in per dynamic tag" if is_dynamic else "not on slide"
+        return {
+            "kind": note_kind,
+            "detail": (
+                f"API has {len(api_only)} extra {noun} {verb}: "
+                f"{', '.join(sample)}{suffix}"
+            ),
+        }
+
+    if (source_categories and not _is_wave_dim(source_categories)
+            and api_cats_pre):
+        api_only = sorted(
+            {_norm_label(c) for c in api_cats_pre}
+            - {_norm_label(c) for c in source_categories}
+        )
+        if api_only:
+            notes.append(_format_note(api_only, "cats"))
+    if (source_series_names and not _is_wave_dim(source_series_names)
+            and api_series_pre):
+        api_only = sorted(
+            {_norm_label(n) for n, _ in api_series_pre}
+            - {_norm_label(n) for n in source_series_names}
+        )
+        if api_only:
+            notes.append(_format_note(api_only, "series"))
+
+    # Row-drop diagnostic from selectedRows match earlier in the function
+    if _row_drop_note is not None:
+        notes.append(_row_drop_note)
+
+    # selectedColumns drift diagnostic: source listed columns that don't
+    # match current pivot output (segment dim changed, column-structure
+    # differs at the API since deck render, etc.).
+    if _selected_columns_unmatched:
+        sample = _selected_columns_unmatched[:3]
+        more = len(_selected_columns_unmatched) - len(sample)
+        suffix = "..." if more > 0 else ""
+        notes.append({
+            "kind": "selectedColumns_drift",
+            "detail": (
+                f"{len(_selected_columns_unmatched)} selectedColumns "
+                f"could not be matched against current pivot output "
+                f"(segment dim or column structure changed): "
+                f"{', '.join(sample)}{suffix}. Review tag or move to non-connected."
+            ),
+        })
+
+    return ChartRefreshData(categories=categories, series=series, notes=notes)
 
 
 def refresh_chart_from_synapse(

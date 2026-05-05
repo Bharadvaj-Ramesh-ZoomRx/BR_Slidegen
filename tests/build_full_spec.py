@@ -84,7 +84,15 @@ def _datasource_from_lineage(lin: dict, sources: dict) -> str | None:
     existing_names = set(sources[key]["static_time_period_names"])
     new_names = set(lin.get("static_time_period_names") or [])
     sources[key]["static_time_period_names"] = sorted(existing_names | new_names)
-    if lin.get("include_live_wave") is True:
+    # For dynamic sources (no static IDs), force include_live_wave=True so the
+    # latest wave always flows in on refresh — matches user's contract that
+    # refresh = "bring in whatever's new". Connector tags often have this set
+    # to False from earlier deck renders when April was still in-progress;
+    # now April is a closed deliverable and the user expects it in the deck.
+    # Static sources skip refresh entirely so this flag is moot for them.
+    if not sources[key]["static_time_period_ids"]:
+        sources[key]["include_live_wave"] = True
+    elif lin.get("include_live_wave") is True:
         sources[key]["include_live_wave"] = True
     return key
 

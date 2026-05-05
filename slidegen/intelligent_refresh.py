@@ -31,6 +31,7 @@ import shutil
 import sys
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -444,18 +445,170 @@ def format_data_for_interpretation(df: pd.DataFrame) -> str:
 # Data Fetching
 # ══════════════════════════════════════════════════════════════════════════════
 
-def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
+# Chronological sort for wave-period names. time_period_id is NOT chronological
+# (per CLAUDE.md gotcha #1) — Apr'26 has id 26110 but Mar'26 has id 25373 and
+# Jan'26 has id 25375, so sorting by id descending gives [Apr, Jan, Feb, Mar].
+# Parsing names handles every format we've seen across CREON, ATU, AstraZeneca:
+#   Jan'26    → year-month
+#   Q1'26     → year-quarter (mapped to first month of quarter)
+#   Q1 2026   → year-quarter
+#   Wave 12   → integer (later waves have higher numbers per project)
+#   W32       → integer
+#   Jan'25 - Mar'25  (rolling) → last-month of range
+# Returns a sortable tuple — earlier waves sort before later ones.
+import re as _re_chrono
+
+_CHRONO_MONTH = {m: i for i, m in enumerate(
+    ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"], start=1)}
+
+_CHRONO_PATTERNS = (
+    # Layer 1: Dated patterns (most precise — try first to prevent the year
+    # in MMM'YY from being misread as a "wave number" by the generic layer).
+    (_re_chrono.compile(
+        r"^[A-Za-z]+['’]?\d{2}\s*[-–]\s*([A-Za-z]+)['’]?(\d{2})$"),
+     "rolling_year_month"),
+    (_re_chrono.compile(r"^([A-Za-z]+)['’]?(\d{2})$"), "year_month"),
+    (_re_chrono.compile(r"^Q([1-4])['’]?(\d{2})$"), "quarter_year_short"),
+    (_re_chrono.compile(r"^Q([1-4])\s+(\d{4})$"), "quarter_year_full"),
+    (_re_chrono.compile(r"^Wave\s+(\d+)$", _re_chrono.IGNORECASE), "wave_n"),
+    (_re_chrono.compile(r"^W(\d+)$"), "w_n"),
+    (_re_chrono.compile(r"^Project\s+Wave\s+(\d+)$"), "wave_n"),
+    # Layer 2: year-less quarters (Q1, Q2, ..., Q10) — single-prefix charts.
+    (_re_chrono.compile(r"^Q(\d+)$", _re_chrono.IGNORECASE), "q_n_only"),
+    # Layer 3: generic prefix-N fallback (Period 1, M1, etc.). Trailing int
+    # is the sort key; everything before is the prefix and tiebreaks across
+    # mixed-prefix charts. Doesn't fire on dated labels — those match layer 1.
+    (_re_chrono.compile(r"^([A-Za-z][A-Za-z\s_\-]*?)\s*(\d+)$"), "prefix_n"),
+)
+
+
+def _chronological_wave_key(label: str) -> tuple:
+    """Return a sortable key for a wave label so latest-N selects correctly.
+
+    Higher tuple = later wave. Format: (year, month, sub) where unknown
+    formats fall back to (-inf, label) so they sort before recognized ones —
+    callers should filter to recognized-only when stability matters.
+    """
+    s = (str(label) if label is not None else "").strip()
+    if not s:
+        return (-1, 0, s)
+    for pat, kind in _CHRONO_PATTERNS:
+        m = pat.match(s)
+        if not m:
+            continue
+        if kind == "year_month":
+            mon = m.group(1).lower()[:3]
+            if mon not in _CHRONO_MONTH:
+                # Not a real month abbreviation — fall through to next pattern
+                # (e.g. "Day25" shouldn't match year_month even though regex
+                # accepts any 3-letter prefix).
+                continue
+            yy = int(m.group(2))
+            year = 2000 + yy if yy < 80 else 1900 + yy
+            return (year, _CHRONO_MONTH[mon], 0)
+        if kind == "rolling_year_month":
+            mon = m.group(1).lower()[:3]
+            if mon not in _CHRONO_MONTH:
+                continue
+            yy = int(m.group(2))
+            year = 2000 + yy if yy < 80 else 1900 + yy
+            return (year, _CHRONO_MONTH[mon], 0)
+        if kind == "quarter_year_short":
+            q = int(m.group(1)); yy = int(m.group(2))
+            year = 2000 + yy if yy < 80 else 1900 + yy
+            return (year, q * 3, 0)
+        if kind == "quarter_year_full":
+            q = int(m.group(1)); year = int(m.group(2))
+            return (year, q * 3, 0)
+        if kind == "wave_n":
+            return (10000, int(m.group(1)), 0)
+        if kind == "w_n":
+            return (10000, int(m.group(1)), 0)
+        if kind == "q_n_only":
+            # Year-less quarter: same year-bucket as W##/Wave N to keep
+            # mixed-format charts sortable. (year=10000 is a sentinel meaning
+            # "non-dated; sort by trailing N within prefix group".)
+            return (10000, int(m.group(1)), "q")
+        if kind == "prefix_n":
+            prefix = m.group(1).strip().lower()
+            n = int(m.group(2))
+            return (10000, n, prefix)
+    return (-1, 0, s)
+
+
+def _synapse_cache_root() -> Path:
+    """Cache directory for Synapse API responses. Override with SYNAPSE_CACHE_DIR."""
+    override = os.environ.get("SYNAPSE_CACHE_DIR")
+    if override:
+        return Path(override)
+    return REPO_ROOT / "projects" / ".synapse_cache"
+
+
+def _synapse_cache_key(lineage: dict) -> str:
+    """sha256 of normalized lineage + today's date — daily auto-expiry."""
+    norm = {
+        "project_id": lineage.get("project_id"),
+        "reporting_plan_id": lineage.get("reporting_plan_id"),
+        "analysis_ids": sorted(lineage.get("analysis_ids") or []),
+        "segment_ids": sorted(lineage.get("segment_ids") or []),
+        "static_time_period_ids": sorted(lineage.get("static_time_period_ids") or []),
+        "dynamic_latest_n": lineage.get("dynamic_latest_n"),
+        "include_live_wave": lineage.get("include_live_wave"),
+    }
+    payload = json.dumps(norm, sort_keys=True, default=str)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    date = datetime.now().strftime("%Y-%m-%d")
+    return f"{digest}_{date}"
+
+
+def _read_synapse_cache(key: str) -> list[dict] | None:
+    path = _synapse_cache_root() / f"{key}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _write_synapse_cache(key: str, records: list[dict]) -> None:
+    root = _synapse_cache_root()
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        (root / f"{key}.json").write_text(
+            json.dumps(records, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        print(f"  [warn] synapse cache write failed: {e}")
+
+
+def fetch_synapse_data(
+    data_lineage: dict,
+    *,
+    force_fresh: bool = False,
+) -> tuple[list[dict], pd.DataFrame]:
     """Fetch records from Synapse API using data lineage dict.
 
     Uses SynapseClient (synapse-cli) so auth is resolved automatically via
     the CLI's fallback chain — works with sk_* keys, cached JWT, Azure AD.
     SYNAPSE_API_URL must be set in .env; no explicit key is required.
 
+    Cached on disk by (normalized lineage hash + today's date). Pass
+    ``force_fresh=True`` to bypass the cache.
+
     Returns (records_list, dataframe).
     """
     import time
     from synapse_cli import SynapseClient
     from synapse_cli.errors import SynapseError
+
+    cache_key = _synapse_cache_key(data_lineage)
+    if not force_fresh:
+        cached = _read_synapse_cache(cache_key)
+        if cached is not None:
+            df = pd.DataFrame(cached) if cached else pd.DataFrame()
+            return cached, df
 
     base_url = os.environ.get("SYNAPSE_API_URL", "").rstrip("/")
     if not base_url:
@@ -521,13 +674,22 @@ def fetch_synapse_data(data_lineage: dict) -> tuple[list[dict], pd.DataFrame]:
     # Client-side latest_n filter — API ignores latest_n_deliverables on some
     # endpoint configurations, so enforce it here when a dynamic latest_n is
     # specified and we're not already constrained by static IDs.
+    #
+    # Sort by parsed wave-NAME chronology, NOT by time_period_id (per CLAUDE.md
+    # gotcha: time_period_ids are NOT chronological — Apr'26 has id 26110 but
+    # Mar'26 has id 25373, so id-descending picks [Apr, Jan, Feb, Mar] when the
+    # user wants [Mar, Apr]).
     latest_n = data_lineage.get("dynamic_latest_n")
     if records and not static_ids and latest_n and latest_n > 0:
-        tp_ids = {r.get("time_period_id") for r in records if r.get("time_period_id") is not None}
-        if len(tp_ids) > latest_n:
-            keep_ids = sorted(tp_ids, reverse=True)[:latest_n]
-            keep_set = set(keep_ids)
-            records = [r for r in records if r.get("time_period_id") in keep_set]
+        names = {r.get("time_period_name") for r in records
+                 if r.get("time_period_name") is not None}
+        if len(names) > latest_n:
+            ranked = sorted(names, key=_chronological_wave_key)
+            keep_set = set(ranked[-latest_n:])
+            records = [r for r in records if r.get("time_period_name") in keep_set]
+
+    if records:
+        _write_synapse_cache(cache_key, records)
 
     df = pd.DataFrame(records) if records else pd.DataFrame()
     return records, df
@@ -2028,7 +2190,14 @@ def write_headline(pptx_path: str, slide_index: int, headline_text: str) -> None
 # Deck-level refresh from a single spec JSON
 # ══════════════════════════════════════════════════════════════════════════════
 
-def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: str = None) -> dict:
+def refresh_deck_from_spec(
+    spec_path: str,
+    pptx_path: str = None,
+    output_path: str = None,
+    *,
+    force_fresh: bool = False,
+    max_workers: int = 6,
+) -> dict:
     """Refresh a deck using a single spec JSON file.
 
     Spec JSON format:
@@ -2091,6 +2260,42 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
     # Cache fetched data by data_source key
     data_cache = {}
+
+    # ── Parallel pre-fetch of every unique data_source referenced in the spec
+    # Honors disk cache inside fetch_synapse_data (skips API entirely on hit).
+    # Lazy fetches below remain as a fallback for keys not enumerated here.
+    needed_keys: list[str] = []
+    seen_keys: set[str] = set()
+    for _slide_spec in slides:
+        _slide_ds = _slide_spec.get("data_source")
+        if _slide_ds and _slide_ds in data_sources and _slide_ds not in seen_keys:
+            seen_keys.add(_slide_ds); needed_keys.append(_slide_ds)
+        for _comp in _slide_spec.get("components", []):
+            _cds = _comp.get("data_source")
+            if _cds and _cds in data_sources and _cds not in seen_keys:
+                seen_keys.add(_cds); needed_keys.append(_cds)
+
+    if needed_keys:
+        print(f"  Pre-fetching {len(needed_keys)} data_source(s) "
+              f"(parallel, force_fresh={force_fresh})")
+
+        def _fetch_one(k: str):
+            try:
+                _, _df = fetch_synapse_data(data_sources[k], force_fresh=force_fresh)
+                return k, _df, None
+            except Exception as exc:
+                return k, pd.DataFrame(), exc
+
+        workers = max(1, min(max_workers, len(needed_keys)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for k, df_k, err in pool.map(_fetch_one, needed_keys):
+                if err is not None:
+                    print(f"    [warn] {k}: {err}")
+                    data_cache[k] = pd.DataFrame()
+                else:
+                    data_cache[k] = df_k
+                    print(f"    {k}: {len(df_k)} records")
+
     # Cache the full known-wave set per data_source — Fix L/M uses this for
     # value-driven wave-label detection in selectedColumns. Computed lazily
     # by stripping wave filters from the lineage and re-fetching once per ds.
@@ -2112,7 +2317,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                     "static_time_period_ids": [],
                     "static_time_period_names": [],
                     "include_live_wave": True,
-                })
+                }, force_fresh=force_fresh)
                 if not full_df.empty and "time_period_name" in full_df.columns:
                     raw = full_df["time_period_name"].astype(str).unique()
                     labels = set(raw)
@@ -2139,13 +2344,13 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
         slide = prs.slides[si]
 
-        # Fetch data (cached by data_source key)
+        # Fetch data (cached by data_source key) — fallback if pre-fetch missed it
         if ds_key and ds_key not in data_cache:
             lineage = data_sources.get(ds_key, {})
             if lineage:
                 print(f"  Fetching data_source '{ds_key}': project={lineage.get('project_id')}, "
                       f"analysis={lineage.get('analysis_ids')}")
-                records, df = fetch_synapse_data(lineage)
+                records, df = fetch_synapse_data(lineage, force_fresh=force_fresh)
                 data_cache[ds_key] = df
                 print(f"    -> {len(records)} records")
             else:
@@ -2158,12 +2363,77 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
             all_results["slides"].append({"slide_index": si, "error": "no data"})
             continue
 
-        # Index shapes by name
+        # Index shapes — list of (name, left_in, top_in, shape, used_flag).
+        # Connector "split-viz" puts 15+ chart shapes on one slide ALL with the
+        # same name (e.g. "Main chart" × 15). A name-only dict collapses them
+        # to one entry; per-component refresh then writes to the same shape 15
+        # times, leaving the other 14 with stale source data. Match by name AND
+        # position (per-component spec carries left/top in inches), and mark a
+        # shape as "used" once it's been claimed by a component.
+        chart_shape_pool: list[dict] = [
+            {"name": s.name,
+             "left_in": (s.left or 0) / 914400,
+             "top_in": (s.top or 0) / 914400,
+             "shape": s, "used": False}
+            for s in slide.shapes if s.has_chart
+        ]
+        table_shape_pool: list[dict] = [
+            {"name": s.name,
+             "left_in": (s.left or 0) / 914400,
+             "top_in": (s.top or 0) / 914400,
+             "shape": s, "used": False}
+            for s in slide.shapes if s.has_table
+        ]
+
+        def _claim_shape(pool: list[dict], name: str,
+                         pos: dict | None = None) -> object | None:
+            """Find an unused shape by name; if multiple match, pick the one
+            whose position best matches the spec component's position. Mark
+            the chosen shape as used so subsequent components in the same
+            slide don't re-claim it."""
+            candidates = [e for e in pool if e["name"] == name and not e["used"]]
+            if not candidates:
+                # Fallback: any matching name (re-use), preserves prior behavior
+                # for non-split slides where pool runs out before components do.
+                fallback = next((e for e in pool if e["name"] == name), None)
+                return fallback["shape"] if fallback else None
+            if len(candidates) == 1 or pos is None:
+                candidates[0]["used"] = True
+                return candidates[0]["shape"]
+            target_l = float(pos.get("left", 0) or 0)
+            target_t = float(pos.get("top", 0) or 0)
+            best = min(
+                candidates,
+                key=lambda e: abs(e["left_in"] - target_l) + abs(e["top_in"] - target_t),
+            )
+            best["used"] = True
+            return best["shape"]
+
+        # Backwards-compat dict aliases for code paths below that haven't
+        # been converted yet (table refresh + dual-mode tables). Reads from
+        # these still work for non-collision slides; collision-prone code
+        # uses _claim_shape().
         chart_shapes = {s.name: s for s in slide.shapes if s.has_chart}
         table_shapes = {s.name: s for s in slide.shapes if s.has_table}
         src_chart_series = src_series_by_slide.get(si, {})
 
         slide_results = {"slide_index": si, "charts": [], "tables": []}
+
+        # ── Split-viz applyTranspose alignment ──
+        # When a slide has multiple chart shapes sharing a name + split_order
+        # 0..N, Connector applies the lead (split=0) shape's applyTranspose
+        # uniformly across the group at render time. Source decks sometimes
+        # carry inconsistent values across the group (lead True, followers
+        # False) — following the tag literally produces mixed orientations.
+        # Copy the lead's applyTranspose into all members.
+        _split_lead_transpose: dict[str, bool] = {}
+        for _comp in slide_spec.get("components", []):
+            if _comp.get("type") != "chart":
+                continue
+            if _comp.get("split_order") == 0:
+                _name = _comp.get("name", "")
+                _rmc = _comp.get("raw_mapping_config") or {}
+                _split_lead_transpose[_name] = _rmc.get("applyTranspose", False)
 
         for comp in slide_spec.get("components", []):
             # ── Resolve active data source for this component ────────────
@@ -2175,7 +2445,7 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 if _cl:
                     print(f"  Fetching component data_source '{_comp_ds}': "
                           f"analysis={_cl.get('analysis_ids')}")
-                    _, _cdf = fetch_synapse_data(_cl)
+                    _, _cdf = fetch_synapse_data(_cl, force_fresh=force_fresh)
                     data_cache[_comp_ds] = _cdf
                     print(f"    -> {len(_cdf)} records")
                 else:
@@ -2201,20 +2471,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 slide_results["tables"].append({"name": name, "status": "static_skipped"})
                 continue
 
-            # ── Static-pinned + no live wave → skip refresh ──
-            # When the user pinned specific waves (static_time_period_ids set)
-            # and explicitly opted out of auto-rolling forward (include_live_wave
-            # False), the chart is "frozen": refreshing wouldn't add new wave
-            # data, and could introduce drift if the API has changed for those
-            # exact waves. Leave the source chart untouched.
-            #
-            # Exception: wave-shift evals (Steps 5/6) set static_time_period_ids
-            # to a DIFFERENT wave set than source and explicitly want a refresh.
-            # They opt in via `force_refresh: true` on the data_source, which
-            # bypasses this guard.
-            ds_include_live = _cl.get("include_live_wave", True)
+            # ── Static-pinned → skip refresh ──
+            # When the user pinned specific waves (static_time_period_ids set),
+            # the chart is "frozen": no refresh, no drift, no annotation noise.
+            # Per user contract: static = static, no exceptions, regardless of
+            # include_live_wave. force_refresh=True is the only override (used
+            # by historical wave-shift evals; live-API evals don't need it).
             ds_force_refresh = bool(_cl.get("force_refresh", False))
-            if lin_raw_static_ids and not ds_include_live and not ds_force_refresh:
+            if lin_raw_static_ids and not ds_force_refresh:
                 bucket = "charts" if ctype == "chart" else "tables"
                 slide_results[bucket].append({
                     "name": name, "status": "static_pinned_skipped",
@@ -2223,6 +2487,18 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
 
             raw_pc = comp.get("raw_pivot_config")
             raw_mc = comp.get("raw_mapping_config")
+
+            # Apply split-viz applyTranspose alignment (see _split_lead_transpose
+            # build above): non-lead split members inherit the lead's value so
+            # all shapes in the group render consistently.
+            if (raw_mc and ctype == "chart"
+                    and comp.get("split_order") is not None
+                    and comp.get("split_order") > 0
+                    and name in _split_lead_transpose):
+                lead_t = _split_lead_transpose[name]
+                if raw_mc.get("applyTranspose") != lead_t:
+                    raw_mc = dict(raw_mc)
+                    raw_mc["applyTranspose"] = lead_t
 
             # ── RAW CONNECTOR PATH ──
             # When a component has raw_pivot_config + raw_mapping_config at the
@@ -2238,7 +2514,10 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 top_n_rows = comp.get("top_n_rows")
 
                 if ctype == "chart":
-                    shape = chart_shapes.get(name)
+                    # Position-aware: claim the specific Connector-split shape
+                    # this spec component refers to (multiple shapes on one
+                    # slide can share a name).
+                    shape = _claim_shape(chart_shape_pool, name, comp.get("position"))
                     if not shape:
                         slide_results["charts"].append({"name": name, "status": "not_found"})
                         continue
@@ -2247,12 +2526,36 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                     # cat/series list (Issues 5/7/10/11). Refresh aligns its
                     # output to source: drop new cats that weren't there,
                     # keep cats with no current data filled with None.
+                    #
+                    # Position-aware source-shape lookup: when split-viz
+                    # creates multiple shapes sharing a name, match by
+                    # (left, top) so each spec component gets its OWN
+                    # source shape (and therefore its OWN source series
+                    # name like "CR6", "CR10", etc.). Without this, every
+                    # component would inherit the first matching shape's
+                    # source data and mass-assign the same series.
                     src_cats: list[str] | None = None
                     src_series_names: list[str] | None = None
                     src_series_values: list[list] | None = None
                     try:
-                        for ss in src_prs.slides[si].shapes:
-                            if ss.has_chart and ss.name == name:
+                        comp_pos = comp.get("position") or {}
+                        comp_l = float(comp_pos.get("left", 0) or 0)
+                        comp_t = float(comp_pos.get("top", 0) or 0)
+                        candidates = [
+                            ss for ss in src_prs.slides[si].shapes
+                            if ss.has_chart and ss.name == name
+                        ]
+                        if len(candidates) > 1 and (comp_l or comp_t):
+                            best = min(
+                                candidates,
+                                key=lambda ss: (
+                                    abs(((ss.left or 0) / 914400) - comp_l)
+                                    + abs(((ss.top or 0) / 914400) - comp_t)
+                                ),
+                            )
+                            candidates = [best]
+                        for ss in candidates:
+                            if True:
                                 _plot = ss.chart.plots[0]
                                 src_cats = [str(c) for c in (_plot.categories or [])]
                                 src_series_names = [
@@ -2340,6 +2643,39 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                                 f"{{{ns_c}}}formatCode")
                         ]
 
+                        # ── formatCode-aware value scaling ──
+                        # Source charts can encode percentages two ways:
+                        #   formatCode "0%"   → cell stores 0.45, displays 45%
+                        #   formatCode "0.0"  → cell stores 45,  displays 45.0
+                        # The mapper produces decimal-scale (0-1) values from
+                        # the API's `decimal` column. Writing 0.45 into a chart
+                        # whose formatCode is "0.0" displays "0.5" — the user's
+                        # report of "everything changes to decimals on refresh".
+                        # If the chart-wide formatCode lacks a percent sign, scale
+                        # decimal-range values up by 100 so the display matches
+                        # the source format.
+                        _scale_to_whole_percent = False
+                        if src_fmts:
+                            non_pct = [fc for fc in src_fmts
+                                       if fc and "%" not in fc and fc != "General"]
+                            if non_pct and len(non_pct) >= max(1, len(src_fmts) // 2):
+                                # Majority of formatCodes lack %; treat as whole-percent scale
+                                _scale_to_whole_percent = True
+
+                        def _scale_val(v):
+                            if v is None: return None
+                            try:
+                                fv = float(v)
+                            except (TypeError, ValueError):
+                                return v
+                            # Only scale if value looks like a 0-1 decimal AND
+                            # source format is whole-percent. Don't scale values
+                            # already in 0-100 range (might happen if API column
+                            # is `percentage` not `decimal`).
+                            if _scale_to_whole_percent and abs(fv) <= 1.5:
+                                return round(fv * 100, 4)
+                            return round(fv, 4)
+
                         # Build chart data object
                         chart_type_str = chart_pattern
                         if "scatter" in chart_type_str or "xy_" in chart_type_str:
@@ -2366,13 +2702,8 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                                 s = cd.add_series(sname)
                                 for rank, oi in enumerate(order):
                                     raw = vals[oi] if oi < len(vals) else None
-                                    # Preserve API precision in the underlying
-                                    # cell; PowerPoint formatCode handles
-                                    # display rounding (e.g. '0%' -> nearest
-                                    # whole percent). Round to 4dp only to
-                                    # eliminate float-wobble artifacts.
-                                    x_val = (round(raw, 4) if raw is not None
-                                             else 0.0)
+                                    scaled = _scale_val(raw)
+                                    x_val = scaled if scaled is not None else 0.0
                                     y_val = float(n_cats - rank)
                                     s.add_data_point(x_val, y_val)
                         else:
@@ -2380,16 +2711,9 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             cd = CategoryChartData()
                             cd.categories = cats
                             for sname, vals in series_data:
-                                # Preserve API precision (4dp) in the cell
-                                # value; PowerPoint formatCode controls how
-                                # the number is displayed. Don't round to
-                                # 2dp here — that would lose the underlying
-                                # precision (e.g. 0.2562 -> 0.26 destroys
-                                # the 25.62% the API delivered).
                                 cd.add_series(
                                     sname,
-                                    [round(v, 4) if v is not None else None
-                                     for v in vals],
+                                    [_scale_val(v) for v in vals],
                                 )
 
                         shape.chart.replace_data(cd)
@@ -2401,11 +2725,14 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                             if i < len(src_fmts):
                                 fc_el.text = src_fmts[i]
 
-                        slide_results["charts"].append({
+                        chart_entry = {
                             "name": name, "status": "ok",
                             "categories": len(cats), "series": len(series_data),
                             "mode": "raw_connector",
-                        })
+                        }
+                        if getattr(chart_data, "notes", None):
+                            chart_entry["notes"] = list(chart_data.notes)
+                        slide_results["charts"].append(chart_entry)
                     except Exception as e:
                         slide_results["charts"].append({
                             "name": name, "status": "error", "error": str(e),
@@ -2700,10 +3027,253 @@ def refresh_deck_from_spec(spec_path: str, pptx_path: str = None, output_path: s
                 except Exception as e:
                     slide_results["tables"].append({"name": name, "status": "error", "error": str(e)})
 
+        # ── Per-slide text replacement: old wave labels → new wave labels ──
+        # When refresh shifts the chart's wave window (e.g. Feb-Mar → Mar-Apr),
+        # any text shape on the slide that referenced the old waves should be
+        # updated to match. Examples: object titles, legend hints, methodology
+        # footnotes, "Wave X data only" annotations.
+        # Also updates "n=NN" sample-size patterns where a single n value
+        # applies to the whole slide.
+        try:
+            _update_slide_text_for_refresh(slide, src_prs.slides[si], slide_spec,
+                                           data_cache, data_sources)
+        except Exception as exc:
+            print(f"  [warn] text-replacement on slide {si} failed: {exc}")
+
         all_results["slides"].append(slide_results)
 
     prs.save(output_path)
     return all_results
+
+
+def _update_slide_text_for_refresh(out_slide, src_slide, slide_spec,
+                                   data_cache, data_sources) -> None:
+    """Update text shapes on a slide to reflect the refreshed wave window.
+
+    Looks at the connected charts' source-vs-refreshed wave categories;
+    builds a label map (old_label → new_label) per chart; and scans every
+    text shape on the slide for occurrences of old labels, replacing them
+    with the corresponding new labels.
+
+    Also updates `n=\\d+` sample-size mentions when a single base value
+    applies (single component on the slide).
+
+    Conservative: only replaces standalone wave-label tokens, not arbitrary
+    substrings — avoids accidental edits to message/option text that
+    happens to share words with a wave label.
+    """
+    # Build per-chart label map by comparing src vs refreshed cats AND series
+    # (waves can live on either axis depending on applyTranspose).
+    src_charts_by_name: dict[str, list] = {}
+    for sh in src_slide.shapes:
+        if sh.has_chart:
+            src_charts_by_name.setdefault(sh.name, []).append(sh)
+
+    label_replacements: list[tuple[str, str]] = []
+    for sh in out_slide.shapes:
+        if not sh.has_chart:
+            continue
+        srcs = src_charts_by_name.get(sh.name, [])
+        if not srcs:
+            continue
+        # Match by closest-position when multiple share a name (split-viz)
+        sh_l = (sh.left or 0); sh_t = (sh.top or 0)
+        src_sh = min(
+            srcs,
+            key=lambda s: abs((s.left or 0) - sh_l) + abs((s.top or 0) - sh_t),
+        )
+        try:
+            src_cats = [str(c) for c in src_sh.chart.plots[0].categories]
+            new_cats = [str(c) for c in sh.chart.plots[0].categories]
+            src_series = [s.name for s in src_sh.chart.plots[0].series]
+            new_series = [s.name for s in sh.chart.plots[0].series]
+        except Exception:
+            continue
+        # Only build a mapping for the WAVE axis (skip non-wave dims).
+        from slidegen.synapse_chart_mapper import _is_wave_label
+        if src_cats and new_cats and all(_is_wave_label(c) for c in src_cats):
+            for old, new in zip(src_cats, new_cats):
+                if old != new:
+                    label_replacements.append((old, new))
+        if src_series and new_series and all(_is_wave_label(c) for c in src_series):
+            for old, new in zip(src_series, new_series):
+                if old != new:
+                    label_replacements.append((old, new))
+
+    # Add range replacements: "Oct'25 - Mar'26" → "Nov'25 - Apr'26" derived
+    # from the first/last waves on a chart that used a wave dim.
+    range_replacements: list[tuple[str, str]] = []
+    for sh in out_slide.shapes:
+        if not sh.has_chart:
+            continue
+        srcs = src_charts_by_name.get(sh.name, [])
+        if not srcs:
+            continue
+        sh_l = (sh.left or 0); sh_t = (sh.top or 0)
+        src_sh = min(
+            srcs,
+            key=lambda s: abs((s.left or 0) - sh_l) + abs((s.top or 0) - sh_t),
+        )
+        try:
+            src_cats = [str(c) for c in src_sh.chart.plots[0].categories]
+            new_cats = [str(c) for c in sh.chart.plots[0].categories]
+        except Exception:
+            continue
+        from slidegen.synapse_chart_mapper import _is_wave_label
+        if (src_cats and new_cats and len(src_cats) >= 2 and len(new_cats) >= 2
+                and all(_is_wave_label(c) for c in src_cats)
+                and all(_is_wave_label(c) for c in new_cats)):
+            old_range = f"{src_cats[0]} - {src_cats[-1]}"
+            new_range = f"{new_cats[0]} - {new_cats[-1]}"
+            if old_range != new_range:
+                range_replacements.append((old_range, new_range))
+            # Also handle the reverse-spelled range
+            old_range_rev = f"{src_cats[0]} – {src_cats[-1]}"  # en dash
+            new_range_rev = f"{new_cats[0]} – {new_cats[-1]}"
+            if old_range_rev != new_range_rev:
+                range_replacements.append((old_range_rev, new_range_rev))
+
+    if not label_replacements and not range_replacements:
+        return
+
+    # Apply replacements. Prefer ranges first (longer matches) then labels.
+    seen = set()
+    ordered = []
+    for pair in range_replacements + label_replacements:
+        if pair not in seen:
+            seen.add(pair); ordered.append(pair)
+
+    for sh in out_slide.shapes:
+        if sh.has_chart or sh.has_table:
+            continue
+        if not sh.has_text_frame:
+            continue
+        tf = sh.text_frame
+        for para in tf.paragraphs:
+            for run in para.runs:
+                txt = run.text
+                if not txt:
+                    continue
+                new_txt = txt
+                for old, new in ordered:
+                    if old and old in new_txt:
+                        new_txt = new_txt.replace(old, new)
+                if new_txt != txt:
+                    run.text = new_txt
+
+
+def stamp_refresh_notes(pptx_path: str, refresh_results: dict) -> dict:
+    """Stamp per-shape REFRESH_NOTE tags into a refreshed PPTX (in place).
+
+    For every shape in `refresh_results["slides"][...]["charts"|"tables"]`
+    that has a non-empty `notes` list, inject the following Connector-format
+    tags into the shape's existing tag.xml file:
+
+        <p:tag name="REFRESH_TIMESTAMP" val="2026-05-05T..."/>
+        <p:tag name="REFRESH_STATUS"    val="ok"/>
+        <p:tag name="REFRESH_NOTES"     val="kind1::detail1||kind2::detail2"/>
+
+    Multi-note shapes get all notes joined with `||` in REFRESH_NOTES so a
+    single tag entry covers them all (PowerPoint's tagLst format expects
+    unique tag names).
+
+    Idempotent within a single refresh: if a shape already has any of these
+    three tags, they are replaced (not duplicated).
+
+    Args:
+        pptx_path:       PPTX to modify in place.
+        refresh_results: Output of refresh_deck_from_spec, dict with key
+                         "slides": [{"slide_index", "charts": [...], "tables": [...]}].
+
+    Returns:
+        {(slide_idx, shape_name): "stamped" | "shape_not_in_pptx" | "no_tag_file"}
+    """
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
+    stamps: dict[tuple[int, str], str] = {}
+
+    # Collect (slide_idx, shape_name) -> notes payload to stamp
+    targets: dict[int, list[tuple[str, str, list[dict]]]] = {}
+    for slide_entry in refresh_results.get("slides", []):
+        si = slide_entry.get("slide_index")
+        if si is None:
+            continue
+        for comp in (slide_entry.get("charts") or []) + (slide_entry.get("tables") or []):
+            notes = comp.get("notes") or []
+            status = comp.get("status", "")
+            if not notes:
+                # Only stamp shapes that actually have annotations to record;
+                # otherwise we'd bloat every connected shape's tag.xml on every
+                # refresh. Status-only entries (e.g. plain "ok") are not stamped.
+                continue
+            name = comp.get("name", "")
+            if not name:
+                continue
+            targets.setdefault(si, []).append((name, status, notes))
+
+    if not targets:
+        return stamps
+
+    with zipfile.ZipFile(pptx_path, "r") as zf:
+        all_entries: dict[str, bytes] = {n: zf.read(n) for n in zf.namelist()}
+
+    for si, shapes_to_stamp in targets.items():
+        slide_file = f"ppt/slides/slide{si + 1}.xml"
+        rels_file = f"ppt/slides/_rels/slide{si + 1}.xml.rels"
+        if slide_file not in all_entries:
+            for nm, _, _ in shapes_to_stamp:
+                stamps[(si, nm)] = "shape_not_in_pptx"
+            continue
+
+        slide_xml = all_entries[slide_file].decode("utf-8")
+        rels_xml = all_entries.get(rels_file, b"").decode("utf-8")
+
+        rid_to_tag: dict[str, str] = {}
+        for m in re.finditer(
+            r'Id="(rId\d+)"[^>]*Target="(\.\./tags/tag\d+\.xml)"', rels_xml
+        ):
+            rid_to_tag[m.group(1)] = "ppt/tags/" + m.group(2).split("/")[-1]
+
+        shape_to_tag: dict[str, str] = {}
+        for m in re.finditer(
+            r'<p:cNvPr[^>]*\bname="([^"]*)"[^>]*/?>.*?<p:tags\s+r:id="(rId\d+)"\s*/>',
+            slide_xml, re.DOTALL,
+        ):
+            shape_to_tag[m.group(1)] = rid_to_tag.get(m.group(2), "")
+
+        for shape_name, status, notes in shapes_to_stamp:
+            tag_file = shape_to_tag.get(shape_name)
+            if not tag_file or tag_file not in all_entries:
+                stamps[(si, shape_name)] = "no_tag_file"
+                continue
+
+            notes_value = "||".join(
+                f"{n.get('kind', 'unknown')}::{(n.get('detail') or '')[:300]}"
+                for n in notes
+            )
+            new_tags = (
+                f'<p:tag name="REFRESH_TIMESTAMP" val="{_escape_attr(timestamp)}"/>'
+                f'<p:tag name="REFRESH_STATUS" val="{_escape_attr(status)}"/>'
+                f'<p:tag name="REFRESH_NOTES" val="{_escape_attr(notes_value)}"/>'
+            )
+
+            tag_xml = all_entries[tag_file].decode("utf-8")
+            # Replace existing tags with same name, then inject new
+            for tag_name in ("REFRESH_TIMESTAMP", "REFRESH_STATUS", "REFRESH_NOTES"):
+                tag_xml = re.sub(
+                    rf'<p:tag\s+name="{tag_name}"\s+val="[^"]*"\s*/>',
+                    "", tag_xml,
+                )
+            tag_xml = tag_xml.replace("</p:tagLst>", new_tags + "</p:tagLst>")
+            all_entries[tag_file] = tag_xml.encode("utf-8")
+            stamps[(si, shape_name)] = "stamped"
+
+    tmp_path = pptx_path + ".tmp"
+    with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for name, data in all_entries.items():
+            zout.writestr(name, data)
+    os.replace(tmp_path, pptx_path)
+
+    return stamps
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2746,6 +3316,10 @@ def main():
     p_deck.add_argument("--spec", required=True, help="Spec JSON (same name as PPTX)")
     p_deck.add_argument("--pptx", default=None, help="Source PPTX (default: from spec)")
     p_deck.add_argument("--output", default=None, help="Output (default: Output_<source>)")
+    p_deck.add_argument("--no-cache", action="store_true",
+                        help="Bypass on-disk Synapse cache (force fresh API fetch)")
+    p_deck.add_argument("--workers", type=int, default=6,
+                        help="Max parallel data_source fetches (default: 6)")
 
     # ── setup-nonconnected: derive + save raw configs for non-connected charts ──
     p_setup = sub.add_parser(
@@ -2815,7 +3389,11 @@ def main():
         print(json.dumps(results, indent=2, ensure_ascii=False))
 
     elif args.command == "refresh-deck":
-        results = refresh_deck_from_spec(args.spec, args.pptx, args.output)
+        results = refresh_deck_from_spec(
+            args.spec, args.pptx, args.output,
+            force_fresh=args.no_cache,
+            max_workers=args.workers,
+        )
         print(json.dumps(results, indent=2, ensure_ascii=False))
 
     elif args.command == "setup-nonconnected":

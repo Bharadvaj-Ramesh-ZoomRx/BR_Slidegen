@@ -45,35 +45,108 @@ WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 
 def _refresh_badge(slide_status: dict | None) -> tuple[RGBColor, str]:
-    """Classify a slide's refresh execution outcome from refresh_status.json."""
+    """Classify a slide's refresh outcome from refresh_status.json.
+
+    Priority (highest attention first):
+      1. tag_mismatch (any) — red, user must review tag or move to non-connected.
+      2. alignment_failed (any) — red, mapper couldn't align even partially.
+      3. static-pinned (all) — amber, surface the "frozen" status so the user
+         can decide if the tag setting is still what they want.
+      4. empty / error (any) — red.
+      5. partial_alignment notes (static tag, API has extras) — amber.
+      6. dynamic_added notes (dynamic tag, new items flowed in) — green w/ note.
+      7. all ok with no notes — green.
+
+    `slide_status is None` means the slide isn't in the refresh spec —
+    treated as non-connected. Surfaced AMBER (not GREY) so the user
+    notices: until pradeep-slidegen merges, non-connected slides aren't
+    refreshed by this pipeline and need manual attention.
+    """
     if slide_status is None:
-        return GREY, "REFRESH - not connected"
+        return AMBER, "NON-CONNECTED slide - manual review"
+
+    # Spec-level error: refresh bailed before processing any component.
+    # Most common cause: the slide's data_source returned 0 records (empty
+    # analysis). User needs to verify the analysis_id in the tag, or accept
+    # that data isn't yet available for this analysis.
+    err = slide_status.get("error")
+    if err:
+        return RED, f"REFRESH - {err} (review analysis)"
 
     components = slide_status.get("charts", []) + slide_status.get("tables", [])
     if not components:
         return GREY, "REFRESH - no components"
 
+    n = len(components)
     statuses = [c.get("status", "missing") for c in components]
-    n = len(statuses)
     n_ok = sum(1 for s in statuses if s == "ok")
     n_static = sum(1 for s in statuses if s == "static_pinned_skipped")
     n_nodata = sum(1 for s in statuses if s == "no_data_for_shifted_window")
     n_empty = sum(1 for s in statuses if s == "empty")
+    n_align_fail = sum(1 for s in statuses if s == "alignment_failed")
 
-    if n_ok == n:
-        return GREEN, f"REFRESH ok  {n_ok}/{n}"
+    # Aggregate note kinds across components
+    n_tag_mismatch = 0
+    n_partial = 0
+    n_dynamic_added = 0
+    n_columns_drift = 0
+    n_rows_dropped = 0
+    for c in components:
+        for note in c.get("notes", []) or []:
+            k = note.get("kind", "")
+            if k == "tag_mismatch":
+                n_tag_mismatch += 1
+            elif k == "partial_alignment":
+                n_partial += 1
+            elif k == "dynamic_added":
+                n_dynamic_added += 1
+            elif k == "selectedColumns_drift":
+                n_columns_drift += 1
+            elif k == "rows_dropped":
+                n_rows_dropped += 1
+
+    # Priority 1: tag_mismatch — review the tag
+    if n_tag_mismatch:
+        return RED, f"REFRESH tag-mismatch  {n_tag_mismatch}/{n} - review tag"
+
+    # Priority 1b: selectedColumns drift (segment dim or column structure
+    # changed at API since deck render). Same severity as tag_mismatch —
+    # user needs to fix the tag or move to non-connected.
+    if n_columns_drift:
+        return RED, f"REFRESH columns-drift  {n_columns_drift}/{n} - review tag"
+
+    # Priority 2: alignment_failed
+    if n_align_fail:
+        return RED, f"REFRESH alignment-failed  {n_align_fail}/{n}"
+
+    # Priority 3: all static-pinned — AMBER label without the word REFRESH so
+    # the user doesn't read "we refreshed this slide" into the badge.
     if n_static == n:
-        return BLUE, f"REFRESH static-pinned  {n_static}/{n}"
-    if n_nodata == n:
-        return BLUE, f"REFRESH no new data  {n_nodata}/{n}"
+        return AMBER, f"STATIC (no refresh)  {n_static}/{n} - tag pinned, review"
+
+    # Priority 4: empty / error
     if n_empty == n:
         return RED, f"REFRESH empty  {n_empty}/{n}"
 
+    # Priority 5/6/7: ok-dominant — secondary annotation drives the color
+    if n_ok == n:
+        if n_partial:
+            return AMBER, f"REFRESH ok  {n_ok}/{n} - API has extras (partial)"
+        if n_dynamic_added:
+            return GREEN, f"REFRESH ok  {n_ok}/{n} (+{n_dynamic_added} dynamic-added)"
+        return GREEN, f"REFRESH ok  {n_ok}/{n}"
+
+    if n_nodata == n:
+        return BLUE, f"REFRESH no new data  {n_nodata}/{n}"
+
+    # Mixed — collect everything that fired
     parts = []
     if n_ok: parts.append(f"{n_ok} ok")
     if n_static: parts.append(f"{n_static} static")
     if n_nodata: parts.append(f"{n_nodata} no-data")
     if n_empty: parts.append(f"{n_empty} empty")
+    if n_partial: parts.append(f"{n_partial} partial")
+    if n_dynamic_added: parts.append(f"{n_dynamic_added} dyn-added")
     color = AMBER if (n_ok > 0 or n_static + n_nodata > 0) else RED
     return color, "REFRESH " + " / ".join(parts)
 
@@ -81,7 +154,7 @@ def _refresh_badge(slide_status: dict | None) -> tuple[RGBColor, str]:
 def _headline_badge(headline_status: dict | None) -> tuple[RGBColor, str]:
     """Classify a slide's headline outcome from with_headlines_status.json."""
     if headline_status is None:
-        return GREY, "HEADLINE - not in scope"
+        return AMBER, "HEADLINE - not connected (manual)"
 
     s = headline_status.get("status", "")
     if s == "updated":
@@ -142,7 +215,7 @@ def annotate(deck_key: str) -> None:
 
     counts = {"both_green": 0, "ok+preserved": 0, "ok+no_narr": 0,
               "no_data+preserved": 0, "static+preserved": 0,
-              "mismatch": 0, "untagged": 0}
+              "non_connected": 0, "mismatch": 0, "untagged": 0}
 
     for s_idx, slide in enumerate(pres.slides):
         r_color, r_label = _refresh_badge(refresh_by_idx.get(s_idx))
@@ -151,7 +224,9 @@ def annotate(deck_key: str) -> None:
         _add_badge(slide, h_color, h_label, slide_w, row=1)
 
         # Bucket for summary
-        if r_color == GREY and h_color == GREY:
+        if "NON-CONNECTED" in r_label:
+            counts["non_connected"] += 1
+        elif r_color == GREY and h_color == GREY:
             counts["untagged"] += 1
         elif "ok" in r_label and h_color == GREEN:
             counts["both_green"] += 1
