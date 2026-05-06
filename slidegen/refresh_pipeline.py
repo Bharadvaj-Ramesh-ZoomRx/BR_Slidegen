@@ -163,10 +163,15 @@ def _bucket_label(r_label: str) -> str:
         return "non_connected"
     if "tag-mismatch" in r_label:
         return "tag_mismatch"
-    if "STATIC" in r_label or "static-pinned" in r_label:
-        return "static_review"
     if "alignment-failed" in r_label:
         return "alignment_failed"
+    # Mixed slide: some components refreshed, others static-pinned.
+    # Badge text is "REFRESH N ok / M static". Must check before the plain
+    # static check below so it doesn't get swallowed by "static_review".
+    if r_label.startswith("REFRESH ") and " ok" in r_label and "static" in r_label:
+        return "ok_with_static_pinned"
+    if "STATIC" in r_label or "static-pinned" in r_label:
+        return "static_review"
     if "(partial)" in r_label:
         return "ok_with_partial"
     if "dynamic-added" in r_label:

@@ -2453,14 +2453,21 @@ def refresh_deck_from_spec(
             df = data_cache.get(_comp_ds, pd.DataFrame())
             records_list = df.to_dict("records") if not df.empty else []
             _cl = data_sources.get(_comp_ds, {})
+            # Resolve static-pin state per-component: trust the component's
+            # own tag first, then its data_source lineage. Do NOT fall back
+            # to slide_spec — slide-level static_time_period_ids is hoisted
+            # from the slide's PRIMARY chart by build_full_spec, and using
+            # it here makes every other component on the slide inherit a
+            # pin it never had. Bug surfaced on Repatha ATU slide 11 where
+            # one chart is pinned to Wave 7 but four label_tables flow
+            # dynamically — without this fix the label_tables get
+            # static_pinned_skipped and the slide is flagged static_review.
             lin_raw_static_names = (
                 comp.get("static_time_period_names")
-                or slide_spec.get("static_time_period_names")
                 or _cl.get("static_time_period_names")
             )
             lin_raw_static_ids = (
                 comp.get("static_time_period_ids")
-                or slide_spec.get("static_time_period_ids")
                 or _cl.get("static_time_period_ids")
             )
 
