@@ -253,6 +253,34 @@ def _all_wave_like(labels, known_wave_labels: set[str] | None = None) -> bool:
 _CHRONO_MONTH = {m: i for i, m in enumerate(
     ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"], start=1)}
 
+# Wave-token regex for extracting a wave-shaped substring from compound labels
+# like "Nov'25 - Gastro" so chronology sort works on segment-suffixed labels.
+# Order matters: rolling MMM-MMM and dated tokens come before generic forms.
+_WAVE_TOKEN_RE = _re_wave.compile(
+    r"(?:^|\s|[-–\(])\s*("
+    r"[A-Za-z]{3}['’‘]\d{2}\s*[-–]\s*[A-Za-z]{3}['’‘]\d{2}|"  # rolling
+    r"[A-Za-z]{3}['’‘]\d{2}|"                                # MMM'YY
+    r"Q[1-4]['’‘]\d{2}|"                                     # Q1'26
+    r"Q[1-4] \d{4}|"                                          # Q1 2026
+    r"(?:Project )?Wave \d+|"                                 # Wave 12
+    r"W\d+"                                                   # W28
+    r")\b"
+)
+
+
+def _extract_wave_token(label: str) -> str | None:
+    """Find a wave-shaped token inside `label`, or return None.
+
+    For compound labels like "Nov'25 - Gastro" returns "Nov'25" so chronology
+    sort can operate on the wave part. Returns None if no recognizable wave
+    token is present (so the caller can fall back to alphabetical).
+    """
+    if not isinstance(label, str) or not label:
+        return None
+    s = label.replace("’", "'").replace("‘", "'")
+    m = _WAVE_TOKEN_RE.search(s)
+    return m.group(1) if m else None
+
 
 def _wave_chrono_key(label: str) -> tuple:
     """Sortable key for a wave label so chronologically-later waves sort later.
@@ -806,6 +834,7 @@ def pivot_records_to_chart_data(
         series_columns.append(sc)
 
     _selected_columns_unmatched: list[str] | None = None
+    _selected_columns_zero_match: bool = False
     if series_columns:
         # Keep only columns that match selectedColumns entries.
         cols_to_keep = []
@@ -829,6 +858,7 @@ def pivot_records_to_chart_data(
             # columns into the chart; record so the caller can surface a
             # tag-mismatch/partial_alignment note.
             _selected_columns_unmatched = list(series_columns)
+            _selected_columns_zero_match = True
 
     # ── Pre-split row reorder per columnDefinitions[row_field].sortCriteria.CustomList ──
     # Connector applies the CustomList from the row field's columnDefinition
@@ -1104,19 +1134,40 @@ def pivot_records_to_chart_data(
     # source decks frequently encode stale "Feb, Mar" pairs that do not match
     # the actual rendered direction; trusting them blindly leaves the chart
     # with refreshed values in the wrong slots.
-    if categories and _all_wave_like(categories, known_wave_labels):
+    # Compute chrono keys per category. Three modes:
+    #   1) pure wave label ("Nov'25") → _wave_chrono_key returns a real key
+    #   2) compound with wave token ("Nov'25 - Gastro") → extract token first
+    #   3) neither → key starts with -1 (unsortable)
+    # If every category has a chrono key under (1) or (2), the chart's
+    # category axis is temporal and we run the chronological sort. The
+    # compound case handles segment-suffixed cats from segment-applied charts
+    # (slides 68-79) which previously fell through alphabetical.
+    def _cat_chrono_key(c: str) -> tuple:
+        k = _wave_chrono_key(c)
+        if k[0] != -1:
+            return k
+        token = _extract_wave_token(c)
+        if token:
+            sub = _wave_chrono_key(token)
+            if sub[0] != -1:
+                return sub
+        return k
+
+    cat_chrono_keys = [_cat_chrono_key(c) for c in categories] if categories else []
+    all_have_chrono = bool(cat_chrono_keys) and all(k[0] != -1 for k in cat_chrono_keys)
+
+    if all_have_chrono:
         descending = False
-        if (source_categories
-                and len(source_categories) >= 2
-                and _all_wave_like(source_categories, known_wave_labels)):
-            src_keys = [_wave_chrono_key(c) for c in source_categories]
-            # Position of the chronologically-latest source wave
-            latest_pos = max(range(len(src_keys)), key=lambda i: src_keys[i])
-            if latest_pos == 0:
-                descending = True
+        if source_categories and len(source_categories) >= 2:
+            src_keys = [_cat_chrono_key(c) for c in source_categories]
+            if all(k[0] != -1 for k in src_keys):
+                # Position of the chronologically-latest source wave
+                latest_pos = max(range(len(src_keys)), key=lambda i: src_keys[i])
+                if latest_pos == 0:
+                    descending = True
         tp_order = sorted(
             range(len(categories)),
-            key=lambda i: _wave_chrono_key(categories[i]),
+            key=lambda i: cat_chrono_keys[i],
             reverse=descending,
         )
         if tp_order != list(range(len(categories))):
@@ -1392,6 +1443,30 @@ def pivot_records_to_chart_data(
                 f"{', '.join(sample)}{suffix}. Review tag or move to non-connected."
             ),
         })
+
+    # When the source's column-axis filter matched ZERO API columns, the
+    # chart's pre-refresh structure can't be reconstructed (API analysis is
+    # structurally different from what the deck was rendered against). The
+    # current pivot would dump all API columns — including ones the source
+    # was filtering out — producing a chart with the wrong attributes/series
+    # (slide 80: each shape was filtered to 1 attribute × 2 brands but API
+    # returns 2 attributes × 2 segment values, so all 4 leak into every
+    # shape). Signal alignment_failed so the orchestrator preserves source.
+    if (_selected_columns_zero_match
+            and source_series_values
+            and source_series_names
+            and source_categories):
+        return ChartRefreshData(
+            categories=list(source_categories),
+            series=[(n, list(v)) for n, v in zip(
+                source_series_names, source_series_values)],
+            success=False,
+            error=(
+                "alignment_failed: selectedColumns fully unmatched "
+                "(API column structure differs from source)"
+            ),
+            notes=notes,
+        )
 
     return ChartRefreshData(categories=categories, series=series, notes=notes)
 

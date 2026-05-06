@@ -132,8 +132,8 @@ def main():
         print("[warn] LLM_API_KEY not set — Step 7 headlines will skip")
 
     # Production CREON deck (the real W33 deliverable, not the test copy).
-    source_pptx = (REPO_ROOT / "projects" / "J&J Rybrevant PET" / "Template"
-                   / "CREON Share of Voice Study - W33.pptx")
+    source_pptx = (REPO_ROOT / "output_testing" / "deck_output"
+                   / "CREON Share of Voice Study - W33 updated source deck.pptx")
     if not source_pptx.exists():
         print(f"[ERROR] Source deck missing: {source_pptx}")
         sys.exit(2)
@@ -157,10 +157,11 @@ def main():
     deck_out_dir.mkdir(parents=True, exist_ok=True)
     json_out_dir.mkdir(parents=True, exist_ok=True)
 
-    base = f"CREON_{today}_v5"
+    base = f"CREON_{today}_v8"
     final_pptx = deck_out_dir / f"{base}.pptx"
     refresh_status_path = json_out_dir / f"{base}_refresh_status.json"
     headline_status_path = json_out_dir / f"{base}_headline_status.json"
+    label_sync_status_path = json_out_dir / f"{base}_label_sync_status.json"
 
     # Intermediates stay in a temp dir — we only ship the final annotated deck.
     work_tmp = tempfile.mkdtemp(prefix="creon_refresh_")
@@ -174,7 +175,7 @@ def main():
     print()
 
     # ── Step 1: Refresh ──
-    print("[1/4] refresh_deck_from_spec...")
+    print("[1/5] refresh_deck_from_spec...")
     result = refresh_deck_from_spec(
         spec_path=str(spec_path),
         pptx_path=str(source_pptx),
@@ -199,7 +200,7 @@ def main():
     print(f"      status -> {refresh_status_path.relative_to(REPO_ROOT)}")
 
     # ── Step 2: Stamp REFRESH_NOTE Connector tags ──
-    print("\n[2/4] stamp_refresh_notes (per-shape Connector tags)...")
+    print("\n[2/5] stamp_refresh_notes (per-shape Connector tags)...")
     stamp_results = stamp_refresh_notes(str(refreshed_pptx), result)
     n_stamped = sum(1 for v in stamp_results.values() if v == "stamped")
     n_skipped = sum(1 for v in stamp_results.values() if v != "stamped")
@@ -207,7 +208,7 @@ def main():
 
     # ── Step 3: Headlines ──
     if os.getenv("LLM_API_KEY"):
-        print("\n[3/4] refresh_headlines (LLM rewrite)...")
+        print("\n[3/5] refresh_headlines (LLM rewrite)...")
         from slidegen.headline_refresh import refresh_headlines
         try:
             with_headlines_pptx = work_dir / f"{base}_step3_headlines.pptx"
@@ -240,11 +241,29 @@ def main():
             print(f"      [warn] headline rewrite failed: {exc}")
             after_headlines = refreshed_pptx
     else:
-        print("\n[3/4] skipped (LLM_API_KEY not set)")
+        print("\n[3/5] skipped (LLM_API_KEY not set)")
         after_headlines = refreshed_pptx
 
-    # ── Step 4: Annotate badges ──
-    print("\n[4/4] slide-level annotation badges...")
+    # ── Step 4: Sync period labels in adjacent text frames ──
+    print("\n[4/5] sync_period_labels (text frames adjacent to charts)...")
+    from slidegen.label_sync import sync_period_labels
+    after_label_sync = work_dir / f"{base}_step4_label_sync.pptx"
+    label_sync_diag = sync_period_labels(
+        source_pptx=str(source_pptx),
+        refreshed_pptx=str(after_headlines),
+        out_pptx=str(after_label_sync),
+        sidecar_path=str(label_sync_status_path),
+    )
+    n_shifted = label_sync_diag["totals"]["slides_with_shift"]
+    n_edits = label_sync_diag["totals"]["edits"]
+    n_conflicts = label_sync_diag["totals"]["conflicts"]
+    print(f"      {n_shifted} slides shifted, {n_edits} run-level edits, "
+          f"{n_conflicts} conflicts")
+    print(f"      status -> {label_sync_status_path.relative_to(REPO_ROOT)}")
+    after_headlines = after_label_sync  # feeds the badge step below
+
+    # ── Step 5: Annotate badges ──
+    print("\n[5/5] slide-level annotation badges...")
     from pptx import Presentation
     from pptx.util import Inches, Pt
     from pptx.dml.color import RGBColor
