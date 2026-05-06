@@ -2478,14 +2478,25 @@ def refresh_deck_from_spec(
                 slide_results["tables"].append({"name": name, "status": "static_skipped"})
                 continue
 
-            # ── Static-pinned → skip refresh ──
-            # When the user pinned specific waves (static_time_period_ids set),
-            # the chart is "frozen": no refresh, no drift, no annotation noise.
-            # Per user contract: static = static, no exceptions, regardless of
-            # include_live_wave. force_refresh=True is the only override (used
-            # by historical wave-shift evals; live-API evals don't need it).
+            # ── Truly-static → skip refresh ──
+            # A component is "frozen" only when it pins specific waves AND
+            # has no live-wave intent. If `include_live_wave=True` or
+            # `dynamic_latest_n>0` are set on the lineage, the user wants
+            # the chart refreshed — the static IDs there mean "ALSO keep
+            # these specific historical waves visible," not "skip refresh."
+            # Repatha ATU slide 11/12 surfaced this: every component there
+            # has static_ids=[Wave 7] AND dynamic_latest_n=1 AND
+            # include_live_wave=True, meaning "show pinned Wave 7 plus
+            # the latest live wave." Pre-fix: skipped as static. Post-fix:
+            # refreshed as mixed.
             ds_force_refresh = bool(_cl.get("force_refresh", False))
-            if lin_raw_static_ids and not ds_force_refresh:
+            _has_live_intent = (
+                bool(_cl.get("include_live_wave"))
+                or (_cl.get("dynamic_latest_n") or 0) > 0
+            )
+            if (lin_raw_static_ids
+                    and not ds_force_refresh
+                    and not _has_live_intent):
                 bucket = "charts" if ctype == "chart" else "tables"
                 slide_results[bucket].append({
                     "name": name, "status": "static_pinned_skipped",
