@@ -64,6 +64,7 @@ if _SHARED_SYNAPSE_ENV.exists():
 from slidegen.intelligent_refresh import (  # noqa: E402
     refresh_deck_from_spec,
     stamp_refresh_notes,
+    walk_shapes_recursive,
 )
 from slidegen.label_sync import sync_period_labels  # noqa: E402
 
@@ -118,8 +119,12 @@ def _regen_spec(source_pptx: Path, out_spec: Path) -> None:
         slide_entry = build_connected_slide(spec, ds_key)
         if si < len(prs.slides):
             pptx_slide = prs.slides[si]
-            chart_shapes = [s for s in pptx_slide.shapes if s.has_chart]
-            table_shapes = [s for s in pptx_slide.shapes if s.has_table]
+            # walk_shapes_recursive descends into Group shapes so a chart
+            # or table nested in a Group still has its connector tag
+            # routed to the right physical shape.
+            all_leaf = list(walk_shapes_recursive(pptx_slide.shapes))
+            chart_shapes = [s for s in all_leaf if s.has_chart]
+            table_shapes = [s for s in all_leaf if s.has_table]
             # Match by CLOSEST position (not first-within-tolerance) so dense
             # slides like Repatha ATU 11/12 — where n-size tables sit 0.13in
             # below value tables — don't pick the wrong shape. Also record

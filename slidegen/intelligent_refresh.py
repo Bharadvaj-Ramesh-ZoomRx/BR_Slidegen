@@ -41,8 +41,24 @@ from dotenv import load_dotenv
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def walk_shapes_recursive(shapes):
+    """Yield every leaf shape on a slide, recursing into groups.
+
+    `slide.shapes` only iterates top-level shapes — nested charts/tables
+    inside a Group placeholder get skipped. The connected-refresh hot
+    paths use this helper so a Connector tag attached to a grouped chart
+    or table is found and refreshed like any top-level shape.
+    """
+    for s in shapes:
+        if s.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from walk_shapes_recursive(s.shapes)
+        else:
+            yield s
 load_dotenv(REPO_ROOT / ".env", override=True)
 
 # Namespace for our Custom XML Part (distinguishes from Connector's parts)
@@ -2376,13 +2392,17 @@ def refresh_deck_from_spec(
             except Exception:
                 return None
 
+        # Walk groups so charts/tables nested in a Group get included in
+        # the shape pool. Without this, a tagged chart inside a group is
+        # never found by _claim_shape -> chart never refreshes.
+        all_leaf_shapes = list(walk_shapes_recursive(slide.shapes))
         chart_shape_pool: list[dict] = [
             {"name": s.name,
              "shape_id": _safe_shape_id(s),
              "left_in": (s.left or 0) / 914400,
              "top_in": (s.top or 0) / 914400,
              "shape": s, "used": False}
-            for s in slide.shapes if s.has_chart
+            for s in all_leaf_shapes if s.has_chart
         ]
         table_shape_pool: list[dict] = [
             {"name": s.name,
@@ -2390,7 +2410,7 @@ def refresh_deck_from_spec(
              "left_in": (s.left or 0) / 914400,
              "top_in": (s.top or 0) / 914400,
              "shape": s, "used": False}
-            for s in slide.shapes if s.has_table
+            for s in all_leaf_shapes if s.has_table
         ]
 
         def _claim_shape(pool: list[dict], name: str,
@@ -2443,8 +2463,8 @@ def refresh_deck_from_spec(
         # been converted yet (table refresh + dual-mode tables). Reads from
         # these still work for non-collision slides; collision-prone code
         # uses _claim_shape().
-        chart_shapes = {s.name: s for s in slide.shapes if s.has_chart}
-        table_shapes = {s.name: s for s in slide.shapes if s.has_table}
+        chart_shapes = {s.name: s for s in all_leaf_shapes if s.has_chart}
+        table_shapes = {s.name: s for s in all_leaf_shapes if s.has_table}
         src_chart_series = src_series_by_slide.get(si, {})
 
         slide_results = {"slide_index": si, "charts": [], "tables": []}
