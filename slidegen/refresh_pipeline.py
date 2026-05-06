@@ -118,25 +118,38 @@ def _regen_spec(source_pptx: Path, out_spec: Path) -> None:
         slide_entry = build_connected_slide(spec, ds_key)
         if si < len(prs.slides):
             pptx_slide = prs.slides[si]
-            chart_shapes = sorted(
-                [s for s in pptx_slide.shapes if s.has_chart],
-                key=lambda x: (x.left or 0, x.top or 0),
-            )
-            table_shapes = sorted(
-                [s for s in pptx_slide.shapes if s.has_table],
-                key=lambda x: (x.left or 0, x.top or 0),
-            )
+            chart_shapes = [s for s in pptx_slide.shapes if s.has_chart]
+            table_shapes = [s for s in pptx_slide.shapes if s.has_table]
+            # Match by CLOSEST position (not first-within-tolerance) so dense
+            # slides like Repatha ATU 11/12 — where n-size tables sit 0.13in
+            # below value tables — don't pick the wrong shape. Also record
+            # the shape's intrinsic XML id so the refresher can look up
+            # exactly the right shape regardless of name collisions.
             for comp in slide_entry["components"]:
                 pos = comp.get("position", {})
-                cl = pos.get("left", 0)
-                ct = pos.get("top", 0)
+                cl = float(pos.get("left", 0) or 0)
+                ct = float(pos.get("top", 0) or 0)
                 cands = chart_shapes if comp["type"] == "chart" else table_shapes
+                if not cands:
+                    continue
+                best_shape = None
+                best_dist = float("inf")
                 for shape in cands:
-                    sl_pos = round(shape.left / 914400, 2) if shape.left else 0
-                    st_pos = round(shape.top / 914400, 2) if shape.top else 0
-                    if abs(sl_pos - cl) < 0.3 and abs(st_pos - ct) < 0.3:
-                        comp["name"] = shape.name
-                        break
+                    sl = (shape.left or 0) / 914400
+                    st = (shape.top or 0) / 914400
+                    d = abs(sl - cl) + abs(st - ct)
+                    if d < best_dist:
+                        best_dist = d
+                        best_shape = shape
+                # Accept if the closest shape is within 0.5in (loose enough
+                # for minor xfrm drift, tight enough that we never grab a
+                # genuinely different shape elsewhere on the slide).
+                if best_shape is not None and best_dist < 0.5:
+                    comp["name"] = best_shape.name
+                    try:
+                        comp["shape_id"] = int(best_shape.shape_id)
+                    except Exception:
+                        pass
         slide_entries.append(slide_entry)
 
     full_spec = {

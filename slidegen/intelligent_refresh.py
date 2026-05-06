@@ -2370,8 +2370,15 @@ def refresh_deck_from_spec(
         # times, leaving the other 14 with stale source data. Match by name AND
         # position (per-component spec carries left/top in inches), and mark a
         # shape as "used" once it's been claimed by a component.
+        def _safe_shape_id(s):
+            try:
+                return int(s.shape_id)
+            except Exception:
+                return None
+
         chart_shape_pool: list[dict] = [
             {"name": s.name,
+             "shape_id": _safe_shape_id(s),
              "left_in": (s.left or 0) / 914400,
              "top_in": (s.top or 0) / 914400,
              "shape": s, "used": False}
@@ -2379,6 +2386,7 @@ def refresh_deck_from_spec(
         ]
         table_shape_pool: list[dict] = [
             {"name": s.name,
+             "shape_id": _safe_shape_id(s),
              "left_in": (s.left or 0) / 914400,
              "top_in": (s.top or 0) / 914400,
              "shape": s, "used": False}
@@ -2386,15 +2394,37 @@ def refresh_deck_from_spec(
         ]
 
         def _claim_shape(pool: list[dict], name: str,
-                         pos: dict | None = None) -> object | None:
-            """Find an unused shape by name; if multiple match, pick the one
-            whose position best matches the spec component's position. Mark
-            the chosen shape as used so subsequent components in the same
-            slide don't re-claim it."""
+                         pos: dict | None = None,
+                         shape_id: int | None = None) -> object | None:
+            """Find an unused shape, preferring intrinsic XML id over
+            name+position. Marks the chosen shape used so later components
+            on the same slide don't re-claim it.
+
+            Resolution order (each tier only fires when the previous found
+            no candidates):
+              1. shape_id exact match — unambiguous; safe even when shape
+                 names collide on the same slide (Repatha ATU 11/12).
+              2. name match + closest-position pick — legacy path for
+                 specs that don't carry shape_id.
+              3. fallback: any matching name (re-use), preserves prior
+                 behavior on split-viz slides where the pool is exhausted.
+            """
+            # Tier 1: shape_id exact match (most specs from refresh_pipeline)
+            if shape_id is not None:
+                for e in pool:
+                    if e["shape_id"] == shape_id and not e["used"]:
+                        e["used"] = True
+                        return e["shape"]
+                # Allow re-use when already claimed (split-viz components
+                # on same shape — rare but supported).
+                for e in pool:
+                    if e["shape_id"] == shape_id:
+                        return e["shape"]
+
+            # Tier 2: name match, position-tiebreak
             candidates = [e for e in pool if e["name"] == name and not e["used"]]
             if not candidates:
-                # Fallback: any matching name (re-use), preserves prior behavior
-                # for non-split slides where pool runs out before components do.
+                # Tier 3: name match (allow re-use)
                 fallback = next((e for e in pool if e["name"] == name), None)
                 return fallback["shape"] if fallback else None
             if len(candidates) == 1 or pos is None:
@@ -2535,7 +2565,11 @@ def refresh_deck_from_spec(
                     # Position-aware: claim the specific Connector-split shape
                     # this spec component refers to (multiple shapes on one
                     # slide can share a name).
-                    shape = _claim_shape(chart_shape_pool, name, comp.get("position"))
+                    shape = _claim_shape(
+                        chart_shape_pool, name,
+                        pos=comp.get("position"),
+                        shape_id=comp.get("shape_id"),
+                    )
                     if not shape:
                         slide_results["charts"].append({"name": name, "status": "not_found"})
                         continue
@@ -2758,7 +2792,14 @@ def refresh_deck_from_spec(
                         })
 
                 elif ctype in ("value_table", "label_table", "table"):
-                    shape = table_shapes.get(name)
+                    # Prefer shape_id-based lookup; fall back to name+pos.
+                    # Without this, dense table layouts (Repatha ATU 11/12)
+                    # can map a tag to the wrong physical table.
+                    shape = _claim_shape(
+                        table_shape_pool, name,
+                        pos=comp.get("position"),
+                        shape_id=comp.get("shape_id"),
+                    )
                     if not shape:
                         slide_results["tables"].append({"name": name, "status": "not_found"})
                         continue

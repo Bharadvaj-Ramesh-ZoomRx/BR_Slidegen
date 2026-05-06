@@ -282,6 +282,217 @@ def _extract_wave_token(label: str) -> str | None:
     return m.group(1) if m else None
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Formula columns (Connector: derived columns from columnDefinitions)
+# ─────────────────────────────────────────────────────────────────────
+# columnDefinitions can carry a Formula like "=B2/100" that derives a
+# new column from existing pivot columns. Excel column letters map to
+# columnDefinitions positions (the connector treats the row label as
+# column A; the first value column is B, etc.). The row number portion
+# changes per row — same operation applied to every row's value.
+#
+# Supported expression grammar (right-hand side of "="):
+#     atom    := COL_REF | NUMBER
+#     term    := atom ('*' atom | '/' atom)*
+#     expr    := term ('+' term | '-' term)*
+# COL_REF is one or more uppercase letters followed by digits.
+# This covers >95% of real connector formulas (=B2, =B2/100, =B2*100,
+# =B2+C2, =B2-C2, etc.). More exotic formulas (IF, ROUND, abs()) fall
+# through to None and the column is dropped with a warning.
+import re as _re_formula
+
+_FORMULA_TOKEN_RE = _re_formula.compile(
+    r"\s*(?:(?P<colref>[A-Z]+)(?P<row>\d+)|(?P<num>-?\d+(?:\.\d+)?)|(?P<op>[+\-*/]))"
+)
+
+
+def _col_letter_to_index(letters: str) -> int:
+    """A->0, B->1, ..., Z->25, AA->26, AB->27, ..."""
+    n = 0
+    for c in letters:
+        n = n * 26 + (ord(c) - ord("A") + 1)
+    return n - 1
+
+
+def _tokenize_formula(expr: str) -> list[tuple[str, object]] | None:
+    """Tokenize the right-hand side of a formula. Returns list of
+    (kind, value) pairs or None on parse error."""
+    tokens: list[tuple[str, object]] = []
+    pos = 0
+    while pos < len(expr):
+        m = _FORMULA_TOKEN_RE.match(expr, pos)
+        if m is None or m.end() == pos:
+            return None
+        if m.group("colref"):
+            tokens.append(("col", _col_letter_to_index(m.group("colref"))))
+        elif m.group("num") is not None:
+            tokens.append(("num", float(m.group("num"))))
+        elif m.group("op"):
+            tokens.append(("op", m.group("op")))
+        pos = m.end()
+    return tokens
+
+
+def _eval_formula_for_row(tokens: list[tuple[str, object]],
+                          row_values: list[float | None]) -> float | None:
+    """Evaluate tokens for one row. Column refs resolve via row_values
+    (indexed by Excel column letter, 0-based). Returns None on missing
+    operand or division by zero."""
+    # Two-pass shunting-yard simplified to */ first, then +-.
+    # Step 1: resolve atoms to numeric values (or None).
+    nums: list[float | None] = []
+    ops: list[str] = []
+    for kind, val in tokens:
+        if kind == "col":
+            if val < 0 or val >= len(row_values):
+                return None
+            nums.append(row_values[val])
+        elif kind == "num":
+            nums.append(float(val))
+        elif kind == "op":
+            ops.append(str(val))
+    if not nums or len(ops) != len(nums) - 1:
+        return None
+    if any(n is None for n in nums):
+        return None
+
+    # Step 2: */ pass
+    i = 0
+    while i < len(ops):
+        if ops[i] in ("*", "/"):
+            a, b = nums[i], nums[i + 1]
+            if ops[i] == "*":
+                r = a * b
+            else:
+                if b == 0:
+                    return None
+                r = a / b
+            nums[i] = r
+            del nums[i + 1]
+            del ops[i]
+        else:
+            i += 1
+    # Step 3: +- pass
+    result = nums[0]
+    for i, op in enumerate(ops):
+        b = nums[i + 1]
+        result = result + b if op == "+" else result - b
+    return result
+
+
+def _build_formula_columns(
+    col_defs: list[dict],
+    series: list[tuple[str, list[float]]],
+    categories: list[str],
+) -> list[tuple[str, list[float]]]:
+    """Return derived series for every columnDefinition that carries a
+    Formula. Excel column letters map to columnDefinitions positions:
+    columnDefinitions[0] is column A, [1] is column B, etc. The pivot's
+    `series` provides values for the data columns (excluding the row
+    label which Excel treats as column A).
+
+    For each row, builds row_values[] indexed by Excel column letter:
+      - row_values[col_letter_idx] = pivot value at that letter
+    Then evaluates the formula tokens against row_values.
+    """
+    if not col_defs or not series:
+        return []
+    n_rows = len(categories)
+    if n_rows == 0:
+        return []
+
+    # Map columnDefinitions position -> series index (or None if it's a
+    # row-label column not present in `series`).
+    # Series display names from the pivot look like "Project Wave 7 - mean"
+    # or "Project Wave 7 @:@ Average of mean", while columnDefinitions[].Name
+    # is the bare wave label "Project Wave 7". So we accept exact match,
+    # alias match, OR a startswith-match where the cd Name appears as the
+    # leading compound segment of the series name.
+    def _norm_compound(s: str) -> str:
+        return s.replace(" @:@ ", " - ")
+
+    series_by_exact: dict[str, int] = {}
+    series_by_prefix: dict[str, int] = {}
+    for i, (sname, _) in enumerate(series):
+        ns = _norm_compound(sname)
+        series_by_exact[sname] = i
+        series_by_exact[ns] = i
+        # Leading compound segment, e.g. "Project Wave 7" from
+        # "Project Wave 7 - mean". First occurrence wins (rare collisions).
+        head = ns.split(" - ", 1)[0]
+        series_by_prefix.setdefault(head, i)
+
+    cd_to_series_idx: list[int | None] = []
+    for cd in col_defs:
+        name = cd.get("Name") or ""
+        if name.startswith("<blank:"):
+            cd_to_series_idx.append(None)  # placeholder for derived col
+            continue
+        norm_name = _norm_compound(name)
+        if name in series_by_exact:
+            cd_to_series_idx.append(series_by_exact[name])
+            continue
+        if norm_name in series_by_exact:
+            cd_to_series_idx.append(series_by_exact[norm_name])
+            continue
+        if name in series_by_prefix:
+            cd_to_series_idx.append(series_by_prefix[name])
+            continue
+        if norm_name in series_by_prefix:
+            cd_to_series_idx.append(series_by_prefix[norm_name])
+            continue
+        # Last-resort substring match: connector default-alias rules can
+        # rename "Project Wave 7" to "Wave 7" at display time. Check every
+        # series name to see if it (or its prefix) contains the cd name's
+        # significant tail — handles those rename rules without needing
+        # to enumerate them.
+        sub_match = None
+        cd_tail = norm_name.split()[-2:]  # last 1-2 tokens, e.g. ["Wave", "7"]
+        cd_tail_str = " ".join(cd_tail) if cd_tail else norm_name
+        for i, (sname, _) in enumerate(series):
+            ns = _norm_compound(sname)
+            head = ns.split(" - ", 1)[0]
+            if cd_tail_str and cd_tail_str in head:
+                sub_match = i
+                break
+        if sub_match is not None:
+            cd_to_series_idx.append(sub_match)
+            continue
+        # Try alias match
+        alias = cd.get("Alias")
+        if alias and alias in series_by_exact:
+            cd_to_series_idx.append(series_by_exact[alias])
+            continue
+        cd_to_series_idx.append(None)  # row-label or unmatched
+
+    out: list[tuple[str, list[float]]] = []
+    for cd_idx, cd in enumerate(col_defs):
+        formula = (cd.get("Formula") or "").strip()
+        if not formula or not formula.startswith("="):
+            continue
+        tokens = _tokenize_formula(formula[1:])
+        if tokens is None:
+            continue
+        # Build per-row values indexed by Excel column letter (0-based)
+        row_results: list[float] = []
+        for r in range(n_rows):
+            row_values: list[float | None] = []
+            for s_idx in cd_to_series_idx:
+                if s_idx is None:
+                    row_values.append(None)
+                else:
+                    vals = series[s_idx][1]
+                    row_values.append(vals[r] if r < len(vals) else None)
+            v = _eval_formula_for_row(tokens, row_values)
+            row_results.append(0.0 if v is None else v)
+        # Display name: prefer Alias, else strip "<blank:" wrapper
+        display = cd.get("Alias") or cd.get("Name", "")
+        if display.startswith("<blank:") and display.endswith(">"):
+            display = display[len("<blank:"):-1]
+        out.append((display, row_results))
+    return out
+
+
 def _wave_chrono_key(label: str) -> tuple:
     """Sortable key for a wave label so chronologically-later waves sort later.
 
@@ -576,6 +787,24 @@ def pivot_records_to_chart_data(
         if resolved:
             primary_val = resolved
             break
+
+    # Survey-style data: ValueFields can name a measure-type label (e.g.
+    # "mean") that isn't a column but appears in the `measure` column with
+    # the actual numeric in `value`. Filter df to rows whose measure
+    # matches val_field, then aggregate `value`. Without this filter the
+    # pivot averages across Mean+Sum+Count+% rows together — produces
+    # nonsense values (Repatha ATU slide 11 saw 2313 instead of 73 for
+    # a Mean-typed chart).
+    if (not primary_val
+            and "measure" in df.columns
+            and "value" in df.columns):
+        for vf in val_fields:
+            measure_mask = df["measure"].astype(str).str.lower() == vf.lower()
+            if measure_mask.any():
+                df = df[measure_mask].copy()
+                primary_val = "value"
+                break
+
     if not primary_val:
         for fallback in ["percentage", "decimal", "value"]:
             if fallback in df.columns:
@@ -994,6 +1223,25 @@ def pivot_records_to_chart_data(
         vals = [0.0 if pd.isna(v) else float(v) for v in col_data]
         display_name = col_name.replace(" @:@ ", " - ").replace("@:@", " - ")
         series.append((display_name, vals))
+
+    # ── Step 3b: Apply formula columns (Connector: derived columns) ──
+    # columnDefinitions can declare a derived column with an Excel-style
+    # Formula. Example from Repatha ATU slide 11:
+    #     {"Name": "<blank:AvgPercent>", "Formula": "=B2/100", "Format": "0%"}
+    # The chart's selectedColumns references "<blank:AvgPercent>" but the
+    # value in each row is computed via the formula on adjacent columns
+    # (column letters map to columnDefinitions positions; row number is
+    # the per-row substitution). Without applying the formula, the API's
+    # raw "mean" (e.g. 73) leaks into the chart, then the chart's "0%"
+    # formatCode displays it as "7300%".
+    #
+    # Supported patterns: =BN, =BN/X, =BN*X, =BN+CN, =BN-CN, =BN+X, =BN-X
+    # where B,C are column letters (single-letter only) and X is numeric.
+    col_defs = pivot_config.get("columnDefinitions", []) or []
+    if col_defs:
+        formula_cols = _build_formula_columns(col_defs, series, categories)
+        if formula_cols:
+            series.extend(formula_cols)
 
     # ── Apply selectedRows (filter + explicit order) ──
     select_all = mapping_config.get("selectAllRows", True)
