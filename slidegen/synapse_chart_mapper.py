@@ -441,18 +441,33 @@ def _build_formula_columns(
         if norm_name in series_by_prefix:
             cd_to_series_idx.append(series_by_prefix[norm_name])
             continue
-        # Last-resort substring match: connector default-alias rules can
-        # rename "Project Wave 7" to "Wave 7" at display time. Check every
-        # series name to see if it (or its prefix) contains the cd name's
-        # significant tail — handles those rename rules without needing
-        # to enumerate them.
+        # Last-resort suffix match: Connector default-alias rules drop
+        # leading classifier parts of the column name. Examples:
+        #   "Project Wave 7" -> "Wave 7"
+        #   "Specialty (C/PCP Segments) + Tier Detailed - CARD - L"
+        #   -> "CARD - L"
+        # Match by progressively shorter trailing suffixes — split cd by
+        # " - " and check if any series name (or its head) equals the
+        # last-K parts joined back. Falls back to checking if the series
+        # name appears as a tail substring of the cd name.
         sub_match = None
-        cd_tail = norm_name.split()[-2:]  # last 1-2 tokens, e.g. ["Wave", "7"]
-        cd_tail_str = " ".join(cd_tail) if cd_tail else norm_name
+        cd_parts = [p.strip() for p in norm_name.split(" - ") if p.strip()]
         for i, (sname, _) in enumerate(series):
             ns = _norm_compound(sname)
             head = ns.split(" - ", 1)[0]
-            if cd_tail_str and cd_tail_str in head:
+            # Try progressive suffixes of cd_parts (longest first)
+            for k in range(len(cd_parts), 0, -1):
+                suffix = " - ".join(cd_parts[-k:])
+                if suffix == ns or suffix == head:
+                    sub_match = i
+                    break
+            if sub_match is not None:
+                break
+            # Or: series name is a literal tail of the cd name
+            if ns and norm_name.endswith(ns):
+                sub_match = i
+                break
+            if head and norm_name.endswith(head):
                 sub_match = i
                 break
         if sub_match is not None:
@@ -824,15 +839,61 @@ def pivot_records_to_chart_data(
     # ── Apply PivotConfig.Filters ──
     # Connector encodes multi-value IN filters by joining values with ";".
     # When a semicolon is present we split and use isin() for inclusion
-    # (or ~isin() for exclusion). Falls back to the original single-value
-    # / first-word-contains behavior for atomic values.
+    # (or ~isin() for exclusion). For each split value we also try
+    # compound-suffix matching ("Specialty - CARD - L" -> "CARD - L")
+    # because source decks store the long form but the API often
+    # returns just the short suffix.
+    def _resolve_filter_values(values: list[str], col_series) -> list[str]:
+        actual_values = set(col_series.astype(str).values)
+        resolved: list[str] = []
+        for v in values:
+            v = v.strip()
+            if not v:
+                continue
+            if v in actual_values:
+                resolved.append(v)
+                continue
+            # Try compound-part suffix: walk from longest suffix down,
+            # split on " - " or " @:@ ". First match wins.
+            parts = []
+            for sep in (" - ", " @:@ "):
+                if sep in v:
+                    parts = [p.strip() for p in v.split(sep) if p.strip()]
+                    break
+            if parts:
+                # Try progressively shorter suffixes joined by " - ".
+                matched = False
+                for k in range(len(parts), 0, -1):
+                    candidate = " - ".join(parts[-k:])
+                    if candidate in actual_values:
+                        resolved.append(candidate)
+                        matched = True
+                        break
+                    # Case-insensitive check
+                    lc = candidate.lower()
+                    for av in actual_values:
+                        if av.lower() == lc:
+                            resolved.append(av)
+                            matched = True
+                            break
+                    if matched:
+                        break
+                if matched:
+                    continue
+        return resolved
+
     for filt in pivot_config.get("Filters", []):
         col_key = _remap_field(filt.get("ColumnKey", ""))
         fval = filt.get("Value", "")
         criteria = filt.get("filterCriteria", 1)
         if col_key and fval and col_key in df.columns:
             if ";" in fval:
-                values = [v.strip() for v in fval.split(";") if v.strip()]
+                raw_values = [v.strip() for v in fval.split(";") if v.strip()]
+                values = _resolve_filter_values(raw_values, df[col_key])
+                if not values:
+                    # Resolution failed — leave df untouched rather than
+                    # wiping it. Empty filter = all rows pass.
+                    continue
                 if criteria == 2:
                     df = df[~df[col_key].isin(values)]
                 else:
@@ -880,6 +941,27 @@ def pivot_records_to_chart_data(
         filtered = df[df["time_period_name"].isin(static_time_period_names)]
         if not filtered.empty:
             df = filtered
+
+    # ── Latest-wave-only filter ──
+    # When `time_period_name` is in the data but NOT in ColumnFields (i.e.
+    # waves aren't a chart axis) AND multiple waves are present, the user
+    # intent is "show the latest snapshot," not "sum/mean across waves."
+    # Without this filter, an L-style label_table with dynamic_latest_n=2
+    # gets two waves' Mean values summed (148% instead of 74%).
+    # Sort by chronological wave key (NOT time_period_id — that gotcha).
+    if (
+        "time_period_name" in df.columns
+        and "time_period_name" not in (col_fields or [])
+        and df["time_period_name"].nunique() > 1
+    ):
+        unique_waves = list(df["time_period_name"].astype(str).unique())
+        # Use the existing chronology key. Pick the wave with the
+        # highest key, falling back to lexicographic if all keys are
+        # the unknown sentinel.
+        scored = [(w, _wave_chrono_key(w)) for w in unique_waves]
+        scored.sort(key=lambda kv: kv[1])
+        latest_wave = scored[-1][0]
+        df = df[df["time_period_name"].astype(str) == latest_wave]
 
     # ── Build compound column key from ColumnFields ──
     # Connector format: "{col_field_values joined by ' @:@ '}"

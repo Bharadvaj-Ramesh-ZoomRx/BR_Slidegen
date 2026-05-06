@@ -98,23 +98,38 @@ def _looks_like_data_narrative(text: str) -> bool:
 
 
 def _find_headline_shape(slide):
-    """Pick the slide's data-narrative headline.
+    """Pick the slide's headline text frame — topmost wide title shape.
+
+    Updated heuristic (slide 73 fix on Repatha ATU): the previous logic
+    required a narrative-verb match (rose / declined / trended / ...),
+    which on multi-Title slides skipped the real headline at the top
+    when its wording happened to lack those verbs (e.g. "Overall, HCPs
+    exhibit a growing trend in their intent..."). It then fell to the
+    next Title shape — a section header below ("Expected Increase in
+    Prescription – Primary Prevention - Trended") — which IS lower on
+    the slide but happens to contain a verb.
+
+    The user's contract for "headliner": top-most wide text frame with
+    a 1-3 line sentence, NOT a roadmap or section-header strip. Reading
+    "narrative-shaped" gates BUILDING a fresh narrative (caller's job),
+    not which shape is the headline.
 
     Heuristic order:
-      1. Shape named 'Title*' or 'Headline*' — among these, prefer the
-         topmost one whose text reads like a data narrative. (Some Google
-         Slides decks have multiple Title shapes; the methodology footnote
-         is also styled as Title.)
-      2. zrx_<slide:03d>_001 (SlideGen pipeline's first-shape convention).
-      3. Top-most text frame in the upper portion of the slide whose
-         content looks like a data narrative.
+      1. zrx_<slide:03d>_001 — SlideGen pipeline's first-shape convention.
+      2. Title*/Headline*-named shapes that are reasonably wide (>= 40%
+         of slide width) and have substantive text — pick the topmost.
+      3. Any wide text frame in the upper portion of the slide with
+         substantive text (10+ chars) — pick the topmost.
 
-    Returns None if no candidate qualifies — caller marks the slide
-    'no_headline' and skips. By design, slides that never had a narrative
-    headline stay untouched after refresh.
+    Returns None only when no title-like shape exists at all.
     """
+    slide_w_emu = (slide.part.package.presentation_part.presentation
+                   .slide_width if hasattr(slide.part.package, "presentation_part")
+                   else 9144000)  # fallback ~10in
+    min_width_emu = int(slide_w_emu * 0.4)
+
     title_candidates = []
-    candidates = []
+    other_candidates = []
     for shape in slide.shapes:
         if not shape.has_text_frame:
             continue
@@ -122,26 +137,25 @@ def _find_headline_shape(slide):
         text = (shape.text_frame.text or "").strip()
         if not text:
             continue
-        top = shape.top or 0
-        if name.startswith("title") or name.startswith("headline"):
-            title_candidates.append((top, shape, text))
-            continue
         if name.startswith("zrx_") and name.endswith("_001"):
             return shape
-        if len(text) > 10 and top < _HEADLINE_TOP_LIMIT_EMU:
-            candidates.append((top, shape, text))
+        top = shape.top or 0
+        width = shape.width or 0
+        if name.startswith("title") or name.startswith("headline"):
+            if width >= min_width_emu and len(text) >= 10:
+                title_candidates.append((top, shape, text))
+            continue
+        if (len(text) > 10
+                and top < _HEADLINE_TOP_LIMIT_EMU
+                and width >= min_width_emu):
+            other_candidates.append((top, shape, text))
 
     if title_candidates:
         title_candidates.sort(key=lambda t: t[0])
-        for _top, shape, text in title_candidates:
-            if _looks_like_data_narrative(text):
-                return shape
-        return None  # Title* shapes exist but none are narrative — slide has no headline
-
-    candidates.sort(key=lambda t: t[0])
-    for _top, shape, text in candidates:
-        if _looks_like_data_narrative(text):
-            return shape
+        return title_candidates[0][1]
+    if other_candidates:
+        other_candidates.sort(key=lambda t: t[0])
+        return other_candidates[0][1]
     return None
 
 
@@ -173,9 +187,18 @@ def _summarize_chart(shape) -> str:
 
 def _build_prompt(old_headline: str, src_chart_summary: str,
                   ref_chart_summary: str, slide_context: str = "") -> str:
+    is_narrative = _looks_like_data_narrative(old_headline)
+    voice_instruction = (
+        "Rewrite the headline to reflect the new values, preserving the "
+        "original's voice, structure, and tone."
+        if is_narrative
+        else "The original is a category/section label — replace it with a "
+             "narrative-style verdict that reflects the new data. Use a "
+             "natural-sounding 2-3 line claim, not a label."
+    )
     return f"""You are updating a PowerPoint slide headline after a data refresh. The output you produce will be written verbatim into the slide's title shape — there is no editor in between.
 
-Rewrite the headline to reflect the new values, preserving the original's voice, structure, and tone. The headline is a VERDICT — a 2-3 line claim about what mattered — not a data summary or analysis.
+{voice_instruction} The headline is a VERDICT — a 2-3 line claim about what mattered — not a data summary or analysis.
 
 ORIGINAL HEADLINE
 {old_headline}
@@ -191,7 +214,7 @@ CONTEXT
 
 INSTRUCTIONS — STRICT
 - Output ONLY the headline text. It will be written verbatim into the title shape.
-- LENGTH: 2-3 lines maximum. Match the original's word count within ~20%.
+- LENGTH: 2-3 lines maximum. Aim for 80-160 characters total.
 - A headline is a VERDICT — what mattered, expressed as a claim. Not a data inventory.
 - Reflect actual values from the NEW data with concrete movement words ("rose 6 points", "dropped 4 points", "held steady"). Treat moves under 1 point as flat.
 - If the new data is empty / all-None / clearly corrupted, output the ORIGINAL headline unchanged.

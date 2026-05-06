@@ -59,6 +59,195 @@ def walk_shapes_recursive(shapes):
             yield from walk_shapes_recursive(s.shapes)
         else:
             yield s
+
+
+def _format_cell_value(v, fmt: str | None) -> str:
+    """Render a numeric value through a connector Format string.
+    Falls back to plain string for unrecognized formats. Empty/None
+    values render as empty string so the existing source content
+    doesn't get wiped with 'None' or '0'."""
+    if v is None or (isinstance(v, float) and (v != v)):  # NaN check
+        return ""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    fmt = (fmt or "").strip()
+    if fmt in ("0%", "0.0%", "#%"):
+        # Connector decimals: 0.73 -> "73%"; whole-number: 73 -> "73%".
+        # Heuristic: <= 1.0 means decimal-scale (already a fraction).
+        if abs(f) <= 1.0:
+            return f"{f * 100:.0f}%"
+        return f"{f:.0f}%"
+    if fmt.endswith("%"):
+        # e.g. "0.0%" with 1 decimal
+        decimals = max(0, fmt.count(".") and (len(fmt) - fmt.index(".") - 2) or 0)
+        scale = 100 if abs(f) <= 1.0 else 1
+        return f"{f * scale:.{decimals}f}%"
+    if fmt in ("0", "#,##0"):
+        return f"{int(round(f)):,}" if "," in fmt else f"{int(round(f))}"
+    if fmt.startswith("0.") or fmt.startswith("#."):
+        decimals = max(0, len(fmt) - fmt.index(".") - 1)
+        return f"{f:.{decimals}f}"
+    # No recognized format: integer if integral, else 1-decimal float
+    return f"{int(round(f))}" if abs(f - round(f)) < 1e-9 else f"{f:.1f}"
+
+
+def _format_for_column(col_def: dict | None, val) -> str:
+    """Format a value using a columnDefinition's Format field. Falls back
+    to a sensible default. Connector format codes accepted: 0%, 0.0%,
+    0, #,##0, 0.0, etc."""
+    fmt = (col_def or {}).get("Format")
+    return _format_cell_value(val, fmt)
+
+
+def _auto_compute_cell_values(
+    table_shape, categories, series, raw_pivot_config: dict | None,
+    raw_mapping_config: dict | None,
+):
+    """Build a 2D cell_values grid from a connected refresh's pivot output,
+    matching the existing table's row/col layout. Returns None if the
+    layout doesn't fit a supported pattern (caller leaves source values
+    intact).
+
+    Layouts handled:
+      - 1 col × N rows (vertical label + values): row 0 stays as the
+        original label; rows 1..N-1 receive series[0] values, formatted
+        per columnDefinitions[].Format if available.
+      - 1 row × N cols (horizontal label + values): col 0 stays; cols
+        1..N-1 receive series[0] values.
+      - N rows × M cols (matrix, M >= 2): col 0 stays as row labels;
+        for each data column j (1..M-1), use series[j-1] aligned by
+        position. Header row (row 0) preserved.
+
+    The connector's templated 1×1 single-cell labels (e.g. "CARDs (n =
+    120)") are deliberately not auto-rewritten — the embedded count
+    requires a template-aware substitution that's a separate fix.
+    """
+    if not series or not categories:
+        return None
+    tbl = table_shape.table
+    n_rows = len(tbl.rows)
+    n_cols = len(tbl.columns)
+    if n_rows == 0 or n_cols == 0:
+        return None
+
+    # Resolve the columnDefinition that drives the format for series[0].
+    # selectedColumns names the visible column; columnDefinitions has the
+    # Format. For tables with a formula column (selectedColumns has only
+    # "<blank:Alias>"), the alias maps to that columnDef.
+    col_defs = (raw_pivot_config or {}).get("columnDefinitions") or []
+    selected = (raw_mapping_config or {}).get("selectedColumns") or []
+    selected_visible = [c for c in selected if not _is_row_field_name(c, raw_pivot_config)]
+
+    def _col_def_for_series_index(s_idx: int) -> dict | None:
+        # Try selectedColumns[s_idx] -> matching columnDefinition by Name/Alias
+        if s_idx < len(selected_visible):
+            sname = selected_visible[s_idx]
+            for cd in col_defs:
+                if cd.get("Name") == sname or cd.get("Alias") == sname:
+                    return cd
+        # Fall back: find any columnDef with a Format (formula columns)
+        for cd in col_defs:
+            if cd.get("Format"):
+                return cd
+        return None
+
+    # Pick the SERIES that match selectedColumns. Without this filter the
+    # auto-write uses series[0] regardless, which on Repatha ATU slide 11
+    # picks the raw "CARD - L" tier (148% sum-of-waves) instead of the
+    # formula-derived "L" column (74%). For each visible selectedColumns
+    # entry, find the series whose display name matches its Alias (or
+    # the Name with @:@->-, etc).
+    def _pick_series_for_selected(sel_name: str):
+        if not sel_name:
+            return None
+        # Resolve <blank:Alias> -> the Alias
+        target_aliases = [sel_name]
+        if sel_name.startswith("<blank:") and sel_name.endswith(">"):
+            target_aliases.append(sel_name[len("<blank:"):-1])
+        # Also resolve via columnDefinitions (Name -> Alias mapping)
+        for cd in col_defs:
+            if cd.get("Name") == sel_name and cd.get("Alias"):
+                target_aliases.append(cd["Alias"])
+        # Find a series whose display name matches any of the targets
+        for i, (sname, vals) in enumerate(series):
+            sn_norm = sname.replace(" @:@ ", " - ")
+            if any(t == sn_norm or t == sname for t in target_aliases):
+                return i
+        return None
+
+    # Build a filtered series list aligned to selected_visible; if nothing
+    # matches (rare, e.g. selectedColumns refers to row fields only), keep
+    # original series order.
+    if selected_visible:
+        picked: list[tuple[str, list[float]]] = []
+        for sel in selected_visible:
+            idx = _pick_series_for_selected(sel)
+            if idx is not None:
+                picked.append(series[idx])
+        if picked:
+            series = picked
+
+    # Read existing cell content so we preserve labels and untouched cells.
+    existing = [
+        [tbl.cell(r, c).text_frame.text for c in range(n_cols)]
+        for r in range(n_rows)
+    ]
+
+    # ── Layout 1: vertical 1-col label table (e.g. slide 11 "L" 5x1) ──
+    if n_cols == 1 and n_rows >= 2:
+        col_def = _col_def_for_series_index(0)
+        first_vals = series[0][1] if series else []
+        out = [[existing[0][0]]]  # preserve top label
+        for i in range(1, n_rows):
+            v = first_vals[i - 1] if (i - 1) < len(first_vals) else None
+            if v is None:
+                out.append([existing[i][0]])  # preserve unmatched
+            else:
+                out.append([_format_for_column(col_def, v)])
+        return out
+
+    # ── Layout 2: horizontal 1-row label table ──
+    if n_rows == 1 and n_cols >= 2:
+        col_def = _col_def_for_series_index(0)
+        first_vals = series[0][1] if series else []
+        row_out = [existing[0][0]]
+        for j in range(1, n_cols):
+            v = first_vals[j - 1] if (j - 1) < len(first_vals) else None
+            if v is None:
+                row_out.append(existing[0][j])
+            else:
+                row_out.append(_format_for_column(col_def, v))
+        return [row_out]
+
+    # ── Layout 3: matrix (categories down rows, series across cols) ──
+    if n_rows >= 2 and n_cols >= 2:
+        out = [list(existing[0])]  # header row preserved
+        for i in range(1, n_rows):
+            row_out = [existing[i][0]]  # row label preserved
+            for j in range(1, n_cols):
+                s_idx = j - 1
+                if s_idx < len(series) and (i - 1) < len(series[s_idx][1]):
+                    v = series[s_idx][1][i - 1]
+                    cd = _col_def_for_series_index(s_idx)
+                    row_out.append(_format_for_column(cd, v))
+                else:
+                    row_out.append(existing[i][j])
+            out.append(row_out)
+        return out
+
+    # 1×1 templated labels — handled separately, return None to skip.
+    return None
+
+
+def _is_row_field_name(s: str, raw_pivot_config: dict | None) -> bool:
+    """True if `s` is a RowField in the pivot config (so it should be
+    skipped when iterating series-bearing selectedColumns)."""
+    if not raw_pivot_config:
+        return False
+    rf = raw_pivot_config.get("RowFields") or []
+    return any(s == r or s.lower() == r.lower() for r in rf)
 load_dotenv(REPO_ROOT / ".env", override=True)
 
 # Namespace for our Custom XML Part (distinguishes from Connector's parts)
@@ -2836,6 +3025,42 @@ def refresh_deck_from_spec(
                     # Headers are controlled by source_snapshot — if the source
                     # had headers, cell_values[0] is treated as a header row.
                     cell_values = comp.get("cell_values")
+
+                    # Auto-compute cell_values from the connector pivot when
+                    # the spec doesn't carry them. Without this fallback,
+                    # connected tables (label_table / value_table with
+                    # raw_pivot_config) get marked "ok" but never actually
+                    # have new data written into the cells — slide 11
+                    # tables on Repatha ATU stayed source-identical despite
+                    # the chart pipeline producing correct refreshed values.
+                    raw_pc_t = comp.get("raw_pivot_config")
+                    raw_mc_t = comp.get("raw_mapping_config")
+                    if not cell_values and raw_pc_t and raw_mc_t:
+                        try:
+                            from slidegen.synapse_chart_mapper import pivot_records_to_chart_data
+                            ds_for_t = comp.get("data_source") or ds_key
+                            df_t = data_cache.get(ds_for_t, pd.DataFrame())
+                            recs_t_list = (
+                                df_t.to_dict("records")
+                                if hasattr(df_t, "to_dict") else list(df_t)
+                            )
+                            chart_data_t = pivot_records_to_chart_data(
+                                recs_t_list, raw_pc_t, raw_mc_t,
+                                static_time_period_ids=lin_raw_static_ids,
+                            )
+                            if chart_data_t.success and chart_data_t.categories:
+                                auto_cv = _auto_compute_cell_values(
+                                    shape,
+                                    chart_data_t.categories,
+                                    chart_data_t.series,
+                                    raw_pc_t,
+                                    raw_mc_t,
+                                )
+                                if auto_cv:
+                                    cell_values = auto_cv
+                        except Exception:
+                            pass
+
                     if cell_values:
                         try:
                             from copy import deepcopy
