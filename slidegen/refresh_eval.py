@@ -55,7 +55,14 @@ from pathlib import Path
 
 
 PASSED = {"ok", "ok_with_dynamic_added", "ok_with_partial"}
-PRESERVED = {"static_pinned_skipped"}
+# `no_data_for_shifted_window` is the connector's correct outcome when the
+# API returns no records in the source's wave window — source preserved,
+# nothing to refresh. Semantically identical to `static_pinned_skipped`
+# (both are "correct by design — leave the chart alone"); counted as
+# PRESERVED so a deck whose window has rolled past available data isn't
+# penalised. Mirrors Connector spec §16: refresh leaves cells untouched
+# when there is no new data to apply.
+PRESERVED = {"static_pinned_skipped", "no_data_for_shifted_window"}
 REVIEW = {"tag_mismatch", "ambiguous_tag", "alignment_failed"}
 ERROR = {"not_found", "empty", "error", "missing"}
 

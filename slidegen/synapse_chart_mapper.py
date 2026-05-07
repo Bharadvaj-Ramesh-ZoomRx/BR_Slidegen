@@ -694,6 +694,155 @@ def _rewrite_wave_pinned_selected_columns(
     return rewritten, n_dropped
 
 
+# ── Connector spec §17.4 ConvertConfigAsNonDisruptive ──
+# Pair old `columnDefinitions` names to current pivot output, returning a
+# {old_name: new_name | None} map. Downstream callers use the map to
+# rewrite selectedColumns / moveRowsToFirst / moveRowsToLast against the
+# new column names so the selectedColumns filter doesn't silently drop
+# entries when the API's column structure has shifted since the deck was
+# authored. See §17.4.1 for the full algorithm.
+
+_TP_FIELD_KEYS = ("time_period_name", "time_period_id")
+
+
+def _column_template(name: str, tp_indices: list[int],
+                     sep: str = " @:@ ") -> str | None:
+    """Replace TP-axis parts of a compound column name with a placeholder.
+
+    Returns None if the name has fewer parts than max(tp_indices)+1
+    (i.e. it's not a valid compound name with TP parts).
+    """
+    if not isinstance(name, str):
+        return None
+    if not tp_indices:
+        return None
+    parts = name.split(sep)
+    if max(tp_indices) >= len(parts):
+        return None
+    out = list(parts)
+    for i in tp_indices:
+        out[i] = "<TP>"
+    return sep.join(out)
+
+
+def _build_old_to_new_column_map(
+    column_fields: list[str],
+    column_definitions: list[dict],
+    pivot_columns: list,
+    selected_columns: list[str] | None = None,
+) -> dict[str, str | None]:
+    """Pair old column names (from columnDefinitions and selectedColumns)
+    to current pivot column names.
+
+    Per Connector §17.4 — used to rewrite selectedColumns when API
+    column structure has shifted. Three strategies in order:
+
+      1. Exact match (Pass 1 below).
+      2. TP-template match — replace time-period parts in both sides
+         with `<TP>` placeholder, pair by template (Case B in §17.4.1).
+      3. Substring containment fallback — if every part of the old
+         name appears somewhere in a single new name (or vice-versa),
+         pair them. Catches segment-alias renames where the connector
+         dropped the prefix path (e.g. 'Specialty - CARD' → 'CARD').
+
+    Returns {old_name: new_name}. Old names with no pairing are absent
+    (caller treats them as "leave entry as-is" — they'll fail the
+    downstream column filter and surface as `selectedColumns_drift`).
+    """
+    new_names = [str(c) for c in pivot_columns]
+    new_set = set(new_names)
+    if not new_names:
+        return {}
+
+    tp_indices = [i for i, cf in enumerate(column_fields or [])
+                  if cf in _TP_FIELD_KEYS]
+
+    # Collect old names: from columnDefinitions and from selectedColumns
+    old_names: list[str] = []
+    seen: set[str] = set()
+    for cd in (column_definitions or []):
+        n = cd.get("Name")
+        if isinstance(n, str) and n and n not in seen:
+            old_names.append(n)
+            seen.add(n)
+    for s in (selected_columns or []):
+        if isinstance(s, str) and s and not s.startswith("<blank:") and s not in seen:
+            old_names.append(s)
+            seen.add(s)
+
+    out: dict[str, str | None] = {}
+
+    # Pass 1: exact match
+    for old in old_names:
+        if old in new_set:
+            out[old] = old
+
+    # Pass 2: TP-template match
+    if tp_indices:
+        # Build new templates → list of new names
+        new_by_template: dict[str, list[str]] = {}
+        for nn in new_names:
+            t = _column_template(nn, tp_indices)
+            if t:
+                new_by_template.setdefault(t, []).append(nn)
+        for old in old_names:
+            if old in out:
+                continue
+            t = _column_template(old, tp_indices)
+            if t and t in new_by_template:
+                # Pick the latest TP-instance (last in chronological API order
+                # — pivot_columns came in API-position order from
+                # _wave_chrono_key sort upstream).
+                out[old] = new_by_template[t][-1]
+
+    # Pass 3: substring containment (alias-rename fallback)
+    sep = " @:@ "
+    sep_alt = " - "
+    for old in old_names:
+        if old in out:
+            continue
+        old_parts = [p.strip() for p in old.replace(sep, sep_alt).split(sep_alt) if p.strip()]
+        if not old_parts:
+            continue
+        best: str | None = None
+        best_overlap = 0
+        for nn in new_names:
+            nn_parts = [p.strip() for p in str(nn).replace(sep, sep_alt).split(sep_alt) if p.strip()]
+            if not nn_parts:
+                continue
+            # Count old parts that appear (case-insensitive) somewhere in nn
+            nn_low = str(nn).lower()
+            overlap = sum(1 for p in old_parts if p.lower() in nn_low)
+            # Only accept when EVERY part of the shorter side matches —
+            # mirrors Connector's "all parts present" rule (§17.6 align).
+            shorter = min(len(old_parts), len(nn_parts))
+            if overlap >= shorter and overlap > best_overlap:
+                best = nn
+                best_overlap = overlap
+        if best is not None:
+            out[old] = best
+
+    return out
+
+
+def _rewrite_with_old_to_new(
+    entries: list, old_to_new: dict[str, str | None]
+) -> list:
+    """Apply oldToNew column rename to a list of entries (e.g.
+    selectedColumns). Entries mapped to None are dropped; entries with
+    no mapping are passed through unchanged."""
+    out = []
+    for e in entries:
+        if isinstance(e, str) and e in old_to_new:
+            new = old_to_new[e]
+            if new is not None:
+                out.append(new)
+            # else: drop (None means deleted)
+        else:
+            out.append(e)
+    return out
+
+
 def pivot_records_to_chart_data(
     records: list[dict],
     pivot_config: dict,
@@ -1172,6 +1321,24 @@ def pivot_records_to_chart_data(
         display_idx = valid_row_fields.index(display_row_field)
         pivot.index = [idx[display_idx] if isinstance(idx, tuple) else idx
                        for idx in pivot.index]
+
+    # ── Connector spec §17.4 ConvertConfigAsNonDisruptive ──
+    # When the API column structure shifts since the deck was authored,
+    # rewrite selectedColumns / move-rows entries against the current
+    # pivot output.  Pairs old column names to new ones via:
+    #   1. Exact match.
+    #   2. TP-template match (replace time_period parts with placeholder).
+    #   3. Substring fallback (one part of the old name still appears in
+    #      a new column — handles segment-alias renames).
+    # Without this, selectedColumns entries that don't exact-match the
+    # current pivot get silently dropped, producing the
+    # selectedColumns_drift cases on slides 39/44.
+    _otn = _build_old_to_new_column_map(
+        raw_col_fields, pivot_config.get("columnDefinitions", []),
+        list(pivot.columns), selected,
+    )
+    if _otn:
+        selected = _rewrite_with_old_to_new(selected, _otn)
 
     # ── Step 1: Filter COLUMNS by selectedColumns (Connector: GetSelectedColumnsInOrder) ──
     # This happens BEFORE transpose. Removes columns not in selectedColumns.
