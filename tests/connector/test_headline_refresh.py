@@ -287,7 +287,7 @@ def test_refresh_headlines_processes_non_connected_slides(tmp_path, monkeypatch)
 
     # Stub the LLM call
     monkeypatch.setattr(
-        "slidegen.headline_refresh._call_claude",
+        "slidegen.headliner_full_workflow._call_claude",
         lambda prompt, model=None: "REWRITTEN headline from non-connected path."
     )
     monkeypatch.setenv("LLM_API_KEY", "stub")
@@ -327,7 +327,7 @@ def test_refresh_headlines_processes_table_only_slide(tmp_path, monkeypatch):
     spec_path.write_text('{"slides": [{"slide_index": 0}]}', encoding="utf-8")
 
     monkeypatch.setattr(
-        "slidegen.headline_refresh._call_claude",
+        "slidegen.headliner_full_workflow._call_claude",
         lambda prompt, model=None: "Table-derived rewrite."
     )
     monkeypatch.setenv("LLM_API_KEY", "stub")
@@ -358,7 +358,7 @@ def test_refresh_headlines_skips_when_no_talking_header(tmp_path, monkeypatch):
     out_path = tmp_path / "out.pptx"
 
     monkeypatch.setattr(
-        "slidegen.headline_refresh._call_claude",
+        "slidegen.headliner_full_workflow._call_claude",
         lambda prompt, model=None: "should not be called"
     )
     monkeypatch.setenv("LLM_API_KEY", "stub")
@@ -397,7 +397,7 @@ def test_refresh_headlines_rewrites_even_when_values_unchanged(tmp_path, monkeyp
     out_path = tmp_path / "out.pptx"
 
     monkeypatch.setattr(
-        "slidegen.headline_refresh._call_claude",
+        "slidegen.headliner_full_workflow._call_claude",
         lambda prompt, model=None: "Rewritten despite identical values."
     )
     monkeypatch.setenv("LLM_API_KEY", "stub")
