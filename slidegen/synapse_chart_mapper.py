@@ -798,23 +798,43 @@ def _build_old_to_new_column_map(
         if old in new_set:
             out[old] = old
 
-    # Pass 2: TP-template match
+    # Pass 2: TP-template match (Connector §17.4.1 Phase 3: positional
+    # pairing within each template group — old[i] pairs to new[i], not
+    # all-old to last-new). Without positional pairing, a chart whose
+    # selectedColumns has multiple wave entries with the same suffix
+    # (e.g. slide 3: ['Wave 5 - Welireg', 'Wave 4 - Welireg']) collapses
+    # all old entries onto the latest new wave, losing data and breaking
+    # alignment.
     if tp_indices:
-        # Build new templates → list of new names
         new_by_template: dict[str, list[str]] = {}
         for nn in new_names:
             t = _column_template(nn, tp_indices)
             if t:
                 new_by_template.setdefault(t, []).append(nn)
+        # Group old names by template (preserving first-seen order)
+        old_by_template: dict[str, list[str]] = {}
         for old in old_names:
             if old in out:
                 continue
             t = _column_template(old, tp_indices)
-            if t and t in new_by_template:
-                # Pick the latest TP-instance (last in chronological API order
-                # — pivot_columns came in API-position order from
-                # _wave_chrono_key sort upstream).
-                out[old] = new_by_template[t][-1]
+            if not t:
+                continue
+            old_by_template.setdefault(t, []).append(old)
+        # Pairing per template:
+        #   single old → pick the LAST new (forward-roll a single-pin to the
+        #     latest available wave; matches §21.2 forward-rolling intent).
+        #   multiple old → pair POSITIONALLY (1st old → 1st new, etc.); overflow
+        #     olds fall back to last new (Connector §17.4.1 Phase 3).
+        for template, old_list in old_by_template.items():
+            new_list = new_by_template.get(template, [])
+            if not new_list:
+                continue
+            if len(old_list) == 1:
+                out[old_list[0]] = new_list[-1]
+            else:
+                for i, old in enumerate(old_list):
+                    target = new_list[i] if i < len(new_list) else new_list[-1]
+                    out[old] = target
 
     # Pass 3: substring containment (alias-rename fallback)
     sep = " @:@ "

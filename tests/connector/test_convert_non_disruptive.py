@@ -141,9 +141,10 @@ def test_selectedColumns_get_rewritten_after_tp_rename():
         ["region", "Q1 2026 @:@ Sum of base"], m
     )
     # 'region' has no mapping → passed through unchanged
-    # 'Q1 2026...' rewritten to its TP-paired latest TP
+    # 'Q1 2026...' (1st old of 2 sharing the same template) pairs
+    # POSITIONALLY to Q3 (1st new), not Q4. Q2 → Q4 (2nd → 2nd).
     assert "region" in rewritten
-    assert "Q4 2026 @:@ Sum of base" in rewritten
+    assert "Q3 2026 @:@ Sum of base" in rewritten
     assert "Q1 2026 @:@ Sum of base" not in rewritten
 
 
@@ -218,18 +219,39 @@ def test_template_handles_dash_separator_fallback():
     assert t2 == "<TP> @:@ (blank)"
 
 
-def test_dash_separator_pairing_matches_canonical():
-    """Old name uses dash, new name uses dash — both produce the same
-    canonical template, so they pair via Pass 2."""
+def test_dash_separator_pairing_matches_canonical_positionally():
+    """Old name uses dash, new name uses dash. When old has 2 entries with
+    the same template AND new has 2 entries with the same template, pair
+    positionally (1st old → 1st new, 2nd old → 2nd new). Previous
+    'always pick latest' would collapse both olds onto the same new and
+    break charts that intentionally show multiple waves."""
     m = _build_old_to_new_column_map(
         column_fields=["time_period_name"],
         column_definitions=[{"Name": "W29 - (blank)"}, {"Name": "W30 - (blank)"}],
         pivot_columns=["Wave 31 - (blank)", "Wave 32 - (blank)"],
     )
-    # 'W29 - (blank)' and 'W30 - (blank)' both pair to 'Wave 32 - (blank)'
-    # (the LAST = chronologically latest in pivot order)
-    assert m["W29 - (blank)"] == "Wave 32 - (blank)"
+    # Positional: W29 (1st old) -> 1st new (Wave 31)
+    # W30 (2nd old) -> 2nd new (Wave 32)
+    assert m["W29 - (blank)"] == "Wave 31 - (blank)"
     assert m["W30 - (blank)"] == "Wave 32 - (blank)"
+
+
+def test_pass2_overflow_falls_back_to_last():
+    """When old has MORE entries than new with the same template,
+    overflow olds map to the last new (a wave rolled off the API)."""
+    m = _build_old_to_new_column_map(
+        column_fields=["time_period_name"],
+        column_definitions=[
+            {"Name": "Wave 1 - X"}, {"Name": "Wave 2 - X"},
+            {"Name": "Wave 3 - X"}, {"Name": "Wave 4 - X"},
+        ],
+        pivot_columns=["Wave 5 - X", "Wave 6 - X"],
+    )
+    # First 2 old → first 2 new positionally; remaining 2 → last new
+    assert m["Wave 1 - X"] == "Wave 5 - X"
+    assert m["Wave 2 - X"] == "Wave 6 - X"
+    assert m["Wave 3 - X"] == "Wave 6 - X"
+    assert m["Wave 4 - X"] == "Wave 6 - X"
 
 
 def test_dash_separator_does_not_oversplit_non_wave_names():
