@@ -1,0 +1,104 @@
+# Connector Path — Session Memory
+
+Date-wise log of decisions, fixes, and pending items on the connected-refresh
+pipeline. New sessions should read the most recent date heading first to pick
+up context, then review prior days for continuity.
+
+---
+
+## 2026-05-07
+
+**Context.** The user reviewed Repatha HCP ATU v10 slide-by-slide and
+called out concrete failures across slides 11, 13, 15, 18, 20, 49, 65-67,
+and 73. Frustration was high — earlier sessions had reported "ok"
+statuses on tables that had silently never been written, so the user
+asked for fixes that work universally (not deck-specific) and a clean
+explanation of why each thing was failing.
+
+### Issues raised + status after today
+
+| Slide | Issue | Root cause | Status |
+|---|---|---|---|
+| 11 (tables) | Tables show source values, never refreshed | Spec didn't carry `cell_values`; refresh-time table path required them. "ok" status only meant the connector tag was processed. | **FIXED** — `_auto_compute_cell_values` builds a 2D grid from pivot output (1×N vertical, N×1 horizontal, M×N matrix). Validated byte-level: source `74%, 73%, 62%, 56%` → v9 `70%, 71%, 66%, 65%`. |
+| 11 (n cards / n L / n VH/h / n M) | 1×1 cells with embedded count `(n = 120)` not refreshed | Templated cells need regex substitution, not direct write. | **FIXED** — `_refresh_templated_count_with_records` substitutes `(n = X)` from post-filter records. |
+| 13 (headlines) | Slide says "no narrative — skipped" but should write fresh | Detector required existing narrative-verb match; LLM only updated; never wrote fresh. | **FIXED** — detector picks topmost wide title regardless of verb match; prompt switches to "write fresh narrative" when source isn't narrative-shaped. v10 jumped from 14 → 33 headlines rewritten. |
+| 15 | Badge says "some refreshed, some not" — *which*? | Badge text was vague; per-component detail only in JSON sidecar. | **FIXED** — every slide's speaker notes now have an appended divider + per-component status block (existing notes preserved via lxml direct paragraph append, idempotent on re-run). |
+| 18 (Overall Reach) | `alignment_failed: refreshed values are entirely None` | Source categories were full classifier paths (`"Specialty (C/PCP Segments) + Tier Groups - CARD"`); API returned short tail (`"CARD"`). Exact-match alignment found zero hits → all values nulled → safety net fired → preserve source. | **FIXED** — category alignment now uses 4-tier resolution (exact, progressive-suffix, tail-substring, fuzzy ≥ 0.85). |
+| 20 (abacus / scatter) | Series labelled `"88.31"` instead of `"CARD - Believer"`; values render as `"8800%"` | Two bugs: (a) X-axis values scaled `*100` because half the chart's formatCodes lacked `%`. (b) Series naming was an artifact of yesterday's mapper, fixed implicitly by formula-matching + value-field measure-fallback. | **FIXED** — for scatter charts, if ANY formatCode contains `%`, disable `_scale_to_whole_percent`. Series names now correct. |
+| 49 (cards / nonwriters / dabblers / reservers) | Series order swapped — Wave 7 (latest) source-first ended up second after refresh | Pivot extracts columns alphabetically (`Wave 6` before `Wave 7`); existing source-canonical reorder was gated by `not is_dynamic` so dynamic charts skipped. | **FIXED** — added a positional reorder for dynamic charts when source-series-name count == pivot-series count and each maps 1:1 (using the same 4-tier resolution). |
+| 65-67 | "Is new data even being brought in?" | False alarm — refresh IS working. v10 values differ from source by ~0.001 (precision). | **CONFIRMED OK** — no fix needed. |
+| 73 (headline) | Section header rewritten as headliner instead of the actual top-of-slide narrative | Old detector picked the first Title-named shape with a narrative verb; section header had `"Trended"` so it won. Real headliner above used `"exhibit a growing trend"` (no verb in `_NARRATIVE_VERBS`). | **FIXED** — detector picks topmost wide title shape regardless of verb. v10 slide 73 now correctly rewrites the top headliner with new narrative. |
+| 73 (chart data) | All 4 charts (Chart 139, 22, 23, 24) got identical refreshed values | All 4 charts have BYTE-IDENTICAL connector tags. Tag spec cannot differentiate them — without per-chart filter or split_order, the same pivot output writes to every chart. Spec ambiguity, not a pipeline bug. | **GUARD ADDED** — when ≥ 2 charts on a slide share fingerprint AND source had different values per chart, mark `ambiguous_tag` and preserve source. User must add per-chart filter to enable refresh. |
+
+### Universal fixes shipped (commits, in order)
+
+| Commit | Date | What |
+|---|---|---|
+| `670160a` | 2026-05-06/07 boundary | Table auto-write (`_auto_compute_cell_values`), filter compound-suffix resolver for `;`-joined values, latest-wave-only when waves aren't a column dim, formula-column suffix matching, headline detector picks topmost wide title. |
+| `285a2fc` | 2026-05-07 | `walk_shapes_recursive` — group-nested charts/tables included in refresh shape pools. |
+| `c2c7caf` (and `5697fdb`/`d676a15` from prior day) | 2026-05-06 | Shape-id matching (replaces ±0.3" position tolerance), value-field measure-column fallback, formula columns evaluator, per-component static-pin resolution, honor live-wave intent on mixed-pin. |
+| `947c4e0` | 2026-05-07 | Templated `(n = X)` cell substitution, slide 73 ambiguous-tag guard, slide 49 dynamic series reorder, slide 20 scatter scaling, per-component speaker-notes report. |
+| `e1cf42b` | 2026-05-07 | Scatter scaling guard: don't `*100` when any X-axis formatCode is `%`. |
+| `32fa930` | 2026-05-07 | Category alignment progressive-suffix matching (slide 18). |
+| `30f8227` | 2026-05-07 | Fuzzy similarity (`SequenceMatcher.ratio() ≥ 0.85`) as 4th-tier fallback for category + series alignment. |
+
+### Architectural decisions made today
+
+1. **Shape identity = XML id, not position.** Position with ±0.3" tolerance was ambiguous on dense slides (Repatha ATU 11/12 had n-row tables 0.13" below value-row tables). Replaced with `_claim_shape(shape_id=..., pos=..., name=...)` — id wins, position+name fall back.
+2. **Tables write through `cell_values` always.** The chart-equivalent `replace_data` path for tables didn't exist. Now `_auto_compute_cell_values` synthesizes a 2D grid from pivot output every time the spec doesn't carry pre-computed values.
+3. **Resolution chain, applied universally:** exact → progressive suffix → tail substring → fuzzy ≥ 0.85. Same logic everywhere a label-to-label match happens (categories, series names, formula column refs).
+4. **Ambiguous tag is user-side, not pipeline-side.** When 2+ charts share fingerprint and had different source values, preserve source and surface the ambiguity. Pipeline can't auto-disambiguate from the spec alone.
+5. **Speaker notes preserved.** Per-component status appended below a divider via lxml direct paragraph append — don't use `tf.text =` (clobbers formatting on existing paragraphs). Idempotent on re-runs.
+6. **"ok" status validated byte-level, not via JSON.** Hot lesson: status JSON saying "ok" is necessary but not sufficient. Always diff source-vs-output cell content before claiming a refresh worked.
+
+### Honest answers to recurring questions
+
+**"Why so many failures? Connected refresh is simple."**
+Each new deck shape has revealed a different code path's edge case. Most common patterns:
+- Source labels differ from API labels by Connector's default-alias rule (`"Specialty - X - Y"` → `"Y"`). Fixed with progressive-suffix.
+- Source format is `0%` (decimal) but the mapper aggregated wrong column or didn't filter `measure="Mean"`, producing nonsense values. Fixed with measure-column fallback.
+- Tables silently never wrote because the spec didn't carry `cell_values`. Fixed with auto-compute.
+- Multiple charts share the same tag config — can't auto-differentiate. Now guards instead of corrupting.
+
+**"How and why did scatter fixes break?"**
+They didn't. The April 28 commit (`859f101`) fixed None-safe rounding for crashes; that's still in place. The two scatter bugs surfaced today (value scaling for "0%" axis, series naming) were pre-existing issues not addressed by that fix. Today's commits address them.
+
+**"Is the connected path good now?"**
+Connected path handles correctly: sparse + dense decks, mixed static+dynamic on same slide, mixed-pin charts, segment-suffixed chronology, formula columns, group-nested shapes, ambiguous tags (preserved + surfaced), category/series default-alias renames + minor drift, period banners adjacent to charts, table auto-refresh.
+Known unfixed: field-date stamps (`Q1'26: 01/01/2026 – 25/02/2026`), 1×1 templated cells with non-`(n = X)` patterns, scatter charts where the connector tag's selectedColumns refers to bare value columns without row labels.
+
+### Pending / deferred from today
+
+- **Field-date stamps** — `Q1'26: 01/01/2026 – 25/02/2026` style. Label-sync rewrites the wave token but not the date range. Needs `time_period_start`/`time_period_end` in the shift map.
+- **Slide 73 ambiguous-tag root cause** is on the user side. Each of the 4 charts needs its own filter (e.g. `intent_type = "increase"`) or `split_order` to differentiate.
+- **Templated cells beyond `(n = X)`** — `"Sample size: 120"`, `"based on 51 respondents"`, etc. need explicit pattern handling.
+- **Badge wording for `alignment_failed`** — phrase is technically correct but jargon-heavy. Could be clearer.
+
+### Files created today
+
+- `slidegen/label_sync.py` (prior day, but referenced heavily today)
+- `slidegen/refresh_pipeline.py` (prior day, extended today)
+- `CONNECTOR_PATH_README.md` (today)
+- `CONNECTOR_PATH_MEMORY.md` (this file)
+
+### Validation deck on disk
+
+- `output_testing/deck_output/Repatha_HCP_ATU_Q2_26_Skeleton_Deck1_2026-05-06_v10.pptx` — last full validation run with table auto-write + headline detector + scatter scaling fix; user instructed not to run v11 today, has other tasks.
+
+---
+
+<!--
+## YYYY-MM-DD (template for next session)
+
+**Context.** ...
+
+### Issues raised + status
+
+| Slide | Issue | Root cause | Status |
+
+### Commits
+
+### Decisions
+
+### Pending
+-->
