@@ -592,6 +592,7 @@ def _rewrite_wave_pinned_selected_columns(
     fetched_waves = [str(w) for w in fetched_waves]
     if not fetched_waves:
         return list(selected), 0
+    fetched_set = set(fetched_waves)
 
     non_wave_entries: list = []
     ordered_templates: list[str] = []  # preserves first-seen order
@@ -634,7 +635,37 @@ def _rewrite_wave_pinned_selected_columns(
             else:
                 non_wave_entries.append(entry)
                 continue
-        # Build template with wave-part(s) replaced by sentinel
+
+        # ── Single-wave-pin preservation ──
+        # The data-side wave-label normalization (line 706 of
+        # pivot_records_to_chart_data) strips "Project " from time_period_name
+        # values, so a tag's "Project Wave 13" no longer matches the data
+        # column "Wave 13". When the entry's normalized wave IS in the
+        # fetched waves, the user's pin is still valid — emit a single
+        # rewritten entry (with normalized wave) instead of expand-to-all.
+        # Without this, slide 49's chart pinned to a single wave gets
+        # blasted to all fetched waves; slide 50's compound pin gets
+        # the chart re-pivoted across multiple wave-segment combos.
+        normalized_parts = list(chosen_parts)
+        all_norm_in_fetched = True
+        for i in wave_idxs:
+            wave_part = chosen_parts[i]
+            norm = _re_wave.sub(r"^Project Wave ", "Wave ", wave_part)
+            normalized_parts[i] = norm
+            if norm not in fetched_set:
+                all_norm_in_fetched = False
+                break
+        if all_norm_in_fetched:
+            rewritten_entry = (chosen_sep.join(normalized_parts)
+                               if chosen_sep else normalized_parts[0])
+            non_wave_entries.append(rewritten_entry)
+            if rewritten_entry != entry:
+                n_dropped += 1  # counts as a normalization rewrite
+            continue
+
+        # Fallback: wave(s) rolled off the API window. Drop entry and
+        # rebuild the template against fetched_waves so the chart shifts
+        # forward to whatever the latest data offers.
         tmpl_parts = list(chosen_parts)
         for i in wave_idxs:
             tmpl_parts[i] = _WAVE_TEMPLATE_SENTINEL
