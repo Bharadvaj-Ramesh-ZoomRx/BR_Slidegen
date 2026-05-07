@@ -266,11 +266,11 @@ Synapse credentials are loaded from (in order):
 
 ## Known limitations
 
-- **1×1 cells with embedded counts**: a wide range of conventions are handled — `(n = X)`, `(N = X)`, `n=X`, `Sample size: X`, `Sample Size = X`, `Base: X`, `Total: X`, `based on X respondents`, `X HCPs/patients/subjects`. Cells using a pattern not in this list will need explicit handling; PRs welcome.
-- **Scatter chart series naming**: handled — when a connector tag yields a numeric series name (rare edge case where selectedColumns picks bare value columns without a row-label dimension), the writer falls back to source's series name at the same index, then to `columnDefinitions[].Alias` / `Name`.
-- **Group-nested shapes**: chart and table refresh walks groups via `walk_shapes_recursive`. Label-sync also handles grouped charts.
-- **Field-date stamps** (`"Q1'26: 01/01/2026 – 25/02/2026"`): the wave token portion gets shifted by label sync, but the date range does not. Reason: the Synapse API doesn't currently return `time_period_start` / `time_period_end` in record responses, so there's no source of truth for the new date range. Requires API-side change before this can be auto-wired.
+This section lists what's **not** auto-handled. Items previously listed here that are now handled (templated 1×1 cells with multiple patterns, scatter series-name fallback, group-nested shapes, slide-wide period rewrites for headers / chart titles / footnotes) have moved up into the pipeline description.
+
+- **Field-date stamps** (`"Q1'26: 01/01/2026 – 25/02/2026"`): the wave token portion gets shifted by label sync, but the date range does not. The Synapse API doesn't currently return `time_period_start` / `time_period_end` in record responses, so there's no source of truth for the new date range. Requires API-side change before this can be auto-wired.
 - **Ambiguous tags**: if a slide has 2+ charts that all resolve to the same analysis with byte-identical tag configs but should display different cuts of data, the pipeline marks them `ambiguous_tag` and preserves source. Add a per-chart filter (`Filters` in PivotConfig) or `split_order` to disambiguate. The pipeline can't auto-resolve this without risking wrong assignments.
+- **Templated 1×1 cells with non-standard patterns**: 8 universal patterns are handled — `(n = X)`, `(N = X)`, `n=X`, `Sample size: X`, `Sample Size = X`, `Base: X`, `Total: X`, `based on X respondents`, `X HCPs/patients/subjects`. Cells using a pattern not in this list will need explicit handling (extend `_COUNT_PATTERNS` in `intelligent_refresh.py`).
 - **Period-id reverse-chrono**: time_period_ids are NOT chronological in Synapse. The `dynamic_latest_n` filter parses wave NAMES instead — this is handled, just worth knowing if you debug period-window issues.
 
 ## Where to look when something goes wrong
@@ -296,14 +296,16 @@ Short answer: yes for the majority of slides; the rest get clearly flagged and p
 
 What "just works" end-to-end after a single command:
 
-- Tagged charts and tables across all 5 layout patterns (vertical label, horizontal label, matrix, formula columns, 1×1 templated cells with `(n = X)` placeholders).
+- Tagged charts and tables across all layout patterns (vertical label, horizontal label, matrix, formula columns, 1×1 templated cells across 8 universal count patterns).
 - Charts and tables nested inside group shapes.
 - Mixed-pin slides (some charts static-pinned, others dynamic).
-- Charts with formula-derived columns (`<blank:Alias>` with `=B2/100` etc.).
+- Charts with formula-derived columns (`<blank:Alias>` with `=B2/100`, `=B2*100`, `=B2±C2`, etc.).
+- Scatter / abacus charts including value-scaling and numeric-name fallback.
 - Headlines (rewritten by LLM when chart values changed; left alone otherwise; fresh narrative written when source headline isn't narrative-shaped).
-- Period banners adjacent to charts (`Oct'25..Mar'26` rewritten to `Nov'25..Apr'26` etc.).
-- Per-slide badges showing exactly what happened.
-- Per-component status appended to each slide's speaker notes (existing notes preserved).
+- Period banners adjacent to charts (`Oct'25..Mar'26` rewritten to `Nov'25..Apr'26`).
+- Slide-wide period rewrites — slide headers, chart titles, axis titles, and footnote prose all get their period tokens shifted to match the refreshed waves (sentences preserved, only the tokens change).
+- Per-slide badges + speaker notes showing exactly what happened on each slide (existing speaker-note content preserved).
+- Refresh quality eval at the end — pass/preserve/review/error counts plus pass-rate %.
 
 What gets flagged instead of refreshed (source values preserved, badge tells you why):
 
@@ -315,9 +317,8 @@ What gets flagged instead of refreshed (source values preserved, badge tells you
 
 What is **not** auto-handled (will need manual edit OR future work):
 
-- Field-date stamps like `Q1'26: 01/01/2026 – 25/02/2026` — only the `Q1'26` portion gets shifted, not the date range.
-- Templated 1×1 cells using patterns OTHER than `(n = X)` — e.g. `"Sample size: 120"` or `"based on 51 respondents"`.
-- Scatter charts where the connector tag selects bare value columns without a row-label dimension — series naming may default to the first numeric value.
-- Manual-edit charts that share a tag with sibling charts on the same slide — flagged as `ambiguous_tag` rather than corrupted.
+- Field-date stamps like `Q1'26: 01/01/2026 – 25/02/2026` — only the `Q1'26` portion gets shifted, not the date range. Requires Synapse API to return `time_period_start` / `time_period_end`.
+- Manual-edit charts that share a tag with sibling charts on the same slide — flagged as `ambiguous_tag` rather than corrupted. Requires per-chart filter or split_order in the tag.
+- Templated 1×1 cells using patterns *outside* the 8 we handle — extend `_COUNT_PATTERNS` if you need more.
 
 In practice, on a typical deck with valid connector tags and live Synapse data, ~90%+ of slides refresh cleanly with no human intervention. The remaining 10% land in one of the five flagged buckets above with a clear reason.
