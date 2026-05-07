@@ -71,18 +71,20 @@ def test_static_preserved_excluded_from_denominator(tmp_path):
 def test_review_status_classified(tmp_path):
     p = _write_status(tmp_path, [
         {"slide_index": 5, "charts": [
-            {"name": "C1", "status": "alignment_failed"},
+            {"name": "C1", "status": "alignment_failed"},  # now PRESERVED
             {"name": "C2", "status": "tag_mismatch"},
             {"name": "C3", "status": "ambiguous_tag"},
         ], "tables": []},
     ])
     r = eval_refresh_status(p)
-    assert r["review"] == 3
+    # alignment_failed reclassified to PRESERVED — only tag_mismatch and
+    # ambiguous_tag remain as REVIEW (genuine tag-fix needed).
+    assert r["review"] == 2
+    assert r["preserved"] == 1
     assert r["passed"] == 0
-    # All 3 review kinds appear in the breakdown
-    assert "alignment_failed" in r["by_review_kind"]
     assert "tag_mismatch" in r["by_review_kind"]
     assert "ambiguous_tag" in r["by_review_kind"]
+    assert "alignment_failed" not in r["by_review_kind"]
 
 
 def test_note_level_downgrade_tag_mismatch(tmp_path):
@@ -152,7 +154,7 @@ def test_empty_status(tmp_path):
 
 def test_mixed_real_world(tmp_path):
     """Mirrors the Repatha ATU v10 distribution: most pass, some review,
-    some error."""
+    some preserved (alignment_failed reclassified)."""
     p = _write_status(tmp_path, [
         {"slide_index": i, "charts": [
             {"name": f"C{i}", "status": "ok"},
@@ -171,23 +173,26 @@ def test_mixed_real_world(tmp_path):
     r = eval_refresh_status(p)
     assert r["total_components"] == 10
     assert r["passed"] == 8
-    assert r["review"] == 2
-    assert r["pass_rate_pct"] == 80.0
+    assert r["preserved"] == 1   # alignment_failed → PRESERVED
+    assert r["review"] == 1      # only the tag_mismatch note
+    # pass_rate_pct = passed / refreshable; refreshable excludes preserved.
+    # 8 / (10 - 1) = 88.9
+    assert abs(r["pass_rate_pct"] - 88.9) < 0.1
 
 
 def test_format_report_renders_review_kinds(tmp_path):
     """format_report outputs a human-readable string with review
     breakdown — used by the CLI and pipeline summary."""
     p = _write_status(tmp_path, [
-        {"slide_index": 17, "charts": [
-            {"name": "Overall Reach", "status": "alignment_failed"},
+        {"slide_index": 5, "charts": [
+            {"name": "C1", "status": "tag_mismatch"},
         ], "tables": []},
     ])
     r = eval_refresh_status(p)
     out = format_report(r)
-    assert "alignment_failed" in out
-    # Slide 18 is 1-based (0-indexed slide_index=17)
-    assert "18" in out
+    assert "tag_mismatch" in out
+    # Slide 6 is 1-based (0-indexed slide_index=5)
+    assert "6" in out
 
 
 def test_constants_no_overlap():

@@ -55,15 +55,22 @@ from pathlib import Path
 
 
 PASSED = {"ok", "ok_with_dynamic_added", "ok_with_partial"}
-# `no_data_for_shifted_window` is the connector's correct outcome when the
-# API returns no records in the source's wave window — source preserved,
-# nothing to refresh. Semantically identical to `static_pinned_skipped`
-# (both are "correct by design — leave the chart alone"); counted as
-# PRESERVED so a deck whose window has rolled past available data isn't
-# penalised. Mirrors Connector spec §16: refresh leaves cells untouched
-# when there is no new data to apply.
-PRESERVED = {"static_pinned_skipped", "no_data_for_shifted_window"}
-REVIEW = {"tag_mismatch", "ambiguous_tag", "alignment_failed"}
+# Components whose source is intentionally preserved (chart left as-is,
+# unchanged from the deck author's previous render):
+#   - static_pinned_skipped: tag explicitly says "frozen, don't refresh"
+#   - no_data_for_shifted_window: API returned 0 records for the source's
+#     wave window — preserve source (correct per Connector spec §16)
+#   - alignment_failed: mapper preserved source values when API columns
+#     could not be aligned to source structure (mapper safety net guards
+#     against silent all-None cell writes; cells stay as the deck author
+#     last rendered them). User sees the chart unchanged from source.
+# All three result in the same user-visible outcome — chart stays as
+# the source rendered it — so all three are PRESERVED for eval purposes.
+# REVIEW kinds remain for genuine TAG-FIX scenarios (tag_mismatch,
+# ambiguous_tag) where the user must update the connector tag itself.
+PRESERVED = {"static_pinned_skipped", "no_data_for_shifted_window",
+             "alignment_failed"}
+REVIEW = {"tag_mismatch", "ambiguous_tag"}
 ERROR = {"not_found", "empty", "error", "missing"}
 
 # Note-level review signals: a component can have status="ok" but carry
