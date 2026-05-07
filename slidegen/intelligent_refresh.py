@@ -3073,6 +3073,24 @@ def refresh_deck_from_spec(
                             if pct_fmts and len(pct_fmts) >= max(1, len(src_fmts) // 2):
                                 _scale_to_decimal = True
 
+                        # Scatter charts have separate formatCodes for X and Y
+                        # axes — typically "0%" for X (the actual metric) and
+                        # "0" for Y (position labels). The whole-percent rule
+                        # above can flip True for these because half the format
+                        # codes lack "%", but applying *100 to the X data
+                        # corrupts the chart (0.88 -> 88, then "0%" renders as
+                        # "8800%"). For scatter, override the rule: if ANY
+                        # formatCode contains "%", treat values as decimal-
+                        # scale and skip the *100 scaling.
+                        is_scatter = (
+                            "scatter" in (chart_pattern or "")
+                            or "xy_" in (chart_pattern or "")
+                        )
+                        if is_scatter and src_fmts and any(
+                            "%" in (f or "") for f in src_fmts
+                        ):
+                            _scale_to_whole_percent = False
+
                         def _scale_val(v):
                             if v is None: return None
                             try:
