@@ -197,6 +197,83 @@ def test_one_by_one_templated():
     assert cv == [["CARDs (n = 120)"]]
 
 
+def test_row_field_only_selected_columns_preserves_source():
+    """CR_MR_Table case: selectedColumns=['y_code','y_label'] (both RowFields).
+
+    Spec §17.9.5 says selectedColumns is an exclusive filter — when no
+    selectedColumns entry maps to a value column, no value series should
+    be written. Without this guard, the matrix layout would write
+    series[0] (the first wave column) into physical col 1, overwriting
+    the hand-curated message-text column on CREON slide 15 / 19 / 20 /
+    21 / 22 with a wave percentage.
+
+    Auto-compute must return None so the caller preserves source cells.
+    """
+    shape, _, _ = _new_table(13, 3)
+    # Source table: id | message text | %
+    shape.table.cell(0, 0).text = "ID"
+    shape.table.cell(0, 1).text = "Message"
+    shape.table.cell(0, 2).text = "%"
+    shape.table.cell(1, 0).text = "C6"
+    shape.table.cell(1, 1).text = "Take CREON every meal..."
+    shape.table.cell(1, 2).text = "57%"
+
+    pivot = {
+        "RowFields": ["y_code", "y_label"],
+        "ColumnFields": ["time_period_name"],
+        "ValueFields": ["decimal"],
+        "columnDefinitions": [
+            {"Name": "y_code", "IsDefaultAlias": True},
+            {"Name": "y_label", "IsDefaultAlias": True},
+            {"Name": "Mar'26", "Format": "0%", "IsDefaultAlias": True},
+        ],
+    }
+    mapping = {"selectedColumns": ["y_code", "y_label"], "selectAllRows": False}
+
+    # Series passed in as if from the pivot — wave columns the user
+    # explicitly excluded by setting selectedColumns to row-fields only.
+    series = [("Mar'26", [0.566, 0.548]), ("Feb'26", [0.50, 0.48])]
+    categories = ["msg1", "msg2"]
+
+    cv = _auto_compute_cell_values(shape, categories, series, pivot, mapping)
+    assert cv is None, (
+        f"Expected None (preserve source) when all selectedColumns are RowFields, "
+        f"got {cv!r}. Without this guard, col 1 of the table would be overwritten "
+        f"with the first wave's percentage value."
+    )
+
+
+def test_mixed_row_field_and_value_selected_columns_still_writes():
+    """Sanity: when selectedColumns mixes a RowField AND a value column,
+    the value column must still be written (the row-field-only guard
+    must not over-fire)."""
+    shape, _, _ = _new_table(3, 2)
+    shape.table.cell(0, 0).text = "Region"
+    shape.table.cell(0, 1).text = "%"
+    shape.table.cell(1, 0).text = "NA"
+    shape.table.cell(1, 1).text = "?"
+
+    pivot = {
+        "RowFields": ["region"],
+        "ColumnFields": [],
+        "ValueFields": ["decimal"],
+        "columnDefinitions": [
+            {"Name": "region", "IsDefaultAlias": True},
+            {"Name": "Sum of decimal", "Format": "0%", "IsDefaultAlias": True},
+        ],
+    }
+    mapping = {"selectedColumns": ["region", "Sum of decimal"], "selectAllRows": False}
+    series = [("Sum of decimal", [0.42, 0.58])]
+    categories = ["NA", "EU"]
+
+    cv = _auto_compute_cell_values(shape, categories, series, pivot, mapping)
+    # NOT None — the value column should still be written
+    assert cv is not None
+    # Layout 3 (matrix): row 0 header preserved, row 1 col 0 preserved,
+    # row 1 col 1 = formatted series[0][0]
+    assert cv[1][1] == "42%"
+
+
 def test_one_by_one_no_template_returns_none():
     """1x1 cell without a recognized count pattern -> None (preserves source)."""
     shape, _, _ = _new_table(1, 1)

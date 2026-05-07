@@ -146,6 +146,19 @@ def _auto_compute_cell_values(
     selected = (raw_mapping_config or {}).get("selectedColumns") or []
     selected_visible = [c for c in selected if not _is_row_field_name(c, raw_pivot_config)]
 
+    # ── Connector spec §17.9.5: selectedColumns is an exclusive filter ──
+    # When every non-blank selectedColumns entry is a RowField name (e.g.
+    # CR_MR_Table on CREON slide 15: selectedColumns=['y_code', 'y_label']
+    # and both are RowFields), there are no value series to write — the
+    # user's intent is "display row-field labels only; leave the rest of
+    # the table alone." Without this guard the matrix layout below writes
+    # series[0] (the first pivot wave column) into physical col 1,
+    # silently overwriting hand-curated message-text columns with a wave
+    # percentage. Returning None preserves source cells per the spec.
+    selected_non_blank = [c for c in selected if not c.startswith("<blank:")]
+    if selected_non_blank and not selected_visible:
+        return None
+
     def _col_def_for_series_index(s_idx: int) -> dict | None:
         # Try selectedColumns[s_idx] -> matching columnDefinition by Name/Alias
         if s_idx < len(selected_visible):
