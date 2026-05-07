@@ -6,6 +6,99 @@ up context, then review prior days for continuity.
 
 ---
 
+## 2026-05-07 (later session) — Direct Tag Creation Reference adoption
+
+**Context.** The user dropped a 5352-line reference doc at the repo root,
+`Synapse Connector - Direct Tag Creation Reference.md`, lifted from the
+Connector C# codebase. It's the authoritative line-by-line spec: every
+shape tag, every CustomXMLPart node, every serialization rule, the
+SHA256 hash recipe, the full filter→pivot→map pipeline, every chart/
+table render path, plus a drop-in Python tag stamper in §20. The user
+also confirmed the synapse-cli `latest_n` issue (API previously ignored
+the parameter and returned all periods) is fixed upstream.
+
+User instruction: read the entire doc, identify every gap in our
+existing pipeline, ship the fixes, smoke-test each, commit and push
+to `bharadvaj-slidegen`, then refresh the Testing Deck end-to-end. The
+workflow stays "Claude + deck = output" — we're patching gaps, not
+shifting strategy. Final ask: "if u put together testing deck v2 with
+completely new 50 slides from other projects, it should work the right
+way."
+
+### Gaps the doc revealed
+
+| Gap | Where | Doc reference |
+|---|---|---|
+| MappingConfig was being serialised with `sort_keys=True` (alphabetical) when Connector itself uses **camelCase + C# declaration order + nulls retained** — bytes diverged from Connector's, hash drift on any future re-hash. | `intelligent_refresh._tag_json` | §5.3 |
+| Pre-hash sorts not applied (`AnalysisIds` asc, `SegmentIds` asc when `!NestSegments`, `Filters[]` by `(ColumnKey, Type, filterCriteria, Value)`). Same input produced different hashes depending on caller's order. | `_tag_json` again | §5.1, §5.2 |
+| `Alias` not dropped when `IsDefaultAlias=true` — silent hash mismatch with Connector's ShouldSerialize predicate. | `_tag_json` again | §5.2 footnote |
+| `LASTREFRESHTIME` / `REFRESHERRORMSG` were written ONCE at initial stamp time, never refreshed on subsequent refresh cycles. UI's "last refreshed at …" goes stale immediately; old failures linger after a successful retry. | `refresh_pipeline.py` had no Step 2b | §16.3, §16.5 |
+| CREON slide 4 reverse-chrono `time_period_id` gotcha had a fix in code (`_chronological_wave_key` + name-based `latest_n` filter) but no regression test pinning the contract. | `tests/connector/` | §17.5.3 |
+
+### Fixes shipped today
+
+| Commit | What |
+|---|---|
+| `c0d81c6` | **`feat: connector_tags module with 3 serialization profiles + hash-parity tests`** — new `slidegen/connector_tags.py` (faithful port of doc §5, §6, §20). 23 hash-parity tests in `tests/connector/test_connector_tag_serialization.py` including byte-identical round-trip on real Connector-produced `*_BACKUP` JSON fixtures (proves our minted hash matches Connector's). |
+| `c8b8b79` | **`fix: route write_connector_tags through correct serializer + ship stamp_refresh_dynamic_tags`** — `intelligent_refresh.write_connector_tags` now delegates to `connector_tags.serialize_existing_configs` so each config goes through the right profile + pre-hash sorts + Alias-when-default drop. Adds `stamp_refresh_dynamic_tags` per §16.3 + §16.5 — every refreshed shape gets a fresh `LASTREFRESHTIME`; `REFRESHERRORMSG` is set on failure and **deleted** on the next success. Wired into `refresh_pipeline.py` as Step 2b. 5 unit tests. `propose_raw_configs` gets a §21 forward-rolling docstring. |
+| `72f9995` | **`test: pin period chrono-name sort regression for CREON reverse-chrono case`** — 8 tests in `test_period_chrono_sort.py` against `_chronological_wave_key` + the exact filter logic in `fetch_synapse_data`, covering the literal CREON ID block, `Mmm'YY` / `Q1'26` / `Wave 12` / `W34` formats, year boundary, and end-to-end on a synthetic records list with the buggy ID assignment. |
+
+### Test posture
+
+`pytest tests/connector tests/non_connected` — **125 passed, 0 failed**.
+36 new tests added today across the three commits.
+
+### Smoke test — Testing Deck refresh end-to-end
+
+```
+python -m slidegen.refresh_pipeline "output_testing/deck_output/Testing Deck.pptx" --out-name Testing_Deck_post_fixes
+```
+
+Result:
+- Output: `output_testing/deck_output/Testing_Deck_post_fixes.pptx` (4.8 MB)
+- 45/45 slides processed, 248 components
+- **Inclusive pass rate: 51.2%** (127 passed clean + 0 preserved / 248 total)
+- New Step 2b confirmed working: **"114 shapes received LASTREFRESHTIME / REFRESHERRORMSG update"**
+- 22 headlines rewritten, 5 slides label-shifted
+- Remaining REVIEW (28.6%) and ERROR (6.5%) are pre-existing tag-content issues (slides 4/37/49 `tag_mismatch`; slides 19/20/21/22/39/44 `selectedColumns_drift`; slides 11/32/50 `alignment_failed`) — not regressions from today's fixes.
+
+### Forward-rolling alignment status (§21)
+
+`propose_raw_configs` is already §21-compliant: every emitted column_def
+uses `IsDefaultAlias=true`, no `sortCriteria` on TP-bearing columns,
+ReportConfig is always Dynamic. Refresh-time wave drift in
+`selectedColumns` is handled by
+`synapse_chart_mapper._rewrite_wave_pinned_selected_columns` (the Fix L+M
+universal rewrite). Documented in the propose_raw_configs docstring so
+this stays stable.
+
+### What the doc enables next (deferred)
+
+- **Split-group create/teardown** (§14.9, §14.10) — when a deck has
+  paginated tables that need to span N slides. Not currently exercised
+  by any of our shipping decks; ship when needed.
+- **Full §17 + §18 port** — replacing our `pivot_records_to_chart_data`
+  with a 1:1 reproduction of Connector's filter→pivot→map→render
+  pipeline. Big surface area; only justified if the existing mapper's
+  divergence becomes a recurring pain. Today's §5–§6 fix is the
+  prerequisite; without hash parity, any future port is built on sand.
+- **`MigratedToGalen` cosmetic CustomXMLPart node** — hides the
+  "Migrate to Galen" Ribbon button after our tools touch a deck. Not
+  required for refresh; cosmetic only.
+
+### Files touched today
+
+- `slidegen/connector_tags.py` — NEW (~430 lines)
+- `slidegen/intelligent_refresh.py` — `write_connector_tags` rerouted; `stamp_refresh_dynamic_tags` added; `propose_raw_configs` docstring expanded
+- `slidegen/refresh_pipeline.py` — Step 2b call inserted after Step 2
+- `tests/connector/test_connector_tag_serialization.py` — NEW (23 tests)
+- `tests/connector/test_dynamic_refresh_tags.py` — NEW (5 tests)
+- `tests/connector/test_period_chrono_sort.py` — NEW (8 tests)
+- `CONNECTOR_PATH_README.md` — added "Authoritative spec — read this first" pointer; new module entry; Step 2b section; new test entries
+- `CONNECTOR_PATH_MEMORY.md` — this entry
+
+---
+
 ## 2026-05-07
 
 **Context.** The user reviewed Repatha HCP ATU v10 slide-by-slide and

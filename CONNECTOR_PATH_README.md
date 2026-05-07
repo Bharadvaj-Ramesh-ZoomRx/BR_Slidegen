@@ -33,6 +33,17 @@ python -c "import slidegen.refresh_pipeline; print('OK')"
 python -m slidegen.refresh_pipeline --help
 ```
 
+## Authoritative spec — read this first when something looks off
+
+`Synapse Connector - Direct Tag Creation Reference.md` (at repo root) is the line-by-line behavioral spec for the Connector add-in: every shape tag, every CustomXMLPart node, every serialization rule, every hash, every step of the filter→pivot→map pipeline, every chart/table render path. Use it as the source of truth when:
+
+- A refreshed shape's hash mismatches what Connector itself would produce (see §5 — three different serialization profiles per config).
+- The wrong waves come back from `latest_n` (see §17.5.3 — sort by `reportApi.TimePeriods` index, not `time_period_id`).
+- Split visualizations need to be authored (see §14).
+- A connection should "roll forward" as new waves land (see §21 — Dynamic mode + `IsDefaultAlias=true` + don't enumerate TP-bearing strings in `selectedColumns`).
+
+`slidegen/connector_tags.py` is a faithful Python port of §5, §6, and §20 from that spec — use it (via `build_connector_payload` or `serialize_existing_configs`) for any new tag-write work; it guarantees byte-identical output to what Connector would produce for the same logical config.
+
 ## What "connector path" means
 
 Decks delivered to Galen clients are PowerPoint files where each chart and table has a **Connector tag** — a chunk of XML stamped onto the shape that records:
@@ -112,6 +123,17 @@ Each component records:
 
 Per-shape `REFRESH_NOTE` Connector tag stamped onto each component's CustomXML rels: a one-line summary of the refresh outcome (status + note kinds + counts). Visible to anyone opening the deck through Connector.
 
+### Step 2b: `stamp_refresh_dynamic_tags`
+
+Per Connector spec §16.3 + §16.5, the tool that drives refresh must also rewrite **standard dynamic tags** on every refreshed shape — not just our own `REFRESH_NOTE` tags. This step (added 2026-05-08) writes:
+
+- `LASTREFRESHTIME` — current UTC ISO timestamp on every successful component refresh. Without this, the "last refreshed at …" UI shown by Connector goes stale immediately after our first stamp.
+- `REFRESHERRORMSG` — set to the error message on failure; **deleted** on the next success so a stale earlier failure doesn't linger.
+
+The other two dynamic tags from §16.3 (`COLUMNKEYLABELMAP`, `ANALYSISTYPE`) are written once at stamp time by `write_connector_tags` and stay valid until API metadata changes. We don't touch them here.
+
+Implementation in `slidegen/intelligent_refresh.stamp_refresh_dynamic_tags`. Wired into `refresh_pipeline.py` immediately after `stamp_refresh_notes`. Idempotent — re-running the pipeline replaces the prior values, never duplicates them.
+
 ### Step 3: `refresh_headlines` (LLM)
 
 `slidegen/headline_refresh.py` rewrites slide headlines based on refreshed chart values. Skipped if `LLM_API_KEY` not set.
@@ -144,8 +166,9 @@ Each slide's **speaker notes** also get an appended status block (below a divide
 
 | File | What it owns |
 |---|---|
-| `slidegen/refresh_pipeline.py` | CLI entry + `run_full_pipeline()`. Orchestrates Steps 0-5. Auto-derives output filename via `_slugify()`. |
-| `slidegen/intelligent_refresh.py` | `refresh_deck_from_spec` (Step 1), `stamp_refresh_notes` (Step 2). Houses `_claim_shape` (shape-id matching), `_auto_compute_cell_values` (table auto-write), `_format_cell_value`, `walk_shapes_recursive` (group-walk), `_refresh_templated_count_with_records` (1×1 cell substitution). |
+| `slidegen/refresh_pipeline.py` | CLI entry + `run_full_pipeline()`. Orchestrates Steps 0-5 (incl. Step 2b). Auto-derives output filename via `_slugify()`. |
+| `slidegen/intelligent_refresh.py` | `refresh_deck_from_spec` (Step 1), `stamp_refresh_notes` (Step 2), `stamp_refresh_dynamic_tags` (Step 2b — `LASTREFRESHTIME` / `REFRESHERRORMSG`), `write_connector_tags` (initial tag stamp; routes through `connector_tags.serialize_existing_configs`). Houses `_claim_shape` (shape-id matching), `_auto_compute_cell_values` (table auto-write), `_format_cell_value`, `walk_shapes_recursive` (group-walk), `_refresh_templated_count_with_records` (1×1 cell substitution). |
+| `slidegen/connector_tags.py` | **Faithful port of doc §5, §6, §20.** Three serialization profiles (PascalCase + alphabetical + null-stripped for ReportConfig + PivotConfig; camelCase + declaration-order + nulls-retained for MappingConfig), pre-hash sort rules (`AnalysisIds`, `SegmentIds`, `Filters[]`), `IsDefaultAlias`-ShouldSerialize drop, builder helpers (`numeric_filter`, `text_filter`, `column_def`), top-level `build_connector_payload` + `serialize_existing_configs`. Hash-parity tested against real Connector-produced JSON. |
 | `slidegen/synapse_chart_mapper.py` | `pivot_records_to_chart_data` — the Connector-emulation pivot/map engine. Filter resolver, formula evaluator, chronology sort, source-canonical alignment, fuzzy matching. |
 | `slidegen/headline_refresh.py` | `refresh_headlines` (Step 3). Headline-shape detector, narrative classifier, LLM prompt builder, LiteLLM call. |
 | `slidegen/label_sync.py` | `sync_period_labels` (Step 4). Per-chart shift map, spatial adjacency filter, run-level token replacement. |
@@ -171,6 +194,9 @@ Test coverage spans unit tests for individual mapper helpers, end-to-end golden 
 | `test_filter_resolver.py` | `;`-joined IN filters with exact + compound-suffix matches, broken-filter graceful fallback, measure-column filter, latest-wave-only filter | 6 |
 | `test_refresh_eval.py` | Per-deck quality eval — classification taxonomy (passed/preserved/review/error), note-level downgrades (tag_mismatch on status=ok), rate calculations | 11 |
 | `test_label_sync_slide_wide.py` | Sentence-level period rewriter used by the slide-wide pass — multi-token sentences, single-pass alternation (no chained substitution), curly-quote normalization, partial shift maps | 9 |
+| `test_connector_tag_serialization.py` | Hash-parity contract for `slidegen/connector_tags.py`: byte-identical round-trip on real Connector-produced JSON fixtures (proves our minted hash matches Connector's), null-stripping, alphabetical Ordinal sort, MappingConfig declaration order + null retention, pre-hash sorts (`AnalysisIds`, `SegmentIds`, `Filters[]`), `Alias` drop when `IsDefaultAlias=true`, end-to-end `build_connector_payload` shape | 23 |
+| `test_dynamic_refresh_tags.py` | `stamp_refresh_dynamic_tags` (Step 2b) — `LASTREFRESHTIME` write on success, `REFRESHERRORMSG` on failure, stale-error clearing on next success, idempotence across multiple runs, no-op on empty results | 5 |
+| `test_period_chrono_sort.py` | Locks the chrono-name period sort against the CREON reverse-chrono `time_period_id` gotcha (Jan'26=25375 > Feb=25374 > Mar=25373) — `latest_n=2` must keep Mar+Feb, not Jan+Feb. Covers `Mmm'YY`, `Q1'26`, `Wave 12`, `W34`, year-boundary, and the exact filter logic from `fetch_synapse_data` | 8 |
 
 Run all: `pytest tests/connector/ -q` (~1 sec, no creds, no network).
 
