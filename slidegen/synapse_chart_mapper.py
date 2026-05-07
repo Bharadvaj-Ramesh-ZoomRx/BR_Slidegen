@@ -1574,13 +1574,39 @@ def pivot_records_to_chart_data(
     if (source_categories and not _is_wave_dim(source_categories)
             and not is_dynamic):
         norm_to_idx = {_norm_label(c): i for i, c in enumerate(categories)}
+
+        def _resolve_cat_idx(src_cat: str) -> int | None:
+            """Find the pivot category that corresponds to a source category.
+
+            Tries exact-normalized match first, then progressive-suffix
+            matching to handle Connector default-alias renames where
+            "Specialty (C/PCP Segments) + Tier Groups - CARD" -> "CARD".
+            Repatha ATU slide 18 was failing because source held the
+            full classifier path while the API returned just the short
+            tail; without suffix matching every value got dropped to
+            None and alignment_failed fired.
+            """
+            key = _norm_label(src_cat)
+            if key in norm_to_idx:
+                return norm_to_idx[key]
+            # Progressive suffix: split on " - ", join trailing K parts
+            parts = [p.strip() for p in key.split(" - ") if p.strip()]
+            for k in range(len(parts), 0, -1):
+                suffix = " - ".join(parts[-k:])
+                if suffix in norm_to_idx:
+                    return norm_to_idx[suffix]
+            # Inverse: an api category may itself be the suffix of src_cat
+            for cat_norm, idx in norm_to_idx.items():
+                if cat_norm and (key.endswith(cat_norm) or cat_norm.endswith(key)):
+                    return idx
+            return None
+
         new_series = []
         for sname, vals in series:
             new_vals = []
             for src_cat in source_categories:
-                key = _norm_label(src_cat)
-                if key in norm_to_idx:
-                    j = norm_to_idx[key]
+                j = _resolve_cat_idx(src_cat)
+                if j is not None:
                     new_vals.append(vals[j] if j < len(vals) else None)
                 else:
                     new_vals.append(None)
