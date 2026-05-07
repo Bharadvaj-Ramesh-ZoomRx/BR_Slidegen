@@ -1578,27 +1578,40 @@ def pivot_records_to_chart_data(
         def _resolve_cat_idx(src_cat: str) -> int | None:
             """Find the pivot category that corresponds to a source category.
 
-            Tries exact-normalized match first, then progressive-suffix
-            matching to handle Connector default-alias renames where
-            "Specialty (C/PCP Segments) + Tier Groups - CARD" -> "CARD".
-            Repatha ATU slide 18 was failing because source held the
-            full classifier path while the API returned just the short
-            tail; without suffix matching every value got dropped to
-            None and alignment_failed fired.
+            Resolution tiers (each only fires when previous misses):
+              1. Exact normalized match.
+              2. Progressive-suffix on " - " split (handles default-alias
+                 renames "Specialty - X - CARD" -> "CARD").
+              3. Tail substring containment in either direction.
+              4. Fuzzy similarity (SequenceMatcher.ratio >= 0.85) as a
+                 final guard against minor rewording / whitespace drift.
+                 Only applies when both labels have >= 4 chars to avoid
+                 spurious matches between short tokens.
             """
             key = _norm_label(src_cat)
             if key in norm_to_idx:
                 return norm_to_idx[key]
-            # Progressive suffix: split on " - ", join trailing K parts
             parts = [p.strip() for p in key.split(" - ") if p.strip()]
             for k in range(len(parts), 0, -1):
                 suffix = " - ".join(parts[-k:])
                 if suffix in norm_to_idx:
                     return norm_to_idx[suffix]
-            # Inverse: an api category may itself be the suffix of src_cat
             for cat_norm, idx in norm_to_idx.items():
                 if cat_norm and (key.endswith(cat_norm) or cat_norm.endswith(key)):
                     return idx
+            # Fuzzy fallback — pick the BEST match above the threshold,
+            # not the first one. Skip very short labels.
+            if len(key) >= 4:
+                from difflib import SequenceMatcher
+                best_idx, best_score = None, 0.0
+                for cat_norm, idx in norm_to_idx.items():
+                    if not cat_norm or len(cat_norm) < 4:
+                        continue
+                    score = SequenceMatcher(None, key, cat_norm).ratio()
+                    if score > best_score:
+                        best_score, best_idx = score, idx
+                if best_score >= 0.85:
+                    return best_idx
             return None
 
         new_series = []
@@ -1684,7 +1697,24 @@ def pivot_records_to_chart_data(
                 hits = prefix_idx.get(prefix, [])
                 if len(hits) == 1:
                     return hits[0]
-            return None
+            # Final fallback: text similarity. Pick the BEST current_name
+            # whose normalized form has a SequenceMatcher.ratio >= 0.85
+            # against src_name's normalized form. Guards against minor
+            # rewording or punctuation drift while staying conservative
+            # enough that distinct labels won't collide.
+            sn = _norm_label(src_name)
+            if len(sn) < 4:
+                return None
+            from difflib import SequenceMatcher
+            best_idx, best_score = None, 0.0
+            for i, n in enumerate(current_names):
+                cn = _norm_label(n)
+                if len(cn) < 4:
+                    continue
+                score = SequenceMatcher(None, sn, cn).ratio()
+                if score > best_score:
+                    best_score, best_idx = score, i
+            return best_idx if best_score >= 0.85 else None
 
         # Resolve each source name → index into mapper series.
         matched: list[int | None] = []
