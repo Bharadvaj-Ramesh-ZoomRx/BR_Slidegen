@@ -212,6 +212,132 @@ this new structure plus the existing end-to-end + live-API tests.
 
 ---
 
+### Testing-Deck assembly (open at end of day; resume next session)
+
+**The ask.** Build a single deck named `Testing Deck.pptx` (in
+`output_testing/deck_output/`) by pulling **only the dynamic
+connected slides** from each of 9 source decks. Static-config slides
+should NOT be included — the goal is a sample deck where every slide
+is genuinely refreshable, so user can hit "refresh" and see the full
+pipeline exercised.
+
+**Refinement made just before session ended:** original ask was "all
+connected slides per deck" (~369 slides total — too big). Refined to
+"dynamic slides only" — exclude truly-static-pinned components.
+
+**Definition of dynamic (apply per slide).** A slide qualifies as
+"dynamic connected" if AT LEAST ONE of its connected components has
+either:
+  - `dynamic_latest_n > 0`, OR
+  - `include_live_wave == True`
+
+A component that has `static_time_period_ids` set AND no
+`dynamic_latest_n` AND `include_live_wave == False` is truly static
+and is the kind that gets `static_pinned_skipped` at refresh. Slides
+where ALL connected components are truly static should be EXCLUDED
+from the Testing Deck.
+
+A slide with mixed pin (static + dynamic_latest_n) DOES refresh, so
+it stays IN.
+
+**The 9 source decks (confirmed by user):**
+
+  1. AML & MDS PET Q2FY26 Full Report 27MAR2026 - sandbox migration.pptx
+  2. AVEO Wave 5 PET Report v1.0.pptx
+  3. AZN LOKELMA PET Quarterly Report Q1 2026.pptx
+  4. CREON Share of Voice Study - W33 updated source deck.pptx
+  5. DATROWAY EGFRm NSCLC Promotional Effectiveness Tracking (PET)
+     Q1 '26 PP and NPP Final Report_v1 (4).pptx
+  6. Repatha HCP ATU - Q2'26 Skeleton Deck1 (1).pptx
+  7. [ZoomRx] Abilify LAI PET - Full Report (1).pptx
+  8. [ZoomRx] ILAI Q1 '26 - Topline Report.pptx
+  9. projects/J&J Rybrevant PET/Template/ZoomRx_UC_ATU_Report_Q1_'26.pptx
+
+Connected-slide counts BEFORE the dynamic-only filter (from
+`generate_config_specs`):
+
+  AML & MDS                88 total / 53 connected
+  AVEO Wave 5              58 total / 36 connected
+  AZN LOKELMA              67 total / 33 connected
+  CREON W33               104 total / 47 connected
+  DATROWAY EGFRm           53 total / 30 connected
+  Repatha HCP ATU         109 total / 69 connected
+  Abilify LAI              54 total / 32 connected
+  ILAI Q1'26               33 total / 13 connected
+  UC ATU                   99 total / 56 connected
+                                ----
+                                369 total connected (pre-dynamic-filter)
+
+The dynamic-only filter is expected to drop a meaningful chunk —
+e.g. on Repatha ATU, slides 11/12/etc are mixed-pin and stay; pure
+static-history slides drop. Final Testing Deck size likely 200-300
+slides.
+
+**Cleanup already done.** Eighteen result decks (CREON v2-v8,
+Repatha ATU v1-v10 minus v4, AVEO v1) plus the PowerPoint lock file
+were deleted from `output_testing/deck_output/` per user request.
+`output_testing/deck_output/` now contains ONLY the 9 source decks
+listed above (the J&J one lives in `projects/...`).
+
+**Approach drafted but not executed.** `scripts/build_testing_deck.py`
+exists in the working tree (uncommitted) using PowerPoint COM via
+pywin32 to copy slides cross-deck. This preserves connector tags +
+embedded charts + relationships exactly as a manual PowerPoint
+copy/paste would. Was about to run, then user paused for the
+dynamic-filter clarification AND to switch sessions.
+
+`pywin32==311` was installed today (`pip install pywin32`), so the
+new session has it ready. PowerPoint 16.0 detected on this machine.
+
+**What the next session needs to do.**
+
+  1. Update `scripts/build_testing_deck.py` so the per-deck index
+     filter applies the dynamic-only rule (above) instead of the
+     blanket `tagged > 0` rule. Helper logic to add:
+
+         from slidegen.deck_reader.tag_reader import generate_config_specs
+         from slidegen.slide_spec.schema import dump_spec
+         specs, summary = generate_config_specs(str(deck_path))
+         dynamic_indices_1based = []
+         for spec in specs:
+             d = json.loads(dump_spec(spec))
+             si = d["slide_index"]
+             dynamic = False
+             for comp in d.get("components", []):
+                 if comp.get("type") not in ("chart", "value_table", "label_table"):
+                     continue
+                 dm = comp.get("data_mapping", {}) or {}
+                 lin = dm.get("raw_data_lineage", {}) or {}
+                 if (lin.get("dynamic_latest_n") or 0) > 0:
+                     dynamic = True; break
+                 if lin.get("include_live_wave"):
+                     dynamic = True; break
+             if dynamic:
+                 dynamic_indices_1based.append(si + 1)
+
+  2. Run the script. Expect ~5-10 minutes runtime (COM open/copy/paste
+     across 9 decks). PowerPoint must be installable + able to launch
+     headless on the machine; user already had a Repatha lock file
+     hanging around from a prior session — close any open decks before
+     running.
+
+  3. Verify Testing Deck.pptx exists with the expected slide count.
+     Print per-deck breakdown.
+
+  4. Optional follow-up: run `python -m slidegen.refresh_pipeline
+     "output_testing/deck_output/Testing Deck.pptx"` to refresh and
+     produce the eval verdict.
+
+**Memory notes for the new session:**
+  - Do NOT touch the J&J Rybrevant Template folder's content; the
+    UC ATU deck there is a source of truth.
+  - The pywin32 + PowerPoint COM approach is necessary because
+    python-pptx alone can't reliably cross-deck-copy shapes that
+    have connector custom XML parts + embedded chart OLE objects.
+  - All commits so far today are pushed to `bharadvaj-slidegen`.
+    Latest HEAD = `e3b2a1c`. Working tree has uncommitted file
+    `scripts/build_testing_deck.py` (this session's draft).
+
 <!--
 ## YYYY-MM-DD (template for next session)
 
