@@ -162,10 +162,50 @@ Test coverage spans unit tests for individual mapper helpers, end-to-end golden 
 | `test_resolution_chain.py` | The 5-tier label resolver (exact, progressive-suffix, tail-substring, fuzzy, positional) for both categories and series | 7 |
 | `test_table_auto_write.py` | `_format_cell_value` (0%, 0.0%, 0, #,##0, NaN), `_refresh_templated_count_with_records` (8 templated-cell patterns), `_auto_compute_cell_values` for vertical / horizontal / 1×1 layouts | 21 |
 | `test_filter_resolver.py` | `;`-joined IN filters with exact + compound-suffix matches, broken-filter graceful fallback, measure-column filter, latest-wave-only filter | 6 |
+| `test_refresh_eval.py` | Per-deck quality eval — classification taxonomy (passed/preserved/review/error), note-level downgrades (tag_mismatch on status=ok), rate calculations | 11 |
 
 Run all: `pytest tests/connector/ -q` (~1 sec, no creds, no network).
 
 `tests/test_propose_pivot_config.py` — 8 tests for the spec-inference logic used to bootstrap specs from charts that lack tags (separate from the connector path).
+
+### Per-deck quality eval (`slidegen.refresh_eval`)
+
+After every refresh, the pipeline reads the freshly-written `*_refresh_status.json` sidecar and prints a single verdict — what % of components refreshed cleanly, what % need user review, what % errored. Same eval is also runnable standalone any time:
+
+```bash
+python -m slidegen.refresh_eval output_testing/json_output/<deck>_refresh_status.json
+python -m slidegen.refresh_eval output_testing/deck_output/<deck>.pptx     # auto-locates sidecar
+python -m slidegen.refresh_eval <status.json> --threshold 80              # exit nonzero if pass < 80%
+```
+
+Sample output (Repatha ATU v10):
+```
+------------------------------------------------------------
+Refresh quality report
+------------------------------------------------------------
+  Slides processed:        69 / 69
+  Total components:        357
+  PASSED (clean refresh):   266  (74.5% of refreshable)
+  PRESERVED (static-pin):     0
+  REVIEW (tag fix needed):   49  (13.7% of total)
+  ERROR (broken):            34  (9.5% of total)
+  Inclusive pass rate:     74.5%   (passed + preserved / total)
+
+  Review breakdown (1-based slide numbers):
+    alignment_failed     on slides 18, 19, 37, 47, 55, 60, 61, 71, 72, 74, 97, 106, 107
+    tag_mismatch         on slides 48, 52, 56, 59, 93, 105
+------------------------------------------------------------
+```
+
+Classification taxonomy:
+- **PASSED** = `ok`, `ok_with_dynamic_added`, `ok_with_partial` (the component received refreshed data with no review-worthy notes)
+- **PRESERVED** = `static_pinned_skipped` (correct by design — counted separately so static-by-intent decks aren't penalized)
+- **REVIEW** = `tag_mismatch`, `ambiguous_tag`, `alignment_failed` (data preserved; user-side fix needed). Also detected via *notes* on `status=ok` components — a chart with a `tag_mismatch` note is REVIEW, not PASSED.
+- **ERROR** = `not_found`, `empty`, `error`, `missing` (genuinely broken)
+
+Pass rate denominator excludes preserved (`passed / refreshable`) so a deck that's 50% static-pinned and 50% perfectly refreshed reports 100%, not 50%.
+
+Use `--threshold 80` in CI / scripts to fail any run below 80% pass rate.
 
 ### End-to-end goldens
 

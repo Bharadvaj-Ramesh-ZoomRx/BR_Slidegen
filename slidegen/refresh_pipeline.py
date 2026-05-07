@@ -67,6 +67,7 @@ from slidegen.intelligent_refresh import (  # noqa: E402
     walk_shapes_recursive,
 )
 from slidegen.label_sync import sync_period_labels  # noqa: E402
+from slidegen.refresh_eval import eval_refresh_status, format_report  # noqa: E402
 
 
 def _slugify(name: str) -> str:
@@ -524,6 +525,18 @@ def run_full_pipeline(
     for k, v in sorted(counts.items(), key=lambda kv: -kv[1]):
         print(f"    {k:25s} {v}")
 
+    # Component-level quality eval — what % of components refreshed
+    # cleanly. Reads the sidecar we just wrote and prints the verdict
+    # alongside the slide-level bucket counts. Run standalone any time
+    # via `python -m slidegen.refresh_eval <status.json>`.
+    try:
+        eval_report = eval_refresh_status(refresh_status_path)
+        print()
+        print(format_report(eval_report))
+    except Exception as exc:
+        print(f"  [warn] eval failed: {exc}")
+        eval_report = None
+
     tag_mismatch_slides = [
         s_idx for s_idx in range(len(pres.slides))
         if any(
@@ -557,6 +570,7 @@ def run_full_pipeline(
         "label_sync_status": str(label_sync_status_path),
         "slide_buckets": counts,
         "tag_mismatch_slides": tag_mismatch_slides,
+        "eval_report": eval_report,
     }
 
 

@@ -130,6 +130,28 @@ User asked: can we close all known limitations? Worked through them:
 | `e5bc4d6` | Templated patterns extended + scatter series-name fallback + positional alignment 5th tier + README/memory updates. |
 | (next)   | Connector unit-test suite (4 files, 55 tests) + README evals section rewrite. |
 
+### Per-deck quality eval (added late-late-day)
+
+User pushed back: unit tests are great but they don't tell you "did
+this specific refresh of this specific deck pass." Built
+`slidegen/refresh_eval.py` — reads the `*_refresh_status.json` sidecar
+and outputs a verdict: passed / preserved / review / error counts +
+pass-rate %. Wired into the pipeline so every refresh prints this
+verdict at the end. Also runnable standalone:
+
+    python -m slidegen.refresh_eval <status.json>
+    python -m slidegen.refresh_eval <deck.pptx>           # auto-locates sidecar
+    python -m slidegen.refresh_eval <status> --threshold 80  # CI gate
+
+Note-level downgrade — a component with `status=ok` but carrying a
+`tag_mismatch` or `selectedColumns_drift` note is classified REVIEW,
+not PASSED. Without that, Repatha ATU v10 would have inflated to
+~85%; the honest score is 74.5% PASS / 13.7% REVIEW / 9.5% ERROR.
+
+11 unit tests in `tests/connector/test_refresh_eval.py` cover the
+classification taxonomy, note downgrade, rate calculations, empty
+data, and the format_report renderer.
+
 ### Eval coverage closed today
 
 User asked: are evals extensive enough? Walked through gaps and added
