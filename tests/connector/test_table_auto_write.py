@@ -243,6 +243,120 @@ def test_row_field_only_selected_columns_preserves_source():
     )
 
 
+def test_multi_row_field_columns_preserved_in_matrix_layout():
+    """Datroway slide 25 Table 4 case: 5-col table with selectedColumns =
+    ['ID','Tags','y_label','Q4_2025_value','Q1_2026_value']. Three leading
+    RowField cols must be preserved from source; only the 2 trailing wave
+    value cols should be written from series. Legacy matrix layout would
+    write series[0]/series[1] into the Tags and y_label columns,
+    overwriting hand-curated message text with wave %."""
+    shape, _, _ = _new_table(11, 5)
+    # Source table layout: ID | Tags | Abbreviated Message | Q4'25 | Q1'26
+    shape.table.cell(0, 0).text = "ID"
+    shape.table.cell(0, 1).text = "Tags"
+    shape.table.cell(0, 2).text = "Abbreviated Message"
+    shape.table.cell(0, 3).text = "Q4 '25"
+    shape.table.cell(0, 4).text = "Q1 '26"
+    shape.table.cell(1, 0).text = "D6"
+    shape.table.cell(1, 1).text = "Efficacy - ORR"
+    shape.table.cell(1, 2).text = "45% ORR was observed with DATROWAY..."
+    shape.table.cell(1, 3).text = "66%"
+    shape.table.cell(1, 4).text = "70%"
+
+    pivot = {
+        "RowFields": ["Tags", "ID", "y_label"],
+        "ColumnFields": ["time_period_name", "x_label"],
+        "ValueFields": ["decimal", "me_score"],
+        "columnDefinitions": [
+            {"Name": "ID", "IsDefaultAlias": True},
+            {"Name": "Tags", "IsDefaultAlias": True},
+            {"Name": "y_label", "IsDefaultAlias": True},
+            {"Name": "Q4 2025 @:@ Believable @:@ Average of me_score",
+             "Format": "0%", "IsDefaultAlias": True},
+            {"Name": "Q1 2026 @:@ Believable @:@ Average of me_score",
+             "Format": "0%", "IsDefaultAlias": True},
+        ],
+    }
+    mapping = {
+        "selectedColumns": [
+            "ID", "Tags", "y_label",
+            "Q4 2025 @:@ Believable @:@ Average of me_score",
+            "Q1 2026 @:@ Believable @:@ Average of me_score",
+        ],
+        "selectAllRows": False,
+    }
+    series = [
+        ("Q4 2025 @:@ Believable @:@ Average of me_score", [0.65, 0.59]),
+        ("Q1 2026 @:@ Believable @:@ Average of me_score", [0.71, 0.66]),
+    ]
+    categories = ["msg1", "msg2"]
+
+    cv = _auto_compute_cell_values(shape, categories, series, pivot, mapping)
+    assert cv is not None, "Expected matrix layout to fire (5 cols, 11 rows)"
+    # Header row: preserved verbatim
+    assert cv[0] == ["ID", "Tags", "Abbreviated Message", "Q4 '25", "Q1 '26"]
+    # Data row 1: cols 0-2 preserved (RowFields), cols 3-4 refreshed (waves)
+    assert cv[1][0] == "D6", f"col 0 (ID) must be preserved, got {cv[1][0]!r}"
+    assert cv[1][1] == "Efficacy - ORR", (
+        f"col 1 (Tags) must be preserved as text, got {cv[1][1]!r}. "
+        f"Without the multi-row-field guard, series[0] (Q4 2025 = 65%) "
+        f"would have been written here."
+    )
+    assert cv[1][2] == "45% ORR was observed with DATROWAY...", (
+        f"col 2 (y_label/Message) must be preserved as text, got {cv[1][2]!r}"
+    )
+    assert cv[1][3] == "65%", f"col 3 (Q4'25) must be refreshed, got {cv[1][3]!r}"
+    assert cv[1][4] == "71%", f"col 4 (Q1'26) must be refreshed, got {cv[1][4]!r}"
+
+
+def test_legacy_single_row_label_matrix_unchanged():
+    """Sanity: classic 'col 0 = label, cols 1+ = series' tables (no
+    explicit RowField cols in selectedColumns) keep their legacy
+    behavior — cols 1+ get series[col-1]."""
+    shape, _, _ = _new_table(3, 3)
+    shape.table.cell(0, 0).text = "Topic"
+    shape.table.cell(0, 1).text = "CARD"
+    shape.table.cell(0, 2).text = "ONC"
+    shape.table.cell(1, 0).text = "Efficacy"
+    shape.table.cell(2, 0).text = "Safety"
+
+    pivot = {
+        "RowFields": ["y_label"],
+        "ColumnFields": ["segment_1"],
+        "ValueFields": ["decimal"],
+        "columnDefinitions": [
+            {"Name": "y_label", "IsDefaultAlias": True},
+            {"Name": "CARD @:@ Average of decimal",
+             "Format": "0%", "IsDefaultAlias": True},
+            {"Name": "ONC @:@ Average of decimal",
+             "Format": "0%", "IsDefaultAlias": True},
+        ],
+    }
+    # Note: selectedColumns has only the value cols, NOT the row label —
+    # the legacy "col 0 implicit row label" pattern.
+    mapping = {
+        "selectedColumns": [
+            "CARD @:@ Average of decimal",
+            "ONC @:@ Average of decimal",
+        ],
+        "selectAllRows": True,
+    }
+    series = [
+        ("CARD @:@ Average of decimal", [0.42, 0.58]),
+        ("ONC @:@ Average of decimal", [0.55, 0.61]),
+    ]
+
+    cv = _auto_compute_cell_values(shape, ["Efficacy", "Safety"], series, pivot, mapping)
+    assert cv is not None
+    assert cv[0] == ["Topic", "CARD", "ONC"]
+    # cols 1, 2 fall through to positional fallback in col_actions:
+    # selected[1]/selected[2] map to selected_visible entries → series[0]/[1]
+    assert cv[1][1] == "42%"
+    assert cv[1][2] == "55%"
+    assert cv[2][1] == "58%"
+    assert cv[2][2] == "61%"
+
+
 def test_mixed_row_field_and_value_selected_columns_still_writes():
     """Sanity: when selectedColumns mixes a RowField AND a value column,
     the value column must still be written (the row-field-only guard

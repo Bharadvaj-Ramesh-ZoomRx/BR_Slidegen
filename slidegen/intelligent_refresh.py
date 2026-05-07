@@ -241,18 +241,57 @@ def _auto_compute_cell_values(
         return [row_out]
 
     # ── Layout 3: matrix (categories down rows, series across cols) ──
+    # Per Connector spec §13.1: selectedColumns names the visible columns
+    # in left-to-right order, mixing RowField columns (preserve from source)
+    # and value columns (write series). When selectedColumns covers all
+    # physical columns 1:1, walk it to decide per-col action — this is the
+    # multi-RowField case (e.g. Datroway slide 25 Table 4:
+    # ['ID','Tags','y_label','Q4_2025_value','Q1_2026_value']). Without
+    # this, the legacy "col 0 = label, cols 1..N = series" pattern would
+    # write series[0] / series[1] into the Tags and y_label columns,
+    # overwriting hand-curated message text with wave %.
+    #
+    # When selectedColumns is shorter than n_cols (the implicit-row-label
+    # convention — many tables list only value cols), fall through to the
+    # legacy positional layout so single-row-label + N-series tables keep
+    # working unchanged.
     if n_rows >= 2 and n_cols >= 2:
-        out = [list(existing[0])]  # header row preserved
-        for i in range(1, n_rows):
-            row_out = [existing[i][0]]  # row label preserved
+        col_actions: list[object] = []
+        if len(selected) == n_cols:
+            for j in range(n_cols):
+                sel = selected[j]
+                if _is_row_field_name(sel, raw_pivot_config):
+                    col_actions.append("preserve")
+                else:
+                    s_idx = _pick_series_for_selected(sel)
+                    if s_idx is not None:
+                        col_actions.append(("series", s_idx))
+                    else:
+                        col_actions.append("preserve")
+        else:
+            col_actions.append("preserve")  # col 0 = row label
             for j in range(1, n_cols):
                 s_idx = j - 1
-                if s_idx < len(series) and (i - 1) < len(series[s_idx][1]):
-                    v = series[s_idx][1][i - 1]
-                    cd = _col_def_for_series_index(s_idx)
-                    row_out.append(_format_for_column(cd, v))
+                if s_idx < len(series):
+                    col_actions.append(("series", s_idx))
                 else:
+                    col_actions.append("preserve")
+
+        out = [list(existing[0])]  # header row preserved
+        for i in range(1, n_rows):
+            row_out = []
+            for j in range(n_cols):
+                action = col_actions[j]
+                if action == "preserve":
                     row_out.append(existing[i][j])
+                else:
+                    _, s_idx = action  # type: ignore[misc]
+                    if s_idx < len(series) and (i - 1) < len(series[s_idx][1]):
+                        v = series[s_idx][1][i - 1]
+                        cd = _col_def_for_series_index(s_idx)
+                        row_out.append(_format_for_column(cd, v))
+                    else:
+                        row_out.append(existing[i][j])
             out.append(row_out)
         return out
 
