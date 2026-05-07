@@ -97,70 +97,94 @@ def _looks_like_data_narrative(text: str) -> bool:
     return False
 
 
+# Talking-header vs slide-section-title distinction.
+# Layout convention:
+#   top-LEFT  → talking header (narrative claim, full sentence; this is
+#               what we rewrite)
+#   top-RIGHT → roadmap (narrow nav strip; never rewrite — excluded by
+#               width filter)
+#   below talking header → slide-section title (short label like
+#                          "Message Recall"; never rewrite — excluded
+#                          by text-length filter)
+#
+# Talking headers are sentences (typically 60-200 chars). Section titles
+# are 1-4 word labels (typically 5-30 chars). The 30-char threshold cleanly
+# separates them in every deck we've inspected (Testing Deck, CREON, ATU,
+# AVEO, Repatha, ILAI, Datroway).
+_HEADLINE_MIN_CHARS = 30
+
+
 def _find_headline_shape(slide):
-    """Pick the slide's headline text frame — topmost wide title shape.
+    """Pick the slide's TALKING HEADER — the top-left long-sentence text frame.
 
-    Updated heuristic (slide 73 fix on Repatha ATU): the previous logic
-    required a narrative-verb match (rose / declined / trended / ...),
-    which on multi-Title slides skipped the real headline at the top
-    when its wording happened to lack those verbs (e.g. "Overall, HCPs
-    exhibit a growing trend in their intent..."). It then fell to the
-    next Title shape — a section header below ("Expected Increase in
-    Prescription – Primary Prevention - Trended") — which IS lower on
-    the slide but happens to contain a verb.
+    Strict heuristic to avoid confusion with the slide-section title
+    (short label that sits BELOW the talking header) and the roadmap
+    (narrow strip at top-right):
 
-    The user's contract for "headliner": top-most wide text frame with
-    a 1-3 line sentence, NOT a roadmap or section-header strip. Reading
-    "narrative-shaped" gates BUILDING a fresh narrative (caller's job),
-    not which shape is the headline.
+      1. Width >= 40% of slide width      (excludes roadmap)
+      2. Top < 2 inches from slide top    (excludes body content)
+      3. Text length >= 30 chars          (excludes section-title labels)
+      4. Among survivors: pick TOPMOST.   (talking header is above section title)
+      5. Tiebreak (same top, within ~0.2in): pick LEFTMOST.
+                                            (talking header is top-left)
 
-    Heuristic order:
-      1. zrx_<slide:03d>_001 — SlideGen pipeline's first-shape convention.
-      2. Title*/Headline*-named shapes that are reasonably wide (>= 40%
-         of slide width) and have substantive text — pick the topmost.
-      3. Any wide text frame in the upper portion of the slide with
-         substantive text (10+ chars) — pick the topmost.
+    SlideGen's own naming convention `zrx_<slide:03d>_001` for the
+    first shape on a slide takes priority when present (and only if it
+    also passes the length filter — guards against `zrx_001_001` being
+    a banner).
 
-    Returns None only when no title-like shape exists at all.
+    Returns None when no talking header exists (e.g., dividers, covers).
     """
     slide_w_emu = (slide.part.package.presentation_part.presentation
                    .slide_width if hasattr(slide.part.package, "presentation_part")
                    else 9144000)  # fallback ~10in
     min_width_emu = int(slide_w_emu * 0.4)
+    tiebreak_top_band_emu = 200000  # ~0.2 inches
 
-    title_candidates = []
-    other_candidates = []
+    candidates = []  # (top, left, shape, text)
     for shape in slide.shapes:
         if not shape.has_text_frame:
             continue
-        name = (shape.name or "").lower().strip()
         text = (shape.text_frame.text or "").strip()
         if not text:
             continue
-        if name.startswith("zrx_") and name.endswith("_001"):
-            return shape
         top = shape.top or 0
+        left = shape.left or 0
         width = shape.width or 0
-        if name.startswith("title") or name.startswith("headline"):
-            if width >= min_width_emu and len(text) >= 10:
-                title_candidates.append((top, shape, text))
-            continue
-        if (len(text) > 10
+        # SlideGen first-shape convention — accept only if it also passes
+        # length + position filters (banner-only `zrx_*_001` is excluded).
+        name = (shape.name or "").lower().strip()
+        if name.startswith("zrx_") and name.endswith("_001"):
+            if (width >= min_width_emu
+                    and top < _HEADLINE_TOP_LIMIT_EMU
+                    and len(text) >= _HEADLINE_MIN_CHARS):
+                return shape
+            # Otherwise fall through to the general filter
+        if (width >= min_width_emu
                 and top < _HEADLINE_TOP_LIMIT_EMU
-                and width >= min_width_emu):
-            other_candidates.append((top, shape, text))
+                and len(text) >= _HEADLINE_MIN_CHARS):
+            candidates.append((top, left, shape, text))
 
-    if title_candidates:
-        title_candidates.sort(key=lambda t: t[0])
-        return title_candidates[0][1]
-    if other_candidates:
-        other_candidates.sort(key=lambda t: t[0])
-        return other_candidates[0][1]
-    return None
+    if not candidates:
+        return None
+    # Sort by top, then by left (talking header is topmost; ties resolved
+    # leftmost since talking header is top-LEFT and section title may be
+    # top-CENTERED).
+    candidates.sort(key=lambda c: (c[0], c[1]))
+    # Bucket all candidates within the tiebreak band of the topmost into a
+    # group, then pick leftmost within that group.
+    topmost_y = candidates[0][0]
+    top_band = [c for c in candidates if c[0] - topmost_y <= tiebreak_top_band_emu]
+    top_band.sort(key=lambda c: c[1])  # leftmost wins
+    return top_band[0][2]
 
 
 def _largest_chart(slide):
-    """The chart shape on this slide with the largest area."""
+    """The chart shape on this slide with the largest area.
+
+    Kept for backwards compatibility with existing callers / tests.
+    The new headline flow uses _all_data_shapes() instead.
+    """
     best, best_area = None, 0
     for shape in slide.shapes:
         if not shape.has_chart:
@@ -175,49 +199,147 @@ def _summarize_chart(shape) -> str:
     """Multi-line text summary of a chart's cats + series for the LLM prompt."""
     if not shape.has_chart:
         return ""
-    plot = shape.chart.plots[0]
+    try:
+        plot = shape.chart.plots[0]
+    except Exception:
+        return ""
     cats = [str(c) for c in plot.categories]
     lines = [f"Categories: {cats}"]
     for s in plot.series:
-        vals = [round(float(v), 4) if v is not None else None
-                for v in s.values]
+        try:
+            vals = [round(float(v), 4) if v is not None else None
+                    for v in s.values]
+        except Exception:
+            vals = list(s.values) if hasattr(s, "values") else []
         lines.append(f"Series '{s.name or ''}': {vals}")
     return "\n".join(lines)
 
 
-def _build_prompt(old_headline: str, src_chart_summary: str,
-                  ref_chart_summary: str, slide_context: str = "") -> str:
+def _summarize_table(shape, max_rows: int = 25, max_cols: int = 12) -> str:
+    """Text summary of a table's cells for the LLM prompt.
+
+    Caps at max_rows × max_cols so very large tables don't blow up the
+    prompt. Cell text is stripped; empty rows are dropped.
+    """
+    if not shape.has_table:
+        return ""
+    table = shape.table
+    n_rows = min(len(table.rows), max_rows)
+    n_cols = min(len(table.columns), max_cols)
+    if n_rows == 0 or n_cols == 0:
+        return ""
+    lines = []
+    for r in range(n_rows):
+        cells = []
+        for c in range(n_cols):
+            try:
+                txt = (table.cell(r, c).text_frame.text or "").strip()
+            except Exception:
+                txt = ""
+            # Collapse whitespace inside cell
+            txt = " ".join(txt.split())
+            cells.append(txt)
+        if any(cells):
+            lines.append(" | ".join(cells))
+    truncation = ""
+    if len(table.rows) > max_rows:
+        truncation += f"  (truncated: {len(table.rows) - max_rows} more rows)"
+    if len(table.columns) > max_cols:
+        truncation += f"  (truncated: {len(table.columns) - max_cols} more cols)"
+    return "\n".join(lines) + (("\n" + truncation) if truncation else "")
+
+
+def _all_data_shapes(slide):
+    """Return every chart + table shape on the slide as
+    [(kind, shape, name, summary), ...] sorted by area descending so the
+    largest data shape leads the prompt.
+
+    kind ∈ {'chart', 'table'}. Skips shapes with empty summaries.
+    """
+    out = []
+    for shape in slide.shapes:
+        kind = None
+        summary = ""
+        if shape.has_chart:
+            kind = "chart"
+            summary = _summarize_chart(shape)
+        elif shape.has_table:
+            kind = "table"
+            summary = _summarize_table(shape)
+        else:
+            continue
+        if not summary.strip():
+            continue
+        area = (shape.width or 0) * (shape.height or 0)
+        out.append((area, kind, shape, shape.name or "", summary))
+    out.sort(key=lambda t: -t[0])  # largest first
+    return [(kind, shp, name, sm) for (_a, kind, shp, name, sm) in out]
+
+
+def _build_prompt(old_headline: str, data_summaries: list[tuple[str, str, str]],
+                  src_data_summaries: list[tuple[str, str, str]] | None = None,
+                  slide_context: str = "") -> str:
+    """Build the LLM prompt for talking-header rewrite.
+
+    Args:
+      old_headline: the existing talking header text.
+      data_summaries: [(kind, name, summary), ...] for EVERY chart and
+        table on the slide post-refresh, ordered largest-first. Claude
+        sees them all and decides which to call out (could be all,
+        could be one).
+      src_data_summaries: optional [(kind, name, summary), ...] from
+        SOURCE deck — when provided, Claude can compare to call out
+        what moved. None for non-connected slides where we don't have a
+        meaningful before/after split.
+      slide_context: optional extra context (slide section, project, etc.)
+    """
     is_narrative = _looks_like_data_narrative(old_headline)
     voice_instruction = (
-        "Rewrite the headline to reflect the new values, preserving the "
-        "original's voice, structure, and tone."
+        "Rewrite the headline to reflect the latest values, preserving the "
+        "original's voice, structure, and tone where possible."
         if is_narrative
-        else "The original is a category/section label — replace it with a "
-             "narrative-style verdict that reflects the new data. Use a "
-             "natural-sounding 2-3 line claim, not a label."
+        else "The original may be a label or fragment — write a narrative-style "
+             "VERDICT that captures what matters in the data. Natural-sounding "
+             "2-3 line claim, not a label."
     )
-    return f"""You are updating a PowerPoint slide headline after a data refresh. The output you produce will be written verbatim into the slide's title shape — there is no editor in between.
 
-{voice_instruction} The headline is a VERDICT — a 2-3 line claim about what mattered — not a data summary or analysis.
+    def _fmt_shapes(shapes):
+        if not shapes:
+            return "(none)"
+        out = []
+        for kind, name, summary in shapes:
+            header = f"--- {kind.upper()}: {name or '(unnamed)'} ---"
+            out.append(header + "\n" + summary)
+        return "\n\n".join(out)
 
-ORIGINAL HEADLINE
+    src_block = ""
+    if src_data_summaries:
+        src_block = (
+            f"\n\nSOURCE DATA (what the headline was written about — for comparison)\n"
+            f"{_fmt_shapes(src_data_summaries)}\n"
+        )
+
+    return f"""You are updating a PowerPoint slide's TALKING HEADER. The output you produce will be written verbatim into the talking-header shape (top-left of the slide) — there is no editor in between.
+
+{voice_instruction} A talking header is a VERDICT — a 2-3 line claim about what mattered — not a data inventory.
+
+ORIGINAL TALKING HEADER
 {old_headline}
 
-ORIGINAL CHART DATA (what the headline was written about)
-{src_chart_summary}
-
-NEW CHART DATA (after refresh)
-{ref_chart_summary}
+CURRENT DATA ON THIS SLIDE (every chart and table, largest first)
+{_fmt_shapes(data_summaries)}{src_block}
 
 CONTEXT
 {slide_context or '(none)'}
 
 INSTRUCTIONS — STRICT
-- Output ONLY the headline text. It will be written verbatim into the title shape.
-- LENGTH: 2-3 lines maximum. Aim for 80-160 characters total.
+- Output ONLY the headline text. It will be written verbatim into the talking-header shape.
+- LENGTH: 2-3 lines maximum. Aim for 80-180 characters total.
 - A headline is a VERDICT — what mattered, expressed as a claim. Not a data inventory.
-- Reflect actual values from the NEW data with concrete movement words ("rose 6 points", "dropped 4 points", "held steady"). Treat moves under 1 point as flat.
-- If the new data is empty / all-None / clearly corrupted, output the ORIGINAL headline unchanged.
+- The slide may have MULTIPLE charts/tables. You decide which numbers are worth calling out — sometimes one of them carries the story; sometimes two or three combine. Don't force every shape into the headline.
+- Reflect actual values from the data with concrete movement words ("rose 6 points", "dropped 4 points", "held steady") when SOURCE DATA is provided so you can see movement. When SOURCE is not provided, describe the current state crisply ("X leads at 47%, Y trails at 12%").
+- Treat moves under 1 point as flat.
+- If every chart/table is empty / all-None / clearly corrupted, output the ORIGINAL talking header unchanged.
 - Don't invent context that wasn't in the original.
 
 DO NOT include any of the following in your output:
@@ -297,21 +419,48 @@ def refresh_headlines(
     model: str = "anthropic/claude-sonnet-4-6",
     dry_run: bool = False,
 ) -> list[HeadlineUpdate]:
-    """Rewrite headlines for connected slides whose chart values moved.
+    """Rewrite the talking header on EVERY slide that has one + at least
+    one chart or table.
 
-    only_slides: optional 0-based slide-index whitelist (None = all connected).
-    dry_run: if True, don't write the output deck — just return planned updates.
+    Behavior changes from the previous "Step 7 connected-only" flow:
+      * Walks every slide, not just the spec-listed connected ones.
+      * Reads ALL chart + table shapes on the slide (not just the
+        largest chart) and sends every summary to Claude. Claude decides
+        which numbers are worth calling out.
+      * Doesn't skip when chart values are unchanged. Slides with mixed
+        connected + non-connected components might have new manual edits
+        on the non-connected side that the headline should reflect.
+      * `spec_path` is now optional context — when present, source data is
+        included in the prompt so Claude can describe MOVEMENT
+        ("rose 6 points"); when None or the slide isn't in the spec, the
+        prompt asks for a STATE description ("X leads at 47%").
+
+    Args:
+      source_pptx: pre-refresh deck. Used to read source-side chart/table
+        values for movement-aware prompts on connected slides.
+      refreshed_pptx: post-refresh deck — the file we read current data
+        from and write headlines into.
+      spec_path: optional spec JSON path. Used to flag which slides had
+        connected refresh; doesn't gate processing.
+      out_pptx: output path for the deck with rewritten talking headers.
+      only_slides: optional 0-based slide-index whitelist (None = all).
+      dry_run: if True, don't call the LLM or write the deck — just
+        return planned updates.
     """
     from pptx import Presentation
-    from tests.evals.end_to_end.compare_decks import _extract_chart_data
 
     if not dry_run and not os.environ.get("LLM_API_KEY"):
         raise RuntimeError(
             "LLM_API_KEY not set. Add it to docs/.env or export it."
         )
 
-    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
-    spec_slides = {s["slide_index"] for s in spec.get("slides", [])}
+    spec_slides: set[int] = set()
+    if spec_path and Path(spec_path).exists():
+        try:
+            spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+            spec_slides = {s["slide_index"] for s in spec.get("slides", [])}
+        except Exception:
+            spec_slides = set()
 
     src = Presentation(source_pptx)
     ref = Presentation(refreshed_pptx)
@@ -320,44 +469,54 @@ def refresh_headlines(
     for s_idx, (s_slide, r_slide) in enumerate(zip(src.slides, ref.slides)):
         if only_slides is not None and s_idx not in only_slides:
             continue
-        if s_idx not in spec_slides:
-            continue
-        src_chart = _largest_chart(s_slide)
-        ref_chart = _largest_chart(r_slide)
-        if src_chart is None or ref_chart is None:
-            updates.append(HeadlineUpdate(s_idx, "", "", "", "no_chart"))
-            continue
-        try:
-            _, src_series = _extract_chart_data(src_chart)
-            _, ref_series = _extract_chart_data(ref_chart)
-        except Exception as exc:
-            updates.append(HeadlineUpdate(
-                s_idx, "", "", f"extract error: {exc}", "no_chart"))
-            continue
-        if _values_eq(src_series, ref_series):
-            updates.append(HeadlineUpdate(
-                s_idx, "", "", "values unchanged", "unchanged"))
-            continue
-        if _all_none(ref_series) and not _all_none(src_series):
-            # Refresh corrupted the chart (all values None). Don't ask the LLM
-            # to write a headline against empty data — preserve the original.
-            updates.append(HeadlineUpdate(
-                s_idx, "", "", "refreshed values all-None (corrupted)", "unchanged"))
-            continue
 
+        # 1. Find the talking header. No talking header → skip silently.
         headline_shape = _find_headline_shape(r_slide)
         if headline_shape is None:
-            updates.append(HeadlineUpdate(
-                s_idx, "", "", "", "no_headline"))
+            updates.append(HeadlineUpdate(s_idx, "", "", "", "no_headline"))
             continue
         old_headline = headline_shape.text_frame.text.strip()
 
-        src_summary = _summarize_chart(src_chart)
-        ref_summary = _summarize_chart(ref_chart)
-        prompt = _build_prompt(old_headline, src_summary, ref_summary)
+        # 2. Gather every chart + table on the refreshed slide. Skip the
+        #    slide entirely if there's nothing to summarise (cover, divider).
+        ref_data = _all_data_shapes(r_slide)
+        if not ref_data:
+            updates.append(HeadlineUpdate(
+                s_idx, old_headline, "", "no chart or table on slide", "no_chart"))
+            continue
+        ref_summaries = [(kind, name, summary) for (kind, _shp, name, summary) in ref_data]
 
+        # 3. Source summaries are optional — included only when the slide
+        #    was connected so Claude can describe MOVEMENT. Non-connected
+        #    slides get a state-description prompt instead.
+        src_summaries = None
+        if s_idx in spec_slides:
+            src_data = _all_data_shapes(s_slide)
+            if src_data:
+                src_summaries = [(kind, name, summary)
+                                 for (kind, _shp, name, summary) in src_data]
+
+        # 4. Guard: if every refreshed shape is completely empty / null,
+        #    don't ask the LLM to invent. Preserve the original.
+        all_empty = True
+        for _kind, _name, summary in ref_summaries:
+            if any(ch.isdigit() for ch in summary):
+                all_empty = False
+                break
+        if all_empty:
+            updates.append(HeadlineUpdate(
+                s_idx, old_headline, "",
+                "all data shapes empty/null — preserved", "unchanged"))
+            continue
+
+        # 5. Build the prompt and call Claude.
+        prompt = _build_prompt(
+            old_headline=old_headline,
+            data_summaries=ref_summaries,
+            src_data_summaries=src_summaries,
+        )
         if dry_run:
-            new_headline = ""   # placeholder; not calling the API
+            new_headline = ""
         else:
             try:
                 new_headline = _call_claude(prompt, model=model)
@@ -366,6 +525,7 @@ def refresh_headlines(
                     s_idx, old_headline, "", f"api error: {exc}", "api_error"))
                 continue
 
+        # 6. Write the new talking header into the shape (in place).
         if not dry_run:
             tf = headline_shape.text_frame
             p = tf.paragraphs[0]
@@ -379,9 +539,12 @@ def refresh_headlines(
                 run = p.runs[0]
             run.text = new_headline
 
+        n_shapes = len(ref_summaries)
+        kinds = ", ".join(sorted({k for k, _n, _s in ref_summaries}))
+        connected_flag = "connected" if s_idx in spec_slides else "non-connected"
         updates.append(HeadlineUpdate(
             s_idx, old_headline, new_headline,
-            f"src: {src_summary[:80]}... | ref: {ref_summary[:80]}...",
+            f"{connected_flag}: {n_shapes} data shape(s) [{kinds}]",
             "updated"))
 
     if not dry_run:
