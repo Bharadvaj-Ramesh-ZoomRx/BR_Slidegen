@@ -709,30 +709,41 @@ def _column_template(name: str, tp_indices: list[int],
                      sep: str = " @:@ ") -> str | None:
     """Replace TP-axis parts of a compound column name with a placeholder.
 
+    Tries ' @:@ ' (Connector default) first, then ' - ' as a fallback for
+    Pradeep-inferred / non-Connector specs that use the dash form (e.g.
+    slide 19's CR_MR-style charts with selectedColumns like
+    'W29 - (blank)' that need to pair against pivot output 'Jan-Feb 2026 - (blank)').
+
+    Templates always normalise to the canonical ' @:@ ' join, so the
+    caller's lookup matches across the two source formats.
+
     Returns None when:
-      - The name has fewer parts than max(tp_indices)+1 (not valid compound).
-      - Any part at a tp_index is NOT actually wave-shaped (the name isn't
-        TP-bearing — e.g. row-field name "value" with tp_indices=[0] would
-        otherwise produce a degenerate template "<TP>" that matches every
-        standalone wave column, falsely pairing the row field to a wave).
+      - The name has fewer parts than max(tp_indices)+1 (not compound).
+      - No part at a tp_index is wave-shaped (the name isn't TP-bearing —
+        a row-field name like 'value' would otherwise produce a degenerate
+        template '<TP>' matching every standalone wave column).
     """
     if not isinstance(name, str):
         return None
     if not tp_indices:
         return None
-    parts = name.split(sep)
-    if max(tp_indices) >= len(parts):
-        return None
-    # All parts at TP indices must be wave-shaped — otherwise this name
-    # isn't actually a TP-bearing compound and pairing via template is
-    # spurious.
-    for i in tp_indices:
-        if not _is_wave_label(parts[i]):
-            return None
-    out = list(parts)
-    for i in tp_indices:
-        out[i] = "<TP>"
-    return sep.join(out)
+    # Try canonical ' @:@ ' separator first, then ' - ' fallback.
+    for try_sep in (sep, " - "):
+        parts = name.split(try_sep)
+        if max(tp_indices) >= len(parts):
+            continue
+        # All parts at TP indices must be wave-shaped — otherwise this
+        # split is spurious (especially with ' - ' which could over-split
+        # legitimate compound names).
+        if not all(_is_wave_label(parts[i]) for i in tp_indices):
+            continue
+        out = list(parts)
+        for i in tp_indices:
+            out[i] = "<TP>"
+        # Always join with the canonical separator so old vs new templates
+        # match regardless of which form the source used.
+        return " @:@ ".join(out)
+    return None
 
 
 def _build_old_to_new_column_map(

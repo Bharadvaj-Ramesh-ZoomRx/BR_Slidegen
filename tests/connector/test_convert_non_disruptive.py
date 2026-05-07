@@ -204,6 +204,41 @@ def test_column_template_rejects_non_wave_part_at_tp_index():
     assert _column_template("Wave 13", [0]) == "<TP>"
 
 
+def test_template_handles_dash_separator_fallback():
+    """Slide 19 CR_MR charts use ' - ' separator (Pradeep-inferred specs):
+    'W29 - (blank)'. Pivot output uses the same form.  Template must
+    detect the wave part via the dash fallback and pair across runs."""
+    # 'W29 - (blank)' → template '<TP> @:@ (blank)' (canonical join)
+    t = _column_template("W29 - (blank)", [0])
+    assert t == "<TP> @:@ (blank)"
+    # Same shape applies to 'Jan-Feb 2026 - (blank)' (rolling-period wave)
+    # if Jan-Feb 2026 matched any wave pattern. Test with the simpler
+    # 'Wave 30 - (blank)' which definitely matches.
+    t2 = _column_template("Wave 30 - (blank)", [0])
+    assert t2 == "<TP> @:@ (blank)"
+
+
+def test_dash_separator_pairing_matches_canonical():
+    """Old name uses dash, new name uses dash — both produce the same
+    canonical template, so they pair via Pass 2."""
+    m = _build_old_to_new_column_map(
+        column_fields=["time_period_name"],
+        column_definitions=[{"Name": "W29 - (blank)"}, {"Name": "W30 - (blank)"}],
+        pivot_columns=["Wave 31 - (blank)", "Wave 32 - (blank)"],
+    )
+    # 'W29 - (blank)' and 'W30 - (blank)' both pair to 'Wave 32 - (blank)'
+    # (the LAST = chronologically latest in pivot order)
+    assert m["W29 - (blank)"] == "Wave 32 - (blank)"
+    assert m["W30 - (blank)"] == "Wave 32 - (blank)"
+
+
+def test_dash_separator_does_not_oversplit_non_wave_names():
+    """' - ' fallback must not falsely split 'Specialty - CARD - L' into
+    a TP-template (none of its parts are wave-shaped)."""
+    t = _column_template("Specialty - CARD - L", [0])
+    assert t is None
+
+
 def test_row_field_not_paired_to_wave_via_template():
     """End-to-end: row-field 'value' must NOT be paired to a wave column
     by §17.4 when ColumnFields=['time_period_name']."""
