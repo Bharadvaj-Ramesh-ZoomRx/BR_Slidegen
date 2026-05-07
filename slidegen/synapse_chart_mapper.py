@@ -967,6 +967,13 @@ def pivot_records_to_chart_data(
     # collision with the other axis — if both RowFields and ColumnFields would
     # end up claiming x_label, leave "options" unsubstituted so the mapper
     # returns success=False and the refresh pipeline preserves the source chart.
+    # Display-field fallback chain. Several Connector field aliases
+    # ('y_label', 'title', 'value', 'option_title') refer to "the
+    # categorical display column", but the underlying Synapse analysis
+    # may return a different column name. Try alternates in order.
+    _DISPLAY_FALLBACKS = ("option", "title", "y_label", "alias_label",
+                          "value", "category", "option_title")
+
     def _substitute_missing(field_list: list[str], *, allow_options: bool) -> list[str]:
         out = []
         for f in field_list:
@@ -979,6 +986,18 @@ def pivot_records_to_chart_data(
             if f == "options" and allow_options and "x_label" in df.columns and "x_label" not in out:
                 out.append("x_label")
                 continue
+            # Display-field fallback (Testing Deck slides 31/34 — spec says
+            # 'y_label' or 'option_title' but the API returns 'option' or
+            # 'title' for those analyses).
+            if f in _DISPLAY_FALLBACKS:
+                substituted = False
+                for alt in _DISPLAY_FALLBACKS:
+                    if alt != f and alt in df.columns and alt not in out:
+                        out.append(alt)
+                        substituted = True
+                        break
+                if substituted:
+                    continue
             out.append(f)  # keep unchanged; downstream handles missing
         return out
 
