@@ -221,10 +221,15 @@ _WAVE_LABEL_PATTERNS = (
     _re_wave.compile(r"^[A-Z][a-z]{2}['’‘]\d{2}$"),                  # Jan'26 / Jan'26
     _re_wave.compile(r"^Q[1-4]['’‘]\d{2}$"),                         # Q1'26
     _re_wave.compile(r"^Q[1-4] \d{4}$"),                              # Q1 2026
-    # Rolling-period labels: e.g. "Oct'25 - Dec'25" or "Jan'26 - Mar'26".
+    # Rolling-period labels with quoted year: e.g. "Oct'25 - Dec'25"
     _re_wave.compile(
         r"^[A-Z][a-z]{2}['’‘]\d{2}\s*[-–]\s*[A-Z][a-z]{2}['’‘]\d{2}$"
     ),
+    # Rolling 2-month period labels with full year: "Jan-Feb 2026", "Mar-Apr 2026"
+    # (CREON Aided Message Recall convention).
+    _re_wave.compile(r"^[A-Z][a-z]{2}-[A-Z][a-z]{2}\s+\d{4}$"),
+    # Rolling 2-month period labels with shortened year: "Jan-Feb '26"
+    _re_wave.compile(r"^[A-Z][a-z]{2}-[A-Z][a-z]{2}\s+['’‘]\d{2}$"),
 )
 
 _WAVE_TEMPLATE_SENTINEL = "\x00WAVE\x00"
