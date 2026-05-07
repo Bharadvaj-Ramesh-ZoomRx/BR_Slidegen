@@ -130,6 +130,42 @@ User asked: can we close all known limitations? Worked through them:
 | `e5bc4d6` | Templated patterns extended + scatter series-name fallback + positional alignment 5th tier + README/memory updates. |
 | (next)   | Connector unit-test suite (4 files, 55 tests) + README evals section rewrite. |
 
+### Slide-wide period sync (intelligence layer added end-of-day)
+
+User asked: when chart cats shift Oct'25..Mar'26 -> Nov'25..Apr'26,
+the slide header / chart header / footnote prose still say the old
+window. Can Claude have an intelligent layer that rewrites period
+tokens *anywhere* on the slide that references the old wave window?
+
+Extended `slidegen/label_sync.py` with a Pass 2 (slide-wide). The
+existing Pass 1 (adjacency-strict, label-shape guard) still runs and
+remains the primary path for period-banner cells. Pass 2 then walks
+every other text frame on the slide, plus chart titles + axis titles
+(which live in chart XML — separate walk via `_rewrite_chart_titles`).
+Sentence-level rewriter `_apply_shift_to_sentence` rewrites period
+tokens in place without the label-shape filter, preserving the
+surrounding sentence intact.
+
+Key design decisions:
+  - Two passes, not one. Pass 1 stays strict so period-banner cells
+    don't get over-rewritten; Pass 2 is permissive for prose.
+  - Pass 2 skips runs already edited by Pass 1 (tracked via
+    (id(text_frame), para_idx, run_idx) keys) so we never
+    double-rewrite.
+  - Single-pass regex alternation for the shift map — no chained
+    substitution where Oct -> Nov -> Dec.
+  - Curly quotes normalized at match time (' / ' / `).
+  - `slide_wide=True` is the default; pass False to revert to
+    strict-adjacency-only.
+
+9 unit tests in tests/connector/test_label_sync_slide_wide.py cover
+sentence-level rewriter behavior, single-pass guarantee, curly-quote
+match, partial shift maps, empty-input handling.
+
+Smoke-tested on Repatha ATU v10: Pass 2 catches `Q1'26 -> Wave 7`
+substitutions in tables that the adjacency pass missed (e.g. Table
+27/28 on slides 73/75 column headers).
+
 ### Per-deck quality eval (added late-late-day)
 
 User pushed back: unit tests are great but they don't tell you "did

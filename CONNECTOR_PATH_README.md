@@ -123,7 +123,14 @@ Per-shape `REFRESH_NOTE` Connector tag stamped onto each component's CustomXML r
 
 ### Step 4: `sync_period_labels`
 
-`slidegen/label_sync.py` walks every chart on every slide. For each chart whose category axis shifted (e.g. `Oct'25..Mar'26` → `Nov'25..Apr'26`), it builds a per-chart `{old_token: new_token}` shift map by extracting wave tokens from compound labels. Then for each text frame OR table cell whose bbox sits **immediately above or below** the chart (within 0.4" vertically, ≥ 30% horizontal overlap) AND whose text reads as a **label** (short, mostly wave tokens with chart connectors like "vs"/"to") — the wave tokens get rewritten in place. Footnotes, sidebars, headlines, methodology text — left alone.
+`slidegen/label_sync.py` walks every chart on every slide. For each chart whose category axis shifted (e.g. `Oct'25..Mar'26` → `Nov'25..Apr'26`), it builds a per-chart `{old_token: new_token}` shift map by extracting wave tokens from compound labels.
+
+The sync runs in **two passes** per slide:
+
+1. **Adjacency-strict pass**. For each text frame OR table cell whose bbox sits *immediately above or below* the chart (within 0.4" vertically, ≥ 30% horizontal overlap) AND whose text reads as a *short label* (mostly wave tokens with chart connectors like `vs`/`to`/`-`) — wave tokens get rewritten. Catches the period-banner row of cells right next to a chart.
+2. **Slide-wide pass**. For every other text frame on the slide, plus chart titles and axis titles (which live in chart XML, not the slide tree), wave tokens are rewritten *within sentences* — no label-shape filter. Catches slide headers (`"Field period: Oct'25 - Mar'26"`), chart titles (`"Trended view, Oct'25 - Mar'26"`), and footnote prose (`"Compared with Q1'26..."`). Runs already edited by Pass 1 are skipped to avoid double-rewriting.
+
+The slide-wide pass is enabled by default (`slide_wide=True`); pass `slide_wide=False` to revert to the strict-adjacency-only behavior. Edits are tagged in the sidecar with `(adjacent)` or `(slide_wide)` so you can audit which pass touched which run.
 
 ### Step 5: Slide-level annotation
 
@@ -163,6 +170,7 @@ Test coverage spans unit tests for individual mapper helpers, end-to-end golden 
 | `test_table_auto_write.py` | `_format_cell_value` (0%, 0.0%, 0, #,##0, NaN), `_refresh_templated_count_with_records` (8 templated-cell patterns), `_auto_compute_cell_values` for vertical / horizontal / 1×1 layouts | 21 |
 | `test_filter_resolver.py` | `;`-joined IN filters with exact + compound-suffix matches, broken-filter graceful fallback, measure-column filter, latest-wave-only filter | 6 |
 | `test_refresh_eval.py` | Per-deck quality eval — classification taxonomy (passed/preserved/review/error), note-level downgrades (tag_mismatch on status=ok), rate calculations | 11 |
+| `test_label_sync_slide_wide.py` | Sentence-level period rewriter used by the slide-wide pass — multi-token sentences, single-pass alternation (no chained substitution), curly-quote normalization, partial shift maps | 9 |
 
 Run all: `pytest tests/connector/ -q` (~1 sec, no creds, no network).
 

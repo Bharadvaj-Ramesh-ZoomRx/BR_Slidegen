@@ -231,22 +231,121 @@ def _pair_charts_by_position(src_shapes, ref_shapes):
     return pairs
 
 
+def _apply_shift_to_sentence(text: str, shift: dict[str, str]) -> tuple[str, int]:
+    """Sentence-aware token replacement — rewrites every old-wave-token
+    occurrence in `text` to its new wave, preserving the surrounding
+    sentence intact. Unlike _apply_shift_to_text + _is_label_run, this
+    does NOT require the run to read like a short label; it works on
+    headers, chart titles, footnotes, and any other prose that
+    references the wave window.
+
+    Used by the slide-wide pass of sync_period_labels (Step 4b). The
+    label-shaped guard is dropped because the slide-wide pass is meant
+    to catch sentences like "Trends from Oct'25 to Mar'26 across..." or
+    "Field period: Q4'25 - Q1'26".
+    """
+    if not shift or not text:
+        return text, 0
+    norm = _norm_quotes(text)
+    pattern = re.compile(
+        r"(?<!\w)(" + "|".join(re.escape(k) for k in shift) + r")(?!\w)"
+    )
+    new_text, count = pattern.subn(lambda m: shift[m.group(1)], norm)
+    if count == 0:
+        return text, 0
+    return new_text, count
+
+
+def _is_chart_title_or_subtitle(shape) -> bool:
+    """True for chart-title / chart-axis-title shapes that belong to a
+    chart object (those titles live in chart XML, not the slide tree).
+    The slide-tree walker below skips them because we'll rewrite them
+    via the chart object's title/axis-title properties instead."""
+    return False  # placeholder — chart titles are walked separately via shape.chart
+
+
+def _rewrite_chart_titles(chart_shape, shift: dict[str, str]) -> list[dict]:
+    """Rewrite period tokens in chart title + axis-title text. Chart
+    titles live in chart XML (not the slide shape tree) so the slide-
+    wide pass on slide.shapes misses them. Walks chart_shape.chart
+    title runs and applies the shift map. Returns a list of edits.
+    """
+    edits = []
+    try:
+        chart = chart_shape.chart
+    except Exception:
+        return edits
+
+    # Chart title (top of chart)
+    try:
+        if chart.has_title:
+            title_tf = chart.chart_title.text_frame
+            for para in title_tf.paragraphs:
+                for run in para.runs:
+                    new_text, n = _apply_shift_to_sentence(run.text, shift)
+                    if n > 0:
+                        edits.append({
+                            "shape": f"{chart_shape.name}::title",
+                            "before": run.text,
+                            "after": new_text,
+                            "n_replacements": n,
+                        })
+                        run.text = new_text
+    except Exception:
+        pass
+
+    # Axis titles (cat axis + val axis)
+    try:
+        for plot in chart.plots:
+            for axis in (chart.category_axis, chart.value_axis):
+                try:
+                    if not axis.has_title:
+                        continue
+                    axis_tf = axis.axis_title.text_frame
+                    for para in axis_tf.paragraphs:
+                        for run in para.runs:
+                            new_text, n = _apply_shift_to_sentence(run.text, shift)
+                            if n > 0:
+                                edits.append({
+                                    "shape": f"{chart_shape.name}::axis_title",
+                                    "before": run.text,
+                                    "after": new_text,
+                                    "n_replacements": n,
+                                })
+                                run.text = new_text
+                except Exception:
+                    continue
+            break  # plots[0] is enough; both axes shared
+    except Exception:
+        pass
+    return edits
+
+
 def sync_period_labels(
     source_pptx: str | Path,
     refreshed_pptx: str | Path,
     *,
     out_pptx: str | Path | None = None,
     sidecar_path: str | Path | None = None,
+    slide_wide: bool = True,
 ) -> dict:
-    """Rewrite period tokens in text frames adjacent to refreshed charts.
+    """Rewrite period tokens in text frames affected by a chart shift.
 
-    Reads source chart cats and refreshed chart cats; per slide, builds a
-    union shift map; rewrites text-frame and table-cell runs that sit
-    immediately above or below a chart and contain a matching old wave
-    token. Saves to `out_pptx` (defaults to in-place over `refreshed_pptx`).
+    Two passes:
+      1. Adjacency-strict pass — text frames / table cells immediately
+         above or below a chart, only rewriting runs that read as
+         short period labels. Catches the period-banner row of cells
+         right next to a chart.
+      2. Slide-wide pass (slide_wide=True, default) — every other text
+         frame on the slide, AND chart titles + axis titles. Rewrites
+         period tokens within sentences (slide header, chart header,
+         footnote prose). The label-shape guard is dropped because the
+         text here is sentence-shaped.
 
-    Returns a diagnostic dict with per-slide shift maps, edits, and
-    conflicts. Also writes it to `sidecar_path` if given.
+    Both passes share the same per-slide union shift map. Edits are
+    recorded into the diag sidecar with locator names like
+    "Title 1::pass=adjacent" or "Chart 5::title::pass=slide_wide" so
+    you can audit which pass touched which run.
     """
     src_prs = Presentation(str(source_pptx))
     ref_prs = Presentation(str(refreshed_pptx))
@@ -294,6 +393,10 @@ def sync_period_labels(
         diag["totals"]["slides_with_shift"] += 1
         diag["totals"]["conflicts"] += len(conflicts)
 
+        # ── Pass 1: adjacency-strict (existing behavior) ──
+        # Track which (text_frame, run_index) tuples got edited so the
+        # slide-wide pass below doesn't re-edit the same run.
+        adjacent_edits_keys: set[tuple[int, int, int]] = set()
         for sh in ref_shapes_flat:
             if not (sh.has_table or sh.has_text_frame):
                 continue
@@ -303,19 +406,55 @@ def sync_period_labels(
             if not any(_is_adjacent(tb, cb) for cb in chart_bboxes):
                 continue
             for tf, locator in _shape_text_frames(sh):
-                for para in tf.paragraphs:
-                    for run in para.runs:
+                for p_idx, para in enumerate(tf.paragraphs):
+                    for r_idx, run in enumerate(para.runs):
                         if not _is_label_run(run.text):
                             continue
                         new_text, n = _apply_shift_to_text(run.text, merged)
                         if n > 0:
                             slide_diag["edits"].append({
-                                "shape": locator,
+                                "shape": locator + " (adjacent)",
                                 "before": run.text,
                                 "after": new_text,
                                 "n_replacements": n,
                             })
                             run.text = new_text
+                            adjacent_edits_keys.add(
+                                (id(tf), p_idx, r_idx)
+                            )
+
+        # ── Pass 2: slide-wide (slide headers / chart headers / footnotes) ──
+        # Walks every text frame + every chart title on the slide. The
+        # label-shape guard is dropped — full sentences with period
+        # tokens are rewritten in place. Runs already edited by Pass 1
+        # are skipped.
+        if slide_wide:
+            for sh in ref_shapes_flat:
+                # Chart titles live in chart XML (not the slide shape
+                # tree's text-frame walk). Handle them separately.
+                if sh.has_chart:
+                    chart_edits = _rewrite_chart_titles(sh, merged)
+                    for e in chart_edits:
+                        e["shape"] = e["shape"] + " (slide_wide)"
+                        slide_diag["edits"].append(e)
+                if not (sh.has_table or sh.has_text_frame):
+                    continue
+                for tf, locator in _shape_text_frames(sh):
+                    for p_idx, para in enumerate(tf.paragraphs):
+                        for r_idx, run in enumerate(para.runs):
+                            if (id(tf), p_idx, r_idx) in adjacent_edits_keys:
+                                continue  # already edited in Pass 1
+                            new_text, n = _apply_shift_to_sentence(
+                                run.text, merged,
+                            )
+                            if n > 0:
+                                slide_diag["edits"].append({
+                                    "shape": locator + " (slide_wide)",
+                                    "before": run.text,
+                                    "after": new_text,
+                                    "n_replacements": n,
+                                })
+                                run.text = new_text
 
         diag["totals"]["edits"] += len(slide_diag["edits"])
 
