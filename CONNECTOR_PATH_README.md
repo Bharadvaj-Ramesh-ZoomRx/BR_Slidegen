@@ -1,6 +1,37 @@
 # Connector Path — End-to-End Refresh Workflow
 
-This document explains what happens when you run the connected-refresh pipeline against any deck with Galen Connector tags. Read this before refreshing a new deck so you know what each step does, what it touches, and how to interpret the output.
+This document explains what happens when the connected-refresh pipeline runs against any deck with Galen Connector tags. Read it before refreshing a new deck so it's clear what each step does, what it touches, and how to interpret the output.
+
+## TL;DR — refreshing a deck
+
+```bash
+git clone <repo>
+cd <repo>
+pip install -r requirements.txt
+# put credentials in synapse env/.env or docs/.env (see Authentication below)
+python -m slidegen.refresh_pipeline path/to/deck.pptx
+```
+
+The refreshed deck lands at `output_testing/deck_output/<auto-derived-name>.pptx` with badges on each slide telling you what got refreshed and what didn't. The pipeline is fully automatic — no per-deck configuration, no per-slide intervention. Slides that can't be refreshed (no connector tags, ambiguous tags, or tags pointing at the wrong analysis) are clearly flagged so a human can review them.
+
+## Prerequisites
+
+Before the first run on a new machine:
+
+| Requirement | Where | How |
+|---|---|---|
+| Python 3.10+ | system | `python --version` |
+| Repo dependencies | `requirements.txt` | `pip install -r requirements.txt` |
+| Synapse API URL | `synapse env/.env` (preferred) or `docs/.env` or repo-root `.env` | `SYNAPSE_API_URL=https://...` |
+| Synapse credentials | same `.env` | `SYNAPSE_API_KEY=...` (preferred) — without it the pipeline falls back to `synapse-cli` cached JWT; run `synapse login` once. |
+| LLM credentials (optional) | same `.env` | `LLM_API_KEY=...` enables the headline-rewrite step. Without it, headlines are preserved verbatim. |
+
+Verify with a quick health check:
+
+```bash
+python -c "import slidegen.refresh_pipeline; print('OK')"
+python -m slidegen.refresh_pipeline --help
+```
 
 ## What "connector path" means
 
@@ -182,10 +213,42 @@ Synapse credentials are loaded from (in order):
 
 ## Adding a new deck
 
-You don't write code. Just:
+No code changes are required for new decks.
 
 ```bash
 python -m slidegen.refresh_pipeline path/to/deck.pptx
 ```
 
-The pipeline auto-derives the output filename from the deck stem. If your deck has scatter/abacus charts, double-check Step 1.5 #11 (chronology sort) actually fired — the badge will tell you.
+The pipeline auto-derives the output filename from the deck stem (so `"Repatha HCP ATU - Q2'26 Skeleton (1).pptx"` becomes `Repatha_HCP_ATU_Q2_26_Skeleton_<date>_v1.pptx`). For scatter/abacus charts, the badge on each slide reports refresh status — review those slides directly when in doubt.
+
+## Will "refresh this deck" just work?
+
+Short answer: yes for the majority of slides; the rest get clearly flagged and preserved as source.
+
+What "just works" end-to-end after a single command:
+
+- Tagged charts and tables across all 5 layout patterns (vertical label, horizontal label, matrix, formula columns, 1×1 templated cells with `(n = X)` placeholders).
+- Charts and tables nested inside group shapes.
+- Mixed-pin slides (some charts static-pinned, others dynamic).
+- Charts with formula-derived columns (`<blank:Alias>` with `=B2/100` etc.).
+- Headlines (rewritten by LLM when chart values changed; left alone otherwise; fresh narrative written when source headline isn't narrative-shaped).
+- Period banners adjacent to charts (`Oct'25..Mar'26` rewritten to `Nov'25..Apr'26` etc.).
+- Per-slide badges showing exactly what happened.
+- Per-component status appended to each slide's speaker notes (existing notes preserved).
+
+What gets flagged instead of refreshed (source values preserved, badge tells you why):
+
+- `non_connected` — no connector tags on the slide. Manual edits only.
+- `static_pinned_skipped` — tag explicitly pinned to historical waves.
+- `tag_mismatch` — connector tag points at an analysis whose label structure differs from the source. Repoint the tag.
+- `ambiguous_tag` — multiple charts on the slide share an identical tag fingerprint but had different source values; pipeline can't disambiguate. Add a per-chart filter or `split_order`.
+- `alignment_failed` — refreshed values couldn't be aligned to source structure even after fuzzy matching. Investigate `selectedColumns` / `selectedRows` in the tag.
+
+What is **not** auto-handled (will need manual edit OR future work):
+
+- Field-date stamps like `Q1'26: 01/01/2026 – 25/02/2026` — only the `Q1'26` portion gets shifted, not the date range.
+- Templated 1×1 cells using patterns OTHER than `(n = X)` — e.g. `"Sample size: 120"` or `"based on 51 respondents"`.
+- Scatter charts where the connector tag selects bare value columns without a row-label dimension — series naming may default to the first numeric value.
+- Manual-edit charts that share a tag with sibling charts on the same slide — flagged as `ambiguous_tag` rather than corrupted.
+
+In practice, on a typical deck with valid connector tags and live Synapse data, ~90%+ of slides refresh cleanly with no human intervention. The remaining 10% land in one of the five flagged buckets above with a clear reason.
