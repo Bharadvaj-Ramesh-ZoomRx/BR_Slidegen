@@ -43,6 +43,10 @@ from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
+from slidegen.connector_tags import (
+    serialize_existing_configs as _ct_serialize_existing_configs,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -1503,6 +1507,19 @@ def propose_raw_configs(
     provided (from read_slide_context), it is used for Jaccard validation.
     When chart_shape is None, pure DataFrame heuristics are used.
 
+    Forward-rolling alignment (Connector spec §21):
+      - All emitted columnDefinitions use IsDefaultAlias=true so the connector
+        regenerates aliases from API metadata each refresh.  Hand-baked
+        per-TP entries with that flag get auto-reconciled in
+        AlignColumnDefinitionsWithDataTable as new waves arrive (§17.6).
+      - sortCriteria is never set on a TP-bearing column (those would die
+        when the wave falls off the window).
+      - selectedColumns may include current wave labels; refresh-time
+        forward-rolling is handled by
+        synapse_chart_mapper._rewrite_wave_pinned_selected_columns.
+      - Resulting ReportConfig is always Dynamic mode (set by the caller in
+        write_connector_tags), per §21.1.
+
     Args:
         chart_shape:      Optional shape dict from read_slide_context() with
                           type="chart".  Pass None to infer from DataFrame.
@@ -1872,6 +1889,9 @@ def write_connector_tags(
         analysis_id = cfg["analysis_id"]
 
         # ── Build the three JSON payloads ────────────────────────────────
+        # SurveyId left as None when missing — connector_tags applies
+        # NullValueHandling.Ignore for the Pascal profile, so it gets
+        # omitted from the JSON exactly as Connector itself would.
         report_cfg = {
             "AnalysisIds": [analysis_id],
             "DynamicTimePeriod": {
@@ -1888,15 +1908,24 @@ def write_connector_tags(
             "SurveyId": survey_id,
             "TimePeriodType": 1,
         }
-        if survey_id is None:
-            del report_cfg["SurveyId"]
 
-        report_json  = _tag_json(report_cfg)
-        pivot_json   = _tag_json(pivot_cfg)
-        mapping_json = _tag_json(mapping_cfg)
-
-        report_hash = _sha256(report_json)
-        pivot_hash  = _sha256(pivot_json)
+        # Three different serialization profiles per the connector spec
+        # (see slidegen/connector_tags.py docstring + reference doc §5):
+        #   ReportConfig + PivotConfig: PascalCase, alphabetical Ordinal,
+        #     NullValueHandling.Ignore, plus pre-hash sorts on
+        #     AnalysisIds / SegmentIds / Filters[] and Alias-when-default drop.
+        #   MappingConfig: camelCase, declaration order, nulls retained.
+        # Mixing profiles produces JSON whose hash diverges from Connector's.
+        _ct_payload = _ct_serialize_existing_configs(
+            report_dict=report_cfg,
+            pivot_dict=pivot_cfg,
+            mapping_dict=mapping_cfg,
+        )
+        report_json  = _ct_payload["report_json"]
+        pivot_json   = _ct_payload["pivot_json"]
+        mapping_json = _ct_payload["mapping_json"]
+        report_hash  = _ct_payload["report_hash"]
+        pivot_hash   = _ct_payload["pivot_hash"]
 
         # ── Column key label map: field name → display label ─────────────
         # Include all standard Synapse API fields (matches Connector's format)
@@ -3798,6 +3827,118 @@ def stamp_refresh_notes(pptx_path: str, refresh_results: dict) -> dict:
             tag_xml = tag_xml.replace("</p:tagLst>", new_tags + "</p:tagLst>")
             all_entries[tag_file] = tag_xml.encode("utf-8")
             stamps[(si, shape_name)] = "stamped"
+
+    tmp_path = pptx_path + ".tmp"
+    with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for name, data in all_entries.items():
+            zout.writestr(name, data)
+    os.replace(tmp_path, pptx_path)
+
+    return stamps
+
+
+def stamp_refresh_dynamic_tags(pptx_path: str, refresh_results: dict) -> dict:
+    """Per Connector spec §16.3 + §16.5, the tool that drives refresh must
+    rewrite these dynamic tags on every refreshed shape:
+
+        LASTREFRESHTIME — set to current timestamp on every success.
+        REFRESHERRORMSG — set to the error message on failure;
+                          deleted on success (clears stale errors).
+
+    The other two dynamic tags (COLUMNKEYLABELMAP, ANALYSISTYPE) are
+    written once at stamp time by ``write_connector_tags`` and stay
+    valid until API metadata changes — we leave them alone here, which
+    matches Connector's own behavior when the metadata didn't change.
+
+    Walks every chart + table in ``refresh_results["slides"]`` regardless
+    of whether the shape had notes — every refreshed shape gets a fresh
+    LASTREFRESHTIME so 'last refreshed at …' in the UI never goes stale.
+
+    Returns
+    -------
+    {(slide_idx, shape_name): "stamped" | "shape_not_in_pptx" | "no_tag_file"}
+    """
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
+    stamps: dict[tuple[int, str], str] = {}
+
+    targets: dict[int, list[tuple[str, str, str]]] = {}
+    for slide_entry in refresh_results.get("slides", []):
+        si = slide_entry.get("slide_index")
+        if si is None:
+            continue
+        for comp in (slide_entry.get("charts") or []) + (slide_entry.get("tables") or []):
+            name = comp.get("name", "")
+            if not name:
+                continue
+            status = str(comp.get("status", "") or "")
+            error = str(comp.get("error", "") or "")
+            targets.setdefault(si, []).append((name, status, error))
+
+    if not targets:
+        return stamps
+
+    with zipfile.ZipFile(pptx_path, "r") as zf:
+        all_entries: dict[str, bytes] = {n: zf.read(n) for n in zf.namelist()}
+
+    modified = False
+    for si, shapes_to_stamp in targets.items():
+        slide_file = f"ppt/slides/slide{si + 1}.xml"
+        rels_file = f"ppt/slides/_rels/slide{si + 1}.xml.rels"
+        if slide_file not in all_entries:
+            for nm, _, _ in shapes_to_stamp:
+                stamps[(si, nm)] = "shape_not_in_pptx"
+            continue
+
+        slide_xml = all_entries[slide_file].decode("utf-8")
+        rels_xml = all_entries.get(rels_file, b"").decode("utf-8")
+
+        rid_to_tag: dict[str, str] = {}
+        for m in re.finditer(
+            r'Id="(rId\d+)"[^>]*Target="(\.\./tags/tag\d+\.xml)"', rels_xml
+        ):
+            rid_to_tag[m.group(1)] = "ppt/tags/" + m.group(2).split("/")[-1]
+
+        shape_to_tag: dict[str, str] = {}
+        for m in re.finditer(
+            r'<p:cNvPr[^>]*\bname="([^"]*)"[^>]*/?>.*?<p:tags\s+r:id="(rId\d+)"\s*/>',
+            slide_xml, re.DOTALL,
+        ):
+            shape_to_tag[m.group(1)] = rid_to_tag.get(m.group(2), "")
+
+        for shape_name, status, error in shapes_to_stamp:
+            tag_file = shape_to_tag.get(shape_name)
+            if not tag_file or tag_file not in all_entries:
+                stamps[(si, shape_name)] = "no_tag_file"
+                continue
+
+            tag_xml = all_entries[tag_file].decode("utf-8")
+
+            # Drop any existing LASTREFRESHTIME / REFRESHERRORMSG so we can
+            # reinsert fresh ones (idempotent across multiple refresh runs).
+            for tag_name in ("LASTREFRESHTIME", "REFRESHERRORMSG"):
+                tag_xml = re.sub(
+                    rf'<p:tag\s+name="{tag_name}"\s+val="[^"]*"\s*/>',
+                    "", tag_xml,
+                )
+
+            # Decide what to stamp based on refresh status.
+            success = bool(status) and status not in ("error", "alignment_failed")
+            new_tags = (
+                f'<p:tag name="LASTREFRESHTIME" val="{_escape_attr(timestamp)}"/>'
+            )
+            if not success and error:
+                # Cap error message at 500 chars to keep the tag readable.
+                new_tags += (
+                    f'<p:tag name="REFRESHERRORMSG" val="{_escape_attr(error[:500])}"/>'
+                )
+
+            tag_xml = tag_xml.replace("</p:tagLst>", new_tags + "</p:tagLst>")
+            all_entries[tag_file] = tag_xml.encode("utf-8")
+            stamps[(si, shape_name)] = "stamped"
+            modified = True
+
+    if not modified:
+        return stamps
 
     tmp_path = pptx_path + ".tmp"
     with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:

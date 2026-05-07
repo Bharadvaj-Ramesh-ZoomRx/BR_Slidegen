@@ -405,6 +405,15 @@ def run_full_pipeline(
     n_skipped = sum(1 for v in stamp_results.values() if v != "stamped")
     print(f"      {n_stamped} shapes stamped, {n_skipped} skipped")
 
+    # ── Step 2b: Stamp standard dynamic tags per Connector spec §16.3 ──
+    # LASTREFRESHTIME on every refreshed shape; REFRESHERRORMSG on errors;
+    # cleared on success.  Refresh metadata in the UI ("last refreshed at …")
+    # stays current instead of going stale.
+    from slidegen.intelligent_refresh import stamp_refresh_dynamic_tags
+    dynamic_results = stamp_refresh_dynamic_tags(str(refreshed_pptx), result)
+    n_dyn = sum(1 for v in dynamic_results.values() if v == "stamped")
+    print(f"      {n_dyn} shapes received LASTREFRESHTIME / REFRESHERRORMSG update")
+
     # ── Step 3: Headlines (LLM) ──
     after_headlines = refreshed_pptx
     if os.getenv("LLM_API_KEY"):
