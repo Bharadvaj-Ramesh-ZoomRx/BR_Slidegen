@@ -175,6 +175,111 @@ def _check_synapse_creds() -> tuple[bool, str]:
     return True, "ok"
 
 
+_NOTES_DIVIDER = "─" * 60
+_NOTES_HEADER = f"\n\n{_NOTES_DIVIDER}\n[Refresh status —"
+
+
+def _append_refresh_notes(slide, slide_status: dict | None,
+                          headline_update: dict | None, today: str) -> None:
+    """Append a per-component refresh report to the slide's speaker notes.
+
+    Existing notes (the analyst's question text, sample sizes, etc.) are
+    PRESERVED. The new content is appended below a divider so it's visually
+    separated. If a previous run wrote a refresh report (detected by the
+    same divider+header), that block is replaced — we don't accumulate.
+    """
+    notes_slide = slide.notes_slide
+    tf = notes_slide.notes_text_frame
+    existing = tf.text or ""
+
+    # Strip any prior refresh-status block written by an earlier run, so
+    # repeated refreshes don't pile on. Marker is the literal divider+header.
+    idx = existing.find(_NOTES_HEADER)
+    if idx >= 0:
+        existing = existing[:idx].rstrip()
+
+    lines = [_NOTES_DIVIDER, f"[Refresh status — {today}]"]
+    if slide_status is None:
+        lines.append("  Slide is non-connected — no automatic refresh.")
+    else:
+        comps = (slide_status.get("charts") or []) + (slide_status.get("tables") or [])
+        if not comps:
+            lines.append("  No components processed for this slide.")
+        else:
+            buckets: dict[str, list[str]] = {}
+            for c in comps:
+                key = c.get("status", "missing")
+                buckets.setdefault(key, []).append(c.get("name", "?"))
+            order = [
+                "ok", "ok_with_dynamic_added", "static_pinned_skipped",
+                "ambiguous_tag", "alignment_failed", "tag_mismatch",
+                "no_data_for_shifted_window", "empty", "not_found",
+            ]
+            seen = set()
+            for k in order:
+                if k in buckets:
+                    seen.add(k)
+                    lines.append(f"  {k:24s} {', '.join(buckets[k])}")
+            for k in buckets:
+                if k not in seen:
+                    lines.append(f"  {k:24s} {', '.join(buckets[k])}")
+            # Surface diagnostic notes (tag_mismatch detail, drift, etc.)
+            for c in comps:
+                for n in (c.get("notes") or []):
+                    detail = (n.get("detail") or "").strip()
+                    if detail:
+                        lines.append(f"  note ({c.get('name')}): {detail[:140]}")
+
+    if headline_update:
+        st = headline_update.get("status", "")
+        if st == "updated":
+            old = (headline_update.get("old_headline") or "").strip()[:80]
+            new = (headline_update.get("new_headline") or "").strip()[:80]
+            lines.append(f"  headline: rewritten ({old!r} -> {new!r})")
+        elif st in ("unchanged", "no_chart", "no_headline"):
+            lines.append(f"  headline: {st}")
+
+    # Append new paragraphs via lxml so existing speaker-notes content
+    # (Q text, sample sizes, formatting) stays untouched. Setting
+    # tf.text would clobber paragraph-level formatting on existing
+    # notes — we only want to APPEND a divider + report block.
+    from lxml import etree as _et
+    NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    txBody = tf._txBody
+    QA = lambda tag: f"{{{NS_A}}}{tag}"
+
+    # First, remove any prior refresh block: walk paragraphs, find one
+    # whose text starts with the divider marker, and delete it + every
+    # paragraph after it (the prior report extends to end-of-notes).
+    paras = txBody.findall(QA("p"))
+    cut_from = None
+    for i, p in enumerate(paras):
+        ptext = "".join(t.text or "" for t in p.iter(QA("t")))
+        if _NOTES_DIVIDER in ptext:
+            cut_from = i
+            break
+    if cut_from is not None:
+        for p in paras[cut_from:]:
+            txBody.remove(p)
+
+    # Append: blank separator + each new line as its own paragraph.
+    def _add_para(text: str):
+        p = _et.SubElement(txBody, QA("p"))
+        if text:
+            r = _et.SubElement(p, QA("r"))
+            rPr = _et.SubElement(r, QA("rPr"))
+            rPr.set("lang", "en-US")
+            rPr.set("dirty", "0")
+            t = _et.SubElement(r, QA("t"))
+            t.text = text
+        else:
+            _et.SubElement(p, QA("endParaRPr")).set("lang", "en-US")
+
+    _add_para("")  # blank spacer between existing and new block
+    for line in lines:
+        _add_para(line)
+
+
 def _bucket_label(r_label: str) -> str:
     """Map a refresh-badge label to a slide-bucket key."""
     if "NON-CONNECTED" in r_label:
@@ -385,6 +490,15 @@ def run_full_pipeline(
         h_color, h_label = _headline_badge(hl)
         _add_badge(slide, r_color, r_label, slide_w, row=0)
         _add_badge(slide, h_color, h_label, slide_w, row=1)
+        # Append per-component status to speaker notes so the analyst
+        # can see WHICH components are refreshed vs static-pinned vs
+        # tag-mismatch when the visible badge says e.g. "4 ok / 8 static".
+        # Existing notes (Q text, sample sizes, etc.) preserved above
+        # a divider.
+        try:
+            _append_refresh_notes(slide, rs, hl, today)
+        except Exception:
+            pass
         bucket = _bucket_label(r_label)
         counts[bucket] = counts.get(bucket, 0) + 1
 

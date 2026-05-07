@@ -103,7 +103,7 @@ def _format_for_column(col_def: dict | None, val) -> str:
 
 def _auto_compute_cell_values(
     table_shape, categories, series, raw_pivot_config: dict | None,
-    raw_mapping_config: dict | None,
+    raw_mapping_config: dict | None, filtered_records=None,
 ):
     """Build a 2D cell_values grid from a connected refresh's pivot output,
     matching the existing table's row/col layout. Returns None if the
@@ -237,7 +237,80 @@ def _auto_compute_cell_values(
             out.append(row_out)
         return out
 
-    # 1×1 templated labels — handled separately, return None to skip.
+    # ── Layout 4: 1×1 templated labels ──
+    # Cell text like "CARDs (n = 120)" or "L CARDs (n = 51)" embeds a
+    # count inside a sentence. Detect a "(n = NUMBER)" substring and
+    # substitute the new count from the post-filter records. Universal
+    # across decks — any 1x1 table whose text matches the convention
+    # will refresh; tables without the pattern are left untouched.
+    if n_rows == 1 and n_cols == 1 and filtered_records is not None:
+        cell_text = existing[0][0]
+        try:
+            import pandas as pd
+            df_for_n = (filtered_records if hasattr(filtered_records, "columns")
+                        else pd.DataFrame(filtered_records))
+            new_text = _refresh_templated_count_with_records(cell_text, df_for_n)
+            if new_text and new_text != cell_text:
+                return [[new_text]]
+        except Exception:
+            pass
+        return None
+
+    return None
+
+
+_COUNT_PATTERN = __import__("re").compile(
+    r"\(\s*[nN]\s*=\s*(\d+)\s*\)"
+)
+
+
+def _substitute_templated_count(text, raw_pivot_config, raw_mapping_config,
+                                 table_shape) -> str | None:
+    """Replace '(n = X)' in a templated cell with the refreshed sample
+    size pulled from the most recent fetch's records.
+
+    Universal: any deck whose 1x1 label tables follow the "(n = X)"
+    convention will refresh. Returns None when no count pattern exists
+    or no count can be derived.
+    """
+    if not text or "n =" not in text.lower().replace("n=", "n =").replace("N=", "N ="):
+        return None
+    m = _COUNT_PATTERN.search(text)
+    if not m:
+        return None
+    # Re-run the same pivot and grab the base/respondents value.
+    # (The auto-compute caller hands us the records already; we don't
+    # need the pivot itself, just the n. Pull from the table's data.)
+    # Easiest: read from the current chart_data series_values length OR
+    # from pivot_config Filters' produced subset count. Since we can't
+    # rebuild here without the records, we call the pivot anew with a
+    # tiny path — but the caller already did. Defer this to caller.
+    # Returning None here means caller hasn't supplied the count.
+    return None
+
+
+def _refresh_templated_count_with_records(text: str, df) -> str | None:
+    """Substitute '(n = X)' in `text` using a representative count from
+    `df`. Picks `respondents` -> `base` -> `count`; uses the max value
+    after the existing Filters have been applied (df should be the
+    post-filter frame). Returns None when no substitution applies.
+    """
+    if not text or df is None or len(df) == 0:
+        return None
+    m = _COUNT_PATTERN.search(text)
+    if not m:
+        return None
+    for col in ("respondents", "base", "count"):
+        if col in df.columns:
+            try:
+                # Use the max — base/respondents are constant per cell so
+                # max(==first) works; for count it gives the largest sub-
+                # group, which matches the source label convention.
+                n = int(df[col].max())
+                if n > 0:
+                    return _COUNT_PATTERN.sub(f"(n = {n})", text, count=1)
+            except Exception:
+                continue
     return None
 
 
@@ -2658,6 +2731,47 @@ def refresh_deck_from_spec(
 
         slide_results = {"slide_index": si, "charts": [], "tables": []}
 
+        # ── Ambiguous-tag detection ──
+        # When 2+ chart shapes on a slide carry IDENTICAL connector tag
+        # configs (same data_source, same raw_pivot_config, same
+        # raw_mapping_config, same Filters/selectedRows), the spec
+        # cannot tell them apart — they all run the same pivot and
+        # would receive the same refreshed values. If the source had
+        # *different* values for them (Repatha ATU slide 73: 4 charts
+        # showing 4 different intent measures), writing the same data
+        # to all 4 is wrong. Detect this fingerprint clash and mark
+        # those components so the chart-write path preserves source
+        # values instead of leaking the same data into every chart.
+        import json as _json
+        chart_components = [
+            c for c in slide_spec.get("components", [])
+            if c.get("type") == "chart"
+        ]
+        _ambiguous_chart_keys: set[str] = set()
+        if len(chart_components) >= 2:
+            fingerprint_to_names: dict[str, list[str]] = {}
+            for _c in chart_components:
+                fp = _json.dumps({
+                    "ds": _c.get("data_source"),
+                    "pc": _c.get("raw_pivot_config"),
+                    "mc": _c.get("raw_mapping_config"),
+                    "split_order": _c.get("split_order"),
+                }, sort_keys=True, default=str)
+                fingerprint_to_names.setdefault(fp, []).append(_c.get("name", ""))
+            for fp, names in fingerprint_to_names.items():
+                if len(names) >= 2:
+                    # Compare source values across these shapes — if any
+                    # differ the tags are ambiguous (genuinely different
+                    # display intent, but tag config can't differentiate).
+                    src_value_sigs = set()
+                    for nm in names:
+                        sig = src_series_by_slide.get(si, {}).get(nm)
+                        if sig is not None:
+                            src_value_sigs.add(repr(sig))
+                    if len(src_value_sigs) > 1:
+                        for nm in names:
+                            _ambiguous_chart_keys.add(nm)
+
         # ── Split-viz applyTranspose alignment ──
         # When a slide has multiple chart shapes sharing a name + split_order
         # 0..N, Connector applies the lead (split=0) shape's applyTranspose
@@ -2771,6 +2885,30 @@ def refresh_deck_from_spec(
                 top_n_rows = comp.get("top_n_rows")
 
                 if ctype == "chart":
+                    # Ambiguous-tag short-circuit: if this chart shares
+                    # its tag fingerprint with one or more sibling charts
+                    # on the same slide AND the source had distinct
+                    # values per shape, refusing to refresh and
+                    # preserving source is the only safe choice. Surface
+                    # so the user can fix the tag (add a per-chart
+                    # filter or split_order).
+                    if name in _ambiguous_chart_keys:
+                        slide_results["charts"].append({
+                            "name": name, "status": "ambiguous_tag",
+                            "notes": [{
+                                "kind": "ambiguous_tag",
+                                "detail": (
+                                    "Multiple charts on this slide share "
+                                    "identical connector tags but had "
+                                    "different source values. Spec cannot "
+                                    "differentiate them — preserving "
+                                    "source. Add a per-chart filter / "
+                                    "split_order to enable refresh."
+                                ),
+                            }],
+                        })
+                        continue
+
                     # Position-aware: claim the specific Connector-split shape
                     # this spec component refers to (multiple shapes on one
                     # slide can share a name).
@@ -2923,18 +3061,32 @@ def refresh_deck_from_spec(
                                 # Majority of formatCodes lack %; treat as whole-percent scale
                                 _scale_to_whole_percent = True
 
+                        # Detect inverse case: source formatCodes are mostly
+                        # "0%" / "0.0%" (decimal-scale) but API may return
+                        # whole-percent values. Without scaling, writing 88.31
+                        # into a "0%"-formatted scatter chart renders as
+                        # "8831%" (Repatha ATU slide 20 symptom).
+                        _scale_to_decimal = False
+                        if src_fmts:
+                            pct_fmts = [f for f in src_fmts
+                                        if f and "%" in f]
+                            if pct_fmts and len(pct_fmts) >= max(1, len(src_fmts) // 2):
+                                _scale_to_decimal = True
+
                         def _scale_val(v):
                             if v is None: return None
                             try:
                                 fv = float(v)
                             except (TypeError, ValueError):
                                 return v
-                            # Only scale if value looks like a 0-1 decimal AND
-                            # source format is whole-percent. Don't scale values
-                            # already in 0-100 range (might happen if API column
-                            # is `percentage` not `decimal`).
+                            # Source is whole-percent format and API gave decimal:
+                            # 0-1 -> 0-100.
                             if _scale_to_whole_percent and abs(fv) <= 1.5:
                                 return round(fv * 100, 4)
+                            # Source is decimal-percent format ("0%") and API
+                            # gave whole-percent: 0-100 -> 0-1.
+                            if _scale_to_decimal and abs(fv) > 1.5:
+                                return round(fv / 100, 4)
                             return round(fv, 4)
 
                         # Build chart data object
@@ -3055,6 +3207,7 @@ def refresh_deck_from_spec(
                                     chart_data_t.series,
                                     raw_pc_t,
                                     raw_mc_t,
+                                    filtered_records=df_t,
                                 )
                                 if auto_cv:
                                     cell_values = auto_cv

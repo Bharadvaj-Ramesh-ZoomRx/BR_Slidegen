@@ -1588,6 +1588,41 @@ def pivot_records_to_chart_data(
         categories = list(source_categories)
         series = new_series
 
+    # Always reorder series to source order when source_series_names map
+    # 1:1 to pivot output — even for dynamic charts. Pivot's column
+    # extraction is alphabetical by default; if the source had Wave 7
+    # before Wave 6 (visual most-recent-first) and the pivot returns
+    # them alphabetically, the chart's bars switch sides post-refresh
+    # without any data justification (Repatha ATU slide 49 symptom).
+    # This is purely a reorder — no value substitution, no preservation.
+    if (source_series_names and not _is_wave_dim(source_series_names)
+            and is_dynamic and len(source_series_names) == len(series)):
+        current_names = [n for n, _ in series]
+        norm_to_idx_dyn: dict[str, int] = {}
+        for i, n in enumerate(current_names):
+            norm_to_idx_dyn.setdefault(_norm_label(n), i)
+        reorder_idx: list[int] = []
+        used: set[int] = set()
+        all_resolved = True
+        for src_name in source_series_names:
+            ni = norm_to_idx_dyn.get(_norm_label(src_name))
+            # Try the same fuzzy compound-prefix logic the static path uses
+            if ni is None:
+                for i, cn in enumerate(current_names):
+                    cn_norm = _norm_label(cn)
+                    if (i not in used
+                            and (_norm_label(src_name).endswith(cn_norm)
+                                 or cn_norm.endswith(_norm_label(src_name)))):
+                        ni = i
+                        break
+            if ni is None or ni in used:
+                all_resolved = False
+                break
+            reorder_idx.append(ni)
+            used.add(ni)
+        if all_resolved and reorder_idx != list(range(len(series))):
+            series = [series[i] for i in reorder_idx]
+
     if (source_series_names and not _is_wave_dim(source_series_names)
             and not is_dynamic):
         current_names = [n for n, _ in series]
