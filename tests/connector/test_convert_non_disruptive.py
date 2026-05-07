@@ -173,10 +173,53 @@ def test_column_template_helper_basic():
 
 
 def test_column_template_helper_two_tp_parts():
-    assert _column_template("X @:@ Q1 @:@ Y", [1]) == "X @:@ <TP> @:@ Y"
+    # Use a real wave-shaped TP token (Q1'26 matches _is_wave_label patterns)
+    assert _column_template("X @:@ Q1'26 @:@ Y", [1]) == "X @:@ <TP> @:@ Y"
 
 
 def test_column_template_helper_no_tp_returns_none():
     assert _column_template("Q1 2026 @:@ Sum of base", []) is None
-    assert _column_template("not_a_compound", [0]) == "<TP>"
+    # 'not_a_compound' has tp_indices=[0] but the part isn't wave-shaped,
+    # so the template is rejected (would otherwise match any wave column).
+    assert _column_template("not_a_compound", [0]) is None
     assert _column_template("Q1", [1]) is None  # tp_index out of range
+
+
+def test_column_template_rejects_non_wave_part_at_tp_index():
+    """Regression: a row-field name like 'value' with tp_indices=[0] must
+    NOT produce a template '<TP>' that would falsely pair it to wave
+    columns.
+
+    Slide 50 case (CREON): selectedColumns=['value', 'Project Wave 13']
+    + columnDefinitions including 'value' (the row field). Without this
+    guard, 'value'.template = '<TP>' matches any standalone wave column
+    template, and the §17.4 reconcile pairs 'value' → 'Wave 13',
+    destroying the row identity and making the chart all-None.
+    """
+    # 'value' is not wave-shaped; template must be None
+    assert _column_template("value", [0]) is None
+    # 'region' similarly
+    assert _column_template("region", [0]) is None
+    # 'Wave 13' IS wave-shaped → template emitted
+    assert _column_template("Wave 13", [0]) == "<TP>"
+
+
+def test_row_field_not_paired_to_wave_via_template():
+    """End-to-end: row-field 'value' must NOT be paired to a wave column
+    by §17.4 when ColumnFields=['time_period_name']."""
+    m = _build_old_to_new_column_map(
+        column_fields=["time_period_name"],
+        column_definitions=[
+            {"Name": "value"},  # row field
+            {"Name": "Project Wave 13"},  # TP value col, IsDefaultAlias=False in real spec
+        ],
+        pivot_columns=["Wave 12", "Wave 13"],
+        selected_columns=["value", "Wave 13"],
+    )
+    # 'Project Wave 13' SHOULD pair via TP template (Pass 2)
+    assert m.get("Project Wave 13") == "Wave 13"
+    # 'value' MUST NOT be paired (it isn't wave-shaped — fails template check)
+    assert m.get("value") is None or "value" not in m, (
+        f"'value' was wrongly paired: {m.get('value')!r}. The TP-template "
+        f"check must reject non-wave-shaped names at TP indices."
+    )

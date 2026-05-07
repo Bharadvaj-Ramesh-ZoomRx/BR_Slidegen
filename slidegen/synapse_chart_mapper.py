@@ -709,8 +709,12 @@ def _column_template(name: str, tp_indices: list[int],
                      sep: str = " @:@ ") -> str | None:
     """Replace TP-axis parts of a compound column name with a placeholder.
 
-    Returns None if the name has fewer parts than max(tp_indices)+1
-    (i.e. it's not a valid compound name with TP parts).
+    Returns None when:
+      - The name has fewer parts than max(tp_indices)+1 (not valid compound).
+      - Any part at a tp_index is NOT actually wave-shaped (the name isn't
+        TP-bearing — e.g. row-field name "value" with tp_indices=[0] would
+        otherwise produce a degenerate template "<TP>" that matches every
+        standalone wave column, falsely pairing the row field to a wave).
     """
     if not isinstance(name, str):
         return None
@@ -719,6 +723,12 @@ def _column_template(name: str, tp_indices: list[int],
     parts = name.split(sep)
     if max(tp_indices) >= len(parts):
         return None
+    # All parts at TP indices must be wave-shaped — otherwise this name
+    # isn't actually a TP-bearing compound and pairing via template is
+    # spurious.
+    for i in tp_indices:
+        if not _is_wave_label(parts[i]):
+            return None
     out = list(parts)
     for i in tp_indices:
         out[i] = "<TP>"
