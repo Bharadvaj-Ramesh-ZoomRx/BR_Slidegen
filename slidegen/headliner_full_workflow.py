@@ -354,12 +354,15 @@ def _find_headline_shape(slide, llm_arbiter=None):
 
 
 # Default talking-header zone used when creating a fresh textbox.
-# Top-left, ~85% of slide width, ~1in tall — generous enough for a
-# 2-3 line claim. Caller can resize after writing if needed.
-_DEFAULT_TALKING_HEADER_LEFT_EMU = 274320      # 0.3 in
-_DEFAULT_TALKING_HEADER_TOP_EMU = 182880       # 0.2 in
-_DEFAULT_TALKING_HEADER_WIDTH_EMU = 7772400    # 8.5 in
-_DEFAULT_TALKING_HEADER_HEIGHT_EMU = 914400    # 1.0 in
+# Reference layout (HEadliner position reference.png, slide 11 of
+# Repatha ATU): the talking header sits at the VERY top of the slide,
+# starting at ~0.05" from the top, ~0.5" from the left (clearing any
+# corner badge / nav strip), and spans almost full slide width.
+_DEFAULT_TALKING_HEADER_LEFT_EMU = 457200      # 0.5 in
+_DEFAULT_TALKING_HEADER_TOP_EMU = 45720        # 0.05 in (way up at the top)
+_DEFAULT_TALKING_HEADER_HEIGHT_EMU = 822960    # 0.9 in (~3 lines @ standard pt)
+# Width is computed dynamically per-slide as `slide_width - 2 * left`
+# so the same default works for 10" and 13.3" wide slides.
 
 
 def _find_empty_headline_zone_shape(slide):
@@ -393,13 +396,19 @@ def _find_empty_headline_zone_shape(slide):
 
 
 def _create_talking_header_shape(slide):
-    """Create a fresh textbox in the slide's talking-header zone and
-    return it. Used when neither a text-bearing nor an empty shape
-    exists in the zone (i.e. the user deleted the shape entirely)."""
+    """Create a fresh textbox at the slide's talking-header position
+    (top edge, full-width minus small corner margins) and return it.
+    Width adapts to the slide so 10" and 13.3" decks both get sensible
+    spans."""
+    slide_w = (slide.part.package.presentation_part.presentation
+               .slide_width if hasattr(slide.part.package, "presentation_part")
+               else 9144000)
+    left = _DEFAULT_TALKING_HEADER_LEFT_EMU
+    width = max(914400, slide_w - 2 * left)  # min 1in if slide is tiny
     return slide.shapes.add_textbox(
-        _DEFAULT_TALKING_HEADER_LEFT_EMU,
+        left,
         _DEFAULT_TALKING_HEADER_TOP_EMU,
-        _DEFAULT_TALKING_HEADER_WIDTH_EMU,
+        width,
         _DEFAULT_TALKING_HEADER_HEIGHT_EMU,
     )
 
@@ -415,12 +424,18 @@ _HEADLINE_GAP_THRESHOLD_EMU = int(0.5 * 914400)
 
 
 def _topmost_wide_shape_top(slide) -> int | None:
-    """Return the `top` (EMU) of the topmost wide-enough text frame on
-    the slide (any length, any narrative-shape — pure layout query).
+    """Return the `top` (EMU) of the topmost SUBSTANTIAL text frame on
+    the slide.
 
     Used to decide whether the slide has empty space at the top that
-    qualifies as a talking-header placeholder. Returns None when the
-    slide has no text frames in the upper region.
+    qualifies as a talking-header placeholder. We require substantial
+    text (>= _HEADLINE_MIN_CHARS = 30 chars) so short page banners
+    like "Aided Message Frequency" or "Description of Interaction" at
+    top=0 don't falsely "occupy" the talking-header position. The user
+    rule: the talking-header band is the topmost room for a real 2-3
+    line narrative; a 23-char banner doesn't fill that role.
+
+    Returns None when the slide has no qualifying text frames.
     """
     slide_w_emu = (slide.part.package.presentation_part.presentation
                    .slide_width if hasattr(slide.part.package, "presentation_part")
@@ -431,8 +446,8 @@ def _topmost_wide_shape_top(slide) -> int | None:
         if not shape.has_text_frame:
             continue
         text = (shape.text_frame.text or "").strip()
-        if not text:
-            continue  # empty frames don't block — they ARE the placeholder
+        if len(text) < _HEADLINE_MIN_CHARS:
+            continue  # empty / short banners don't block the placeholder
         top = shape.top or 0
         width = shape.width or 0
         if width < min_width_emu:
@@ -877,6 +892,17 @@ def refresh_headlines(
         # 6. Write the new talking header into the shape (in place).
         if not dry_run:
             tf = headline_shape.text_frame
+            # Force word-wrap within the shape's width and DISABLE
+            # auto-resize, so a long headline wraps to line 2 instead of
+            # the textbox expanding off the slide edge. Critical for
+            # slides 1 / 2 case the user flagged.
+            from pptx.enum.text import MSO_AUTO_SIZE
+            tf.word_wrap = True
+            try:
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+            except Exception:
+                pass
+
             p = tf.paragraphs[0]
             for run in list(p.runs):
                 run.text = ""
@@ -887,6 +913,22 @@ def refresh_headlines(
             else:
                 run = p.runs[0]
             run.text = new_headline
+
+            # When we just CREATED the shape (head_source == "created"),
+            # the box has no explicit fill / line — that's fine and what
+            # we want (transparent so any underlying banner shows
+            # through). But ensure the shape sits on TOP in z-order so
+            # its text is rendered over any opaque banner that occupies
+            # the same top region (slide-9 'Aided Message Frequency'
+            # case).  python-pptx adds new shapes at the end of spTree
+            # (= front of z-order), so this is automatic — but if a
+            # later refresh reordered shapes, re-bump our shape to the
+            # end here defensively.
+            if head_source == "created":
+                sp_tree = headline_shape._element.getparent()
+                if sp_tree is not None:
+                    sp_tree.remove(headline_shape._element)
+                    sp_tree.append(headline_shape._element)
 
         n_shapes = len(ref_summaries)
         kinds = ", ".join(sorted({k for k, _n, _s in ref_summaries}))
