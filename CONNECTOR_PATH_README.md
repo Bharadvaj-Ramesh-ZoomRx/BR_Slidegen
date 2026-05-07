@@ -150,15 +150,36 @@ Each slide's **speaker notes** also get an appended status block (below a divide
 
 ## Evals
 
-Tests under `tests/evals/end_to_end/` validate the pipeline against committed goldens:
+Test coverage spans unit tests for individual mapper helpers, end-to-end golden comparisons, and a live-API integration suite.
 
-| Eval | Purpose |
-|---|---|
-| `test_refresh_execution.py` | Refreshes a fixture deck end-to-end and compares categories, series names, and **values** against a per-deck golden JSON. Catches "mapper succeeded but data didn't move" silently — that class of bug was invisible under categories-only comparison. Mutation test confirms the comparator isn't always-green. |
-| `test_propose_pivot_config.py` | Unit tests for the spec-inference logic (`propose_pivot_config`, `propose_raw_configs`) used to bootstrap specs from charts that lack tags. |
-| `test_spec_refresh_pipeline.py` | Legacy 3-stage spec dataclass pipeline. Test-only, not the active production path. |
+### Unit tests (fast, no network)
+
+`tests/connector/` — targeted coverage for the connector-path internals shipped this session:
+
+| File | Covers | Test count |
+|---|---|---|
+| `test_formula_evaluator.py` | Excel-formula tokenizer, per-row evaluator (precedence, division by zero, missing columns), `_build_formula_columns` flow with default-alias renames | 21 |
+| `test_resolution_chain.py` | The 5-tier label resolver (exact, progressive-suffix, tail-substring, fuzzy, positional) for both categories and series | 7 |
+| `test_table_auto_write.py` | `_format_cell_value` (0%, 0.0%, 0, #,##0, NaN), `_refresh_templated_count_with_records` (8 templated-cell patterns), `_auto_compute_cell_values` for vertical / horizontal / 1×1 layouts | 21 |
+| `test_filter_resolver.py` | `;`-joined IN filters with exact + compound-suffix matches, broken-filter graceful fallback, measure-column filter, latest-wave-only filter | 6 |
+
+Run all: `pytest tests/connector/ -q` (~1 sec, no creds, no network).
+
+`tests/test_propose_pivot_config.py` — 8 tests for the spec-inference logic used to bootstrap specs from charts that lack tags (separate from the connector path).
+
+### End-to-end goldens
+
+`tests/evals/end_to_end/test_refresh_execution.py` refreshes a fixture deck end-to-end and compares categories, series names, and **values** against a per-deck golden JSON. Catches "mapper succeeded but data didn't move" — that class of bug is invisible under categories-only comparison. Mutation test confirms the comparator isn't always-green.
 
 To regenerate goldens after an intentional pipeline change: `python -m tests.evals.end_to_end.generate_golden`.
+
+### Live-API smoke
+
+`tests/evals/end_to_end/test_refresh_against_live_api.py` (marked `live_api`) runs the full pipeline against a real Synapse fetch. Skipped by default; run with `pytest -m live_api` when network + creds are available.
+
+### Legacy
+
+`tests/test_spec_refresh_pipeline.py` covers the legacy 3-stage spec-dataclass pipeline. Test-only, not the active production path; kept for reference.
 
 ## Outputs and how to read them
 

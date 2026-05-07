@@ -127,7 +127,26 @@ User asked: can we close all known limitations? Worked through them:
 | Commit | What |
 |---|---|
 | `dd69544` | README: Prerequisites + 'will it just work?' section. |
-| (next)   | Templated patterns extended + scatter series-name fallback + positional alignment 5th tier + README/memory updates. |
+| `e5bc4d6` | Templated patterns extended + scatter series-name fallback + positional alignment 5th tier + README/memory updates. |
+| (next)   | Connector unit-test suite (4 files, 55 tests) + README evals section rewrite. |
+
+### Eval coverage closed today
+
+User asked: are evals extensive enough? Walked through gaps and added
+4 unit-test files under `tests/connector/`:
+
+| File | Tests | Covers |
+|---|---|---|
+| `test_formula_evaluator.py` | 21 | Tokenizer + evaluator + full `_build_formula_columns` with default-alias renames. |
+| `test_resolution_chain.py` | 7 | 5-tier resolver (exact, suffix, substring, fuzzy, positional) for cats + series. |
+| `test_table_auto_write.py` | 21 | `_format_cell_value`, `_refresh_templated_count_with_records` (8 patterns), `_auto_compute_cell_values` (4 layouts). |
+| `test_filter_resolver.py` | 6 | `;`-joined Filters with compound-suffix, broken-filter fallback, measure filter, latest-wave-only. |
+
+All 55 pass in ~1 sec. The table-auto-write suite caught a real bug
+along the way: `_format_cell_value("0.0%")` was producing 0 decimals
+instead of 1 (the format detection code took the wrong branch). Fixed
+in the same commit. README's Evals section rewritten to point at
+this new structure plus the existing end-to-end + live-API tests.
 
 ### Validation deck on disk
 

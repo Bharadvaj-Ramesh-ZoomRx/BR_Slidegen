@@ -73,15 +73,17 @@ def _format_cell_value(v, fmt: str | None) -> str:
     except (TypeError, ValueError):
         return str(v)
     fmt = (fmt or "").strip()
-    if fmt in ("0%", "0.0%", "#%"):
-        # Connector decimals: 0.73 -> "73%"; whole-number: 73 -> "73%".
-        # Heuristic: <= 1.0 means decimal-scale (already a fraction).
-        if abs(f) <= 1.0:
-            return f"{f * 100:.0f}%"
-        return f"{f:.0f}%"
     if fmt.endswith("%"):
-        # e.g. "0.0%" with 1 decimal
-        decimals = max(0, fmt.count(".") and (len(fmt) - fmt.index(".") - 2) or 0)
+        # Decimal-place count: "0%" -> 0, "0.0%" -> 1, "0.00%" -> 2, etc.
+        # Detect via the format's own ".N" portion. Universal across
+        # connector format strings.
+        if "." in fmt:
+            decimals = max(0, len(fmt) - fmt.index(".") - 2)
+        else:
+            decimals = 0
+        # Heuristic: <= 1.0 means decimal-scale (already a fraction);
+        # > 1.0 means already-whole-percent. Connector tags can encode
+        # either; we accept both and render correctly.
         scale = 100 if abs(f) <= 1.0 else 1
         return f"{f * scale:.{decimals}f}%"
     if fmt in ("0", "#,##0"):
