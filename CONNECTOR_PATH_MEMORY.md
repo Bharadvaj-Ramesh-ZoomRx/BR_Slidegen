@@ -81,6 +81,54 @@ Known unfixed: field-date stamps (`Q1'26: 01/01/2026 – 25/02/2026`), 1×1 temp
 - `CONNECTOR_PATH_README.md` (today)
 - `CONNECTOR_PATH_MEMORY.md` (this file)
 
+### Late-day fixes (after the v10 review pass)
+
+User asked: can we close all known limitations? Worked through them:
+
+- **Templated 1×1 cells beyond `(n = X)`** — extended `_COUNT_PATTERNS`
+  to a list of 7 universal patterns: `(n = X)`, `(N = X)`, `n=X`,
+  `Sample size: X`, `Sample Size = X`, `Base: X`, `Total: X`,
+  `based on X respondents`, `X HCPs/patients/subjects`. All 12 unit
+  tests pass. New patterns can be added in seconds.
+- **Scatter series naming fallback** — when mapper produces a purely-
+  numeric series name (rare edge case where selectedColumns picks
+  bare value columns), writer falls back to: source's series name at
+  same index → `columnDefinitions[].Alias` / first non-`<blank:>`
+  Name. Universal across decks.
+- **Positional alignment 5th-tier fallback** — when categories have
+  same count source vs API and the 4 named-match tiers (exact,
+  suffix, substring, fuzzy) all miss, fall back to positional
+  alignment (source[i] → pivot[i]). Reading values, not consuming
+  pivot rows, so multiple sources can resolve to the same pivot
+  index without conflict. Reduces alignment_failed cases substantially.
+- **Field-date stamps** — investigated, blocked Synapse-side. The
+  API records don't include `time_period_start` / `time_period_end`
+  columns, so we have no source of truth for the new date range
+  when a wave shifts. Documented as a Synapse-API-side requirement.
+- **Ambiguous tag** — confirmed user-side. The 4 charts on slide 73
+  all carry byte-identical connector tags; the pipeline can't
+  auto-disambiguate without risk of wrong assignment. Source values
+  preserved + flagged. Action: add per-chart filter or split_order.
+
+### Doc updates (late day)
+
+- README expanded with Prerequisites table + TL;DR walkthrough so a
+  fresh reader (Vijay or anyone else) can clone, install, configure
+  creds, and refresh without prior context.
+- Added an honest "Will refresh this deck just work?" section that
+  separates "fully auto-handled" (~90% of slides) from "flagged +
+  preserved" (the 5 review buckets) from "not auto-handled" (field-
+  date stamps, exotic templated cells, ambiguous tags).
+- Known Limitations rewritten to mark which were closed today vs which
+  remain (with reasons).
+
+### Late-day commits
+
+| Commit | What |
+|---|---|
+| `dd69544` | README: Prerequisites + 'will it just work?' section. |
+| (next)   | Templated patterns extended + scatter series-name fallback + positional alignment 5th tier + README/memory updates. |
+
 ### Validation deck on disk
 
 - `output_testing/deck_output/Repatha_HCP_ATU_Q2_26_Skeleton_Deck1_2026-05-06_v10.pptx` — last full validation run with table auto-write + headline detector + scatter scaling fix; user instructed not to run v11 today, has other tasks.

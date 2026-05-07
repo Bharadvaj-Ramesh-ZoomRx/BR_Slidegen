@@ -1575,7 +1575,15 @@ def pivot_records_to_chart_data(
             and not is_dynamic):
         norm_to_idx = {_norm_label(c): i for i, c in enumerate(categories)}
 
-        def _resolve_cat_idx(src_cat: str) -> int | None:
+        # 5th-tier positional fallback fires when the 4 named-match
+        # tiers fail AND source/API category counts align. Reading
+        # values — not consuming pivot rows — so multiple source
+        # entries can resolve to the same pivot index without conflict.
+        _positional_enabled = (
+            len(source_categories) == len(categories)
+        )
+
+        def _resolve_cat_idx(src_cat: str, src_idx: int) -> int | None:
             """Find the pivot category that corresponds to a source category.
 
             Resolution tiers (each only fires when previous misses):
@@ -1587,6 +1595,14 @@ def pivot_records_to_chart_data(
                  final guard against minor rewording / whitespace drift.
                  Only applies when both labels have >= 4 chars to avoid
                  spurious matches between short tokens.
+              5. Positional fallback: if source and API have the same
+                 category count AND the named-match tiers couldn't
+                 resolve this entry, return src_idx — assume the API's
+                 nth category corresponds to source's nth. Risky on
+                 reordered datasets but produces non-None values when
+                 every named-match tier failed; the tag_mismatch /
+                 alignment_failed safety nets still catch the
+                 zero-overlap case earlier in the pipeline.
             """
             key = _norm_label(src_cat)
             if key in norm_to_idx:
@@ -1612,13 +1628,16 @@ def pivot_records_to_chart_data(
                         best_score, best_idx = score, idx
                 if best_score >= 0.85:
                     return best_idx
+            # Positional fallback — only when counts align.
+            if _positional_enabled and src_idx < len(categories):
+                return src_idx
             return None
 
         new_series = []
         for sname, vals in series:
             new_vals = []
-            for src_cat in source_categories:
-                j = _resolve_cat_idx(src_cat)
+            for src_idx, src_cat in enumerate(source_categories):
+                j = _resolve_cat_idx(src_cat, src_idx)
                 if j is not None:
                     new_vals.append(vals[j] if j < len(vals) else None)
                 else:

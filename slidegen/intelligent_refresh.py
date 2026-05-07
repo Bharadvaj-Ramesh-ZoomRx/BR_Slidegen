@@ -259,9 +259,21 @@ def _auto_compute_cell_values(
     return None
 
 
-_COUNT_PATTERN = __import__("re").compile(
-    r"\(\s*[nN]\s*=\s*(\d+)\s*\)"
+import re as _re_count
+# Universal templated-cell patterns — covers the conventions we've seen
+# across CREON, Repatha (VESALIUS / ATU), AVEO. Each pattern captures the
+# numeric portion in group 1 so the substitution can replace it cleanly.
+# Order matters: more-specific patterns come first.
+_COUNT_PATTERNS = (
+    _re_count.compile(r"\(\s*[nN]\s*=\s*(\d+)\s*\)"),         # (n = 120) (N = 51)
+    _re_count.compile(r"\b[nN]\s*=\s*(\d+)\b"),               # n=120 / N = 120
+    _re_count.compile(r"[Ss]ample\s+[Ss]ize\s*[:=]?\s*(\d+)"),# Sample size: 120
+    _re_count.compile(r"\b[Bb]ase\s*[:=]?\s*(\d+)\b"),        # Base: 120 / Base 120
+    _re_count.compile(r"\b[Tt]otal\s*[:=]?\s*(\d+)\b"),       # Total: 120
+    _re_count.compile(r"\bbased\s+on\s+(\d+)"),               # based on 51 respondents
+    _re_count.compile(r"\b(\d+)\s+(?:respondents?|HCPs?|patients?|subjects?)\b"),
 )
+_COUNT_PATTERN = _COUNT_PATTERNS[0]  # back-compat for any external caller
 
 
 def _substitute_templated_count(text, raw_pivot_config, raw_mapping_config,
@@ -290,25 +302,37 @@ def _substitute_templated_count(text, raw_pivot_config, raw_mapping_config,
 
 
 def _refresh_templated_count_with_records(text: str, df) -> str | None:
-    """Substitute '(n = X)' in `text` using a representative count from
-    `df`. Picks `respondents` -> `base` -> `count`; uses the max value
-    after the existing Filters have been applied (df should be the
-    post-filter frame). Returns None when no substitution applies.
+    """Substitute count placeholders in `text` using a representative
+    count from `df`. Tries multiple patterns (universal across decks):
+    '(n = X)', 'n=X', 'Sample size: X', 'Base: X', 'Total: X',
+    'based on X respondents', 'X HCPs/patients/subjects'.
+
+    Picks `respondents` -> `base` -> `count` from df, max value
+    (base/respondents are constant per cell; max==first; for count it
+    gives the largest sub-group, matching source label convention).
+    Returns None when no pattern matches or no count is derivable.
     """
     if not text or df is None or len(df) == 0:
         return None
-    m = _COUNT_PATTERN.search(text)
-    if not m:
+    pattern_match = None
+    pattern_used = None
+    for pat in _COUNT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            pattern_match = m
+            pattern_used = pat
+            break
+    if pattern_match is None:
         return None
     for col in ("respondents", "base", "count"):
         if col in df.columns:
             try:
-                # Use the max — base/respondents are constant per cell so
-                # max(==first) works; for count it gives the largest sub-
-                # group, which matches the source label convention.
                 n = int(df[col].max())
                 if n > 0:
-                    return _COUNT_PATTERN.sub(f"(n = {n})", text, count=1)
+                    # Replace only the captured number, keeping surrounding
+                    # template intact (preserves "Sample size: " prefix etc).
+                    start, end = pattern_match.span(1)
+                    return text[:start] + str(n) + text[end:]
             except Exception:
                 continue
     return None
@@ -3129,8 +3153,39 @@ def refresh_deck_from_spec(
                                 )
                             else:
                                 order = list(range(n_cats))
-                            for sname, vals in series_data:
-                                s = cd.add_series(sname)
+                            # Scatter series-name guard: if mapper produced a
+                            # purely-numeric series name (rare edge case where
+                            # selectedColumns selects a bare value column),
+                            # substitute with source name at same index, or
+                            # the columnDefinition Alias / Name as a fallback.
+                            # Universal across decks — any scatter where the
+                            # tag yields numeric series names is patched here.
+                            import re as _re_sname
+                            _is_numeric_name = lambda n: bool(
+                                _re_sname.fullmatch(r"-?\d+(?:\.\d+)?", str(n or "").strip())
+                            )
+                            for s_idx, (sname, vals) in enumerate(series_data):
+                                effective_name = sname
+                                if _is_numeric_name(effective_name):
+                                    if (src_series_names
+                                            and s_idx < len(src_series_names)
+                                            and src_series_names[s_idx]):
+                                        effective_name = src_series_names[s_idx]
+                                    else:
+                                        # Try columnDefinitions[].Alias or Name
+                                        col_defs_local = (raw_pc or {}).get(
+                                            "columnDefinitions") or []
+                                        cd_pick = None
+                                        for cd_entry in col_defs_local:
+                                            n = cd_entry.get("Name", "")
+                                            if (cd_entry.get("Alias")
+                                                    or (n and not n.startswith("<blank:"))):
+                                                cd_pick = (cd_entry.get("Alias")
+                                                           or cd_entry.get("Name"))
+                                                break
+                                        if cd_pick:
+                                            effective_name = cd_pick
+                                s = cd.add_series(effective_name)
                                 for rank, oi in enumerate(order):
                                     raw = vals[oi] if oi < len(vals) else None
                                     scaled = _scale_val(raw)

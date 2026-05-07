@@ -197,12 +197,12 @@ Synapse credentials are loaded from (in order):
 
 ## Known limitations
 
-- **1×1 cells with embedded counts**: only `(n = NUMBER)` pattern is handled. Other templates (`"Sample size: 120"`, `"based on 51 respondents"`) need explicit handling.
-- **Scatter chart series naming**: when a connector tag's selectedColumns selects bare value columns (no row label), the mapper may name the series after the first value. Current best-effort uses fuzzy matching; mileage varies on edge cases.
-- **Group-nested shapes**: chart and table refresh now walks groups, but field-date stamps and other custom text inside groups still use top-level walking in some places.
-- **Field-date stamps** (`"Q1'26: 01/01/2026 – 25/02/2026"`): label sync rewrites the wave token but not the date range. To fix: extend the shift map to include `time_period_start`/`time_period_end`.
-- **Ambiguous tags**: if a slide has 4 charts that all resolve to the same analysis but should display different cuts of data, you must add a per-chart filter or split_order. The pipeline can't auto-disambiguate.
-- **Period-id reverse-chrono**: time_period_ids are NOT chronological in Synapse. The `dynamic_latest_n` filter parses wave NAMES instead.
+- **1×1 cells with embedded counts**: a wide range of conventions are handled — `(n = X)`, `(N = X)`, `n=X`, `Sample size: X`, `Sample Size = X`, `Base: X`, `Total: X`, `based on X respondents`, `X HCPs/patients/subjects`. Cells using a pattern not in this list will need explicit handling; PRs welcome.
+- **Scatter chart series naming**: handled — when a connector tag yields a numeric series name (rare edge case where selectedColumns picks bare value columns without a row-label dimension), the writer falls back to source's series name at the same index, then to `columnDefinitions[].Alias` / `Name`.
+- **Group-nested shapes**: chart and table refresh walks groups via `walk_shapes_recursive`. Label-sync also handles grouped charts.
+- **Field-date stamps** (`"Q1'26: 01/01/2026 – 25/02/2026"`): the wave token portion gets shifted by label sync, but the date range does not. Reason: the Synapse API doesn't currently return `time_period_start` / `time_period_end` in record responses, so there's no source of truth for the new date range. Requires API-side change before this can be auto-wired.
+- **Ambiguous tags**: if a slide has 2+ charts that all resolve to the same analysis with byte-identical tag configs but should display different cuts of data, the pipeline marks them `ambiguous_tag` and preserves source. Add a per-chart filter (`Filters` in PivotConfig) or `split_order` to disambiguate. The pipeline can't auto-resolve this without risking wrong assignments.
+- **Period-id reverse-chrono**: time_period_ids are NOT chronological in Synapse. The `dynamic_latest_n` filter parses wave NAMES instead — this is handled, just worth knowing if you debug period-window issues.
 
 ## Where to look when something goes wrong
 
