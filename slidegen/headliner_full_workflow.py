@@ -71,7 +71,17 @@ class HeadlineUpdate:
     old_headline: str
     new_headline: str
     chart_summary: str
-    status: str  # 'updated' | 'unchanged' | 'no_chart' | 'no_headline' | 'api_error'
+    # status:
+    #   'updated'         — LLM rewrote, deck edited
+    #   'unchanged'       — preserved (all data shapes empty/null)
+    #   'no_chart'        — no chart or table on the slide
+    #   'no_headline'     — couldn't find or create a headline shape
+    #   'skipped_label'   — existing talking header reads as a slide-section
+    #                       label (e.g., "Message Recall CREON") — NOT
+    #                       rewritten. Empty / created shapes still get
+    #                       written; only EXISTING label-style headers skip.
+    #   'api_error'       — LLM call failed
+    status: str
 
 
 _NARRATIVE_VERBS = {
@@ -135,32 +145,159 @@ def _looks_like_data_narrative(text: str) -> bool:
 _HEADLINE_MIN_CHARS = 30
 
 
-def _find_headline_shape(slide):
+# Words / patterns that suggest "section title" or "data label" rather
+# than a narrative claim. Used by the narrative scorer below to penalise
+# label-style candidates so the actual talking header wins on slides
+# where multiple wide-tall-long shapes coexist.
+_LABEL_PATTERNS = (
+    re.compile(r"^[A-Z][A-Za-z\s&/–-]{4,40}\s*[-–]\s*[A-Z]", re.M),  # "X – Y"
+    re.compile(r"\bRespondent\s+Profile\b", re.I),
+    re.compile(r"\bInteraction\s+Details\b", re.I),
+    re.compile(r"\bSlide\s+\d+\b", re.I),
+    re.compile(r"\bSection\s+\d+\b", re.I),
+    re.compile(r"^[A-Z][A-Z\s]+$"),  # ALL CAPS line
+)
+_DATE_RANGE_RE = re.compile(
+    r"\b("
+    r"[A-Z][a-z]{2}['’‘]\d{2}\s*[-–]\s*[A-Z][a-z]{2}['’‘]\d{2}"
+    r"|Q[1-4]['’‘]?\s*\d{2,4}"
+    r"|Wave\s+\d+"
+    r"|[A-Z][a-z]{2}-[A-Z][a-z]{2}\s*['’‘]?\d{2,4}"
+    r")\b"
+)
+_NUMERIC_RE = re.compile(r"\d+%?")
+_COMPARISON_RE = re.compile(
+    r"\b(vs\.?|versus|compared|against|while|whereas|whilst|than)\b", re.I
+)
+
+
+def _score_narrative(text: str) -> float:
+    """Score how narrative-like a text frame reads.
+
+    Higher score = more like a data-driven talking header.
+    Lower (or negative) = more like a section title / label.
+
+    Cheap heuristic — used as a first pass to pick a talking header
+    when multiple candidates pass the layout filter. Reserved as input
+    to LLM arbitration on close calls.
+    """
+    if not text:
+        return -10.0
+    score = 0.0
+    lower = text.lower()
+    # Narrative verbs (rose, fell, retained, dominated, …)
+    score += 2.0 * sum(1 for v in _NARRATIVE_VERBS
+                       if re.search(rf"\b{v}\b", lower))
+    # Claim keywords (highest, lowest)
+    score += 2.0 * sum(1 for p in _CLAIM_KEYWORDS if re.search(p, lower))
+    # Numeric content (a real claim usually cites at least one number)
+    score += min(5, len(_NUMERIC_RE.findall(text))) * 1.0
+    # Comparison structures (vs, compared, while)
+    score += 1.5 * len(_COMPARISON_RE.findall(text))
+    # Length bonus (genuine narratives are usually longer)
+    L = len(text)
+    if L >= 80:
+        score += 2.0
+    if L >= 120:
+        score += 1.5
+    if L >= 180:
+        score += 1.0
+    # Penalties for label-shape patterns
+    for pat in _LABEL_PATTERNS:
+        if pat.search(text):
+            score -= 3.0
+            break
+    # Pure-date-range slabs are section/banner labels, not insights
+    date_hits = len(_DATE_RANGE_RE.findall(text))
+    if date_hits and L < 60:
+        score -= 4.0
+    return score
+
+
+def _llm_pick_talking_header(candidates_text: list[str], llm_arbiter) -> int | None:
+    """Ask Claude which candidate reads most like a data-driven
+    narrative claim (the talking header) vs a section title or label.
+
+    Args:
+      candidates_text: 1-N candidate text strings.
+      llm_arbiter: callable (prompt: str) -> str. Used to get Claude's
+        verdict. Pass `_call_claude` from this module for production.
+
+    Returns:
+      0-based index of the chosen candidate, or None on parse failure.
+    """
+    if not candidates_text:
+        return None
+    if len(candidates_text) == 1:
+        return 0
+    listing = "\n".join(
+        f"({i+1}) {t.replace(chr(10), ' ')[:300]}"
+        for i, t in enumerate(candidates_text)
+    )
+    prompt = (
+        "On a PowerPoint slide, one text frame is the TALKING HEADER — a "
+        "1-3 sentence data-driven INSIGHT or VERDICT about what the chart/"
+        "table data shows (movement, comparison, claim). The others are "
+        "section titles, slide labels, or banners (short, descriptive, "
+        "not a claim).\n\n"
+        "Pick the talking header. Output ONLY a single integer (the "
+        "candidate number, 1-based). No explanation, no punctuation.\n\n"
+        f"{listing}"
+    )
+    try:
+        out = llm_arbiter(prompt).strip()
+    except Exception:
+        return None
+    # Accept the first integer found in the output
+    m = re.search(r"\d+", out)
+    if not m:
+        return None
+    idx = int(m.group(0)) - 1
+    if 0 <= idx < len(candidates_text):
+        return idx
+    return None
+
+
+def _find_headline_shape(slide, llm_arbiter=None):
     """Pick the slide's TALKING HEADER — the top-left long-sentence text frame.
 
-    Strict heuristic to avoid confusion with the slide-section title
-    (short label that sits BELOW the talking header) and the roadmap
-    (narrow strip at top-right):
+    Layered decision:
 
-      1. Width >= 40% of slide width      (excludes roadmap)
-      2. Top < 2 inches from slide top    (excludes body content)
-      3. Text length >= 30 chars          (excludes section-title labels)
-      4. Among survivors: pick TOPMOST.   (talking header is above section title)
-      5. Tiebreak (same top, within ~0.2in): pick LEFTMOST.
-                                            (talking header is top-left)
+      1. Layout filter (cheap, geometry-only):
+         * width >= 40% of slide width   (excludes narrow roadmap)
+         * top < 2 inches from slide top (excludes body content)
+         * text length >= 30 chars       (excludes most section titles)
 
-    SlideGen's own naming convention `zrx_<slide:03d>_001` for the
-    first shape on a slide takes priority when present (and only if it
-    also passes the length filter — guards against `zrx_001_001` being
-    a banner).
+      2. Narrative scoring (cheap, language-only):
+         * narrative verbs / claim keywords / numbers / comparisons → +
+         * label patterns ("Respondent Profile", "Interaction Details",
+           "MMM'YY – MMM'YY") → −
+         If one candidate has a decisive lead (>= 3 points over runner-
+         up), pick it without LLM.
 
-    Returns None when no talking header exists (e.g., dividers, covers).
+      3. LLM arbitration (when scores are close AND llm_arbiter given):
+         Send candidate texts to Claude — "which is the talking header
+         vs section title?" — and use Claude's pick.
+
+      4. Fallback (no LLM available, scores still tied):
+         Pick topmost-leftmost (the layout convention).
+
+    `llm_arbiter` is optional — `refresh_headlines` passes `_call_claude`
+    so production gets Claude judgment on edge cases. Tests / callers
+    that want pure-heuristic behavior can omit it.
+
+    SlideGen's `zrx_<slide:03d>_001` naming convention takes priority
+    when present (and only if the shape passes the length+position
+    filters — guards against `zrx_001_001` being a banner).
+
+    Returns None when no qualifying shape exists (e.g., dividers).
     """
     slide_w_emu = (slide.part.package.presentation_part.presentation
                    .slide_width if hasattr(slide.part.package, "presentation_part")
-                   else 9144000)  # fallback ~10in
+                   else 9144000)
     min_width_emu = int(slide_w_emu * 0.4)
     tiebreak_top_band_emu = 200000  # ~0.2 inches
+    DECISIVE_SCORE_GAP = 3.0
 
     candidates = []  # (top, left, shape, text)
     for shape in slide.shapes:
@@ -172,15 +309,13 @@ def _find_headline_shape(slide):
         top = shape.top or 0
         left = shape.left or 0
         width = shape.width or 0
-        # SlideGen first-shape convention — accept only if it also passes
-        # length + position filters (banner-only `zrx_*_001` is excluded).
         name = (shape.name or "").lower().strip()
+        # SlideGen first-shape convention — only if it also passes filters.
         if name.startswith("zrx_") and name.endswith("_001"):
             if (width >= min_width_emu
                     and top < _HEADLINE_TOP_LIMIT_EMU
                     and len(text) >= _HEADLINE_MIN_CHARS):
                 return shape
-            # Otherwise fall through to the general filter
         if (width >= min_width_emu
                 and top < _HEADLINE_TOP_LIMIT_EMU
                 and len(text) >= _HEADLINE_MIN_CHARS):
@@ -188,16 +323,111 @@ def _find_headline_shape(slide):
 
     if not candidates:
         return None
-    # Sort by top, then by left (talking header is topmost; ties resolved
-    # leftmost since talking header is top-LEFT and section title may be
-    # top-CENTERED).
-    candidates.sort(key=lambda c: (c[0], c[1]))
-    # Bucket all candidates within the tiebreak band of the topmost into a
-    # group, then pick leftmost within that group.
-    topmost_y = candidates[0][0]
-    top_band = [c for c in candidates if c[0] - topmost_y <= tiebreak_top_band_emu]
-    top_band.sort(key=lambda c: c[1])  # leftmost wins
+    if len(candidates) == 1:
+        return candidates[0][2]
+
+    # Score each candidate by narrative quality.
+    scored = [(c[0], c[1], c[2], c[3], _score_narrative(c[3])) for c in candidates]
+    scored.sort(key=lambda x: x[4], reverse=True)
+    top_score = scored[0][4]
+    runner_up = scored[1][4]
+
+    if (top_score - runner_up) >= DECISIVE_SCORE_GAP:
+        return scored[0][2]
+
+    # Scores are close — try LLM arbitration on the tied/near-tied set.
+    near_tied_idx = [i for i, s in enumerate(scored)
+                     if (top_score - s[4]) < DECISIVE_SCORE_GAP]
+    if llm_arbiter and len(near_tied_idx) >= 2:
+        texts = [scored[i][3] for i in near_tied_idx]
+        pick = _llm_pick_talking_header(texts, llm_arbiter)
+        if pick is not None:
+            return scored[near_tied_idx[pick]][2]
+
+    # Fallback: top-most, left-most among the near-tied set.
+    near_tied = [scored[i] for i in near_tied_idx]
+    near_tied.sort(key=lambda x: (x[0], x[1]))
+    topmost_y = near_tied[0][0]
+    top_band = [t for t in near_tied if t[0] - topmost_y <= tiebreak_top_band_emu]
+    top_band.sort(key=lambda x: x[1])
     return top_band[0][2]
+
+
+# Default talking-header zone used when creating a fresh textbox.
+# Top-left, ~85% of slide width, ~1in tall — generous enough for a
+# 2-3 line claim. Caller can resize after writing if needed.
+_DEFAULT_TALKING_HEADER_LEFT_EMU = 274320      # 0.3 in
+_DEFAULT_TALKING_HEADER_TOP_EMU = 182880       # 0.2 in
+_DEFAULT_TALKING_HEADER_WIDTH_EMU = 7772400    # 8.5 in
+_DEFAULT_TALKING_HEADER_HEIGHT_EMU = 914400    # 1.0 in
+
+
+def _find_empty_headline_zone_shape(slide):
+    """Find an empty-text shape sitting in the talking-header zone.
+
+    Used when the user clears the talking-header text but leaves the
+    shape on the slide. Returns the topmost-leftmost qualifying empty
+    shape, or None.
+    """
+    slide_w_emu = (slide.part.package.presentation_part.presentation
+                   .slide_width if hasattr(slide.part.package, "presentation_part")
+                   else 9144000)
+    min_width_emu = int(slide_w_emu * 0.4)
+
+    candidates = []
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = (shape.text_frame.text or "").strip()
+        if text:
+            continue  # non-empty: handled by the regular finder
+        top = shape.top or 0
+        left = shape.left or 0
+        width = shape.width or 0
+        if width >= min_width_emu and top < _HEADLINE_TOP_LIMIT_EMU:
+            candidates.append((top, left, shape))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: (c[0], c[1]))
+    return candidates[0][2]
+
+
+def _create_talking_header_shape(slide):
+    """Create a fresh textbox in the slide's talking-header zone and
+    return it. Used when neither a text-bearing nor an empty shape
+    exists in the zone (i.e. the user deleted the shape entirely)."""
+    return slide.shapes.add_textbox(
+        _DEFAULT_TALKING_HEADER_LEFT_EMU,
+        _DEFAULT_TALKING_HEADER_TOP_EMU,
+        _DEFAULT_TALKING_HEADER_WIDTH_EMU,
+        _DEFAULT_TALKING_HEADER_HEIGHT_EMU,
+    )
+
+
+def _ensure_headline_shape(slide, llm_arbiter=None):
+    """Find the talking-header shape OR create one if missing.
+
+    Three-pass discovery:
+      Pass 1: existing text-bearing shape (`_find_headline_shape`).
+              Handles the standard case + LLM arbitration on close calls.
+      Pass 2: empty-text shape in the talking-header zone.
+              Handles "user cleared the text but kept the shape".
+      Pass 3: no qualifying shape exists — create a new textbox at the
+              default top-left position. Handles "user deleted the shape".
+
+    Returns: (shape, source) where source is one of:
+      'existing'  — Pass 1 hit
+      'empty'     — Pass 2 hit
+      'created'   — Pass 3 created a new shape
+    """
+    shape = _find_headline_shape(slide, llm_arbiter=llm_arbiter)
+    if shape is not None:
+        return shape, "existing"
+    shape = _find_empty_headline_zone_shape(slide)
+    if shape is not None:
+        return shape, "empty"
+    shape = _create_talking_header_shape(slide)
+    return shape, "created"
 
 
 def _largest_chart(slide):
@@ -487,25 +717,55 @@ def refresh_headlines(
     ref = Presentation(refreshed_pptx)
     updates: list[HeadlineUpdate] = []
 
+    # LLM arbiter — passed to _find_headline_shape so close-call cases
+    # (multiple wide-tall-long candidates with similar narrative scores)
+    # get Claude's judgment instead of falling to a topmost-leftmost
+    # heuristic. Only fires when the heuristic alone can't decide.
+    if dry_run:
+        llm_arbiter = None
+    else:
+        def llm_arbiter(prompt: str) -> str:
+            return _call_claude(prompt, model=model)
+
     for s_idx, (s_slide, r_slide) in enumerate(zip(src.slides, ref.slides)):
         if only_slides is not None and s_idx not in only_slides:
             continue
 
-        # 1. Find the talking header. No talking header → skip silently.
-        headline_shape = _find_headline_shape(r_slide)
-        if headline_shape is None:
-            updates.append(HeadlineUpdate(s_idx, "", "", "", "no_headline"))
-            continue
-        old_headline = headline_shape.text_frame.text.strip()
-
-        # 2. Gather every chart + table on the refreshed slide. Skip the
-        #    slide entirely if there's nothing to summarise (cover, divider).
+        # 1. Gather every chart + table FIRST. Skip the slide entirely if
+        #    there's nothing to headline (cover, divider, etc.) — this
+        #    runs before _ensure_headline_shape so we don't leave an
+        #    orphaned empty textbox on data-less slides.
         ref_data = _all_data_shapes(r_slide)
         if not ref_data:
             updates.append(HeadlineUpdate(
-                s_idx, old_headline, "", "no chart or table on slide", "no_chart"))
+                s_idx, "", "", "no chart or table on slide", "no_chart"))
             continue
         ref_summaries = [(kind, name, summary) for (kind, _shp, name, summary) in ref_data]
+
+        # 2. Find OR create the talking-header shape. Three pathways:
+        #    - existing: shape exists with narrative text
+        #    - empty:    shape exists in the zone but text was cleared
+        #    - created:  no qualifying shape — new textbox added at top-left
+        headline_shape, head_source = _ensure_headline_shape(
+            r_slide, llm_arbiter=llm_arbiter)
+        old_headline = headline_shape.text_frame.text.strip()
+
+        # 2b. If the existing talking-header text reads like a slide-section
+        #     title / banner ("Message Recall CREON", "Interaction Details
+        #     - All Products", etc.) — the deck author intentionally didn't
+        #     put a narrative claim in this slot, so don't overwrite it
+        #     with one. Only skips the EXISTING-text path; empty and
+        #     created shapes still get written.
+        LABEL_SCORE_THRESHOLD = 2.0
+        if head_source == "existing" and old_headline:
+            old_score = _score_narrative(old_headline)
+            if old_score < LABEL_SCORE_THRESHOLD:
+                updates.append(HeadlineUpdate(
+                    s_idx, old_headline, "",
+                    f"existing header reads as slide label "
+                    f"(score={old_score:.1f}); not rewriting",
+                    "skipped_label"))
+                continue
 
         # 3. Source summaries are optional — included only when the slide
         #    was connected so Claude can describe MOVEMENT. Non-connected
@@ -518,13 +778,21 @@ def refresh_headlines(
                                  for (kind, _shp, name, summary) in src_data]
 
         # 4. Guard: if every refreshed shape is completely empty / null,
-        #    don't ask the LLM to invent. Preserve the original.
+        #    don't ask the LLM to invent. Preserve the original (or, when
+        #    we just created a placeholder shape, leave it empty rather
+        #    than letting the LLM hallucinate).
         all_empty = True
         for _kind, _name, summary in ref_summaries:
             if any(ch.isdigit() for ch in summary):
                 all_empty = False
                 break
         if all_empty:
+            # Don't keep an orphaned empty shape we just added.
+            if head_source == "created":
+                try:
+                    headline_shape._element.getparent().remove(headline_shape._element)
+                except Exception:
+                    pass
             updates.append(HeadlineUpdate(
                 s_idx, old_headline, "",
                 "all data shapes empty/null — preserved", "unchanged"))
@@ -565,7 +833,8 @@ def refresh_headlines(
         connected_flag = "connected" if s_idx in spec_slides else "non-connected"
         updates.append(HeadlineUpdate(
             s_idx, old_headline, new_headline,
-            f"{connected_flag}: {n_shapes} data shape(s) [{kinds}]",
+            f"{connected_flag} | {n_shapes} data shape(s) [{kinds}] | "
+            f"shape: {head_source}",
             "updated"))
 
     if not dry_run:

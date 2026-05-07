@@ -25,7 +25,11 @@ sys.path.insert(0, str(REPO_ROOT))
 from slidegen.headliner_full_workflow import (
     _all_data_shapes,
     _build_prompt,
+    _ensure_headline_shape,
+    _find_empty_headline_zone_shape,
     _find_headline_shape,
+    _llm_pick_talking_header,
+    _score_narrative,
     _summarize_table,
     refresh_headlines,
 )
@@ -257,13 +261,16 @@ def test_prompt_handles_multiple_data_shapes():
 def test_refresh_headlines_processes_non_connected_slides(tmp_path, monkeypatch):
     """Non-connected slide (slide_index NOT in spec) MUST still get
     its talking header rewritten — that's the new contract."""
-    # Build a 1-slide deck with a talking header + a chart
+    # Build a 1-slide deck with a talking header + a chart. The header
+    # must score as a real narrative (not a label) so the new
+    # skipped_label guard doesn't fire.
     prs = Presentation()
     prs.slide_width = Inches(10)
     prs.slide_height = Inches(7.5)
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_textbox(slide,
-                 "Original talking header that needs to be rewritten by Claude.",
+                 "RINVOQ retained perceived edge at 47 percent vs 33 percent "
+                 "for Tremfya across UC HCPs in Q1, climbing 6 points QoQ.",
                  left_in=0.3, top_in=0.2, width_in=9.0)
     # Add a small chart so _all_data_shapes returns something
     from pptx.chart.data import CategoryChartData
@@ -313,7 +320,8 @@ def test_refresh_headlines_processes_table_only_slide(tmp_path, monkeypatch):
     prs.slide_height = Inches(7.5)
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_textbox(slide,
-                 "Talking header for a table-only slide that should still rewrite.",
+                 "RINVOQ leadership grew 4 points QoQ to 47 percent across "
+                 "UC HCPs while Tremfya held at 33 percent.",
                  left_in=0.3, top_in=0.2, width_in=9.0)
     tbl = slide.shapes.add_table(3, 3, Inches(1), Inches(2), Inches(6), Inches(3))
     for r in range(3):
@@ -342,14 +350,14 @@ def test_refresh_headlines_processes_table_only_slide(tmp_path, monkeypatch):
     assert "table" in updates[0].chart_summary
 
 
-def test_refresh_headlines_skips_when_no_talking_header(tmp_path, monkeypatch):
-    """Cover/divider slide with no qualifying talking header — skipped
-    silently with status no_headline."""
+def test_refresh_headlines_skips_data_less_slide_as_no_chart(tmp_path, monkeypatch):
+    """Cover/divider slide with no chart and no table — skipped as
+    no_chart (data-check now runs BEFORE headline-find, so we don't
+    create empty shapes on data-less slides)."""
     prs = Presentation()
     prs.slide_width = Inches(10)
     prs.slide_height = Inches(7.5)
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    # Only a centred short title — fails the > 30 chars filter
     _add_textbox(slide, "PROJECT COVER",
                  left_in=2.0, top_in=3.0, width_in=6.0)
 
@@ -369,7 +377,7 @@ def test_refresh_headlines_skips_when_no_talking_header(tmp_path, monkeypatch):
         spec_path=None,
         out_pptx=str(out_path),
     )
-    assert updates[0].status == "no_headline"
+    assert updates[0].status == "no_chart"
 
 
 def test_refresh_headlines_rewrites_even_when_values_unchanged(tmp_path, monkeypatch):
@@ -381,7 +389,8 @@ def test_refresh_headlines_rewrites_even_when_values_unchanged(tmp_path, monkeyp
     prs.slide_height = Inches(7.5)
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_textbox(slide,
-                 "Talking header that should be rewritten even with stable data.",
+                 "RINVOQ retained perceived edge at 47 percent vs 33 percent "
+                 "for Tremfya across UC HCPs, holding steady QoQ.",
                  left_in=0.3, top_in=0.2, width_in=9.0)
     from pptx.chart.data import CategoryChartData
     from pptx.enum.chart import XL_CHART_TYPE
