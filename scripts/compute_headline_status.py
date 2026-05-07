@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pptx import Presentation
 
-from slidegen.headline_refresh import (
+from slidegen.headliner_full_workflow import (
     HeadlineUpdate,
     _all_none,
     _find_headline_shape,

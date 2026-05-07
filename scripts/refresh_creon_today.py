@@ -209,7 +209,7 @@ def main():
     # ── Step 3: Headlines ──
     if os.getenv("LLM_API_KEY"):
         print("\n[3/5] refresh_headlines (LLM rewrite)...")
-        from slidegen.headline_refresh import refresh_headlines
+        from slidegen.headliner_full_workflow import refresh_headlines
         try:
             with_headlines_pptx = work_dir / f"{base}_step3_headlines.pptx"
             updates = refresh_headlines(

@@ -40,7 +40,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from pptx import Presentation  # noqa: E402
 
-from slidegen.headline_refresh import (  # noqa: E402
+from slidegen.headliner_full_workflow import (  # noqa: E402
     _all_none,
     _find_headline_shape,
     _largest_chart,
@@ -155,7 +155,7 @@ def test_deck_writes_match_status(deck_key: str):
     if not with_headlines.exists():
         pytest.skip(
             f"with_headlines deck not produced yet: {with_headlines}\n"
-            "Generate by running: python -m slidegen.headline_refresh "
+            "Generate by running: python -m slidegen.headliner_full_workflow "
             f"{deck_key}"
         )
     if not status_json.exists():

@@ -22,7 +22,7 @@ from pptx.util import Inches, Pt
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from slidegen.headline_refresh import (
+from slidegen.headliner_full_workflow import (
     _all_data_shapes,
     _build_prompt,
     _find_headline_shape,
