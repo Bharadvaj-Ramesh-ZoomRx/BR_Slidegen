@@ -404,6 +404,46 @@ def _create_talking_header_shape(slide):
     )
 
 
+# Vertical gap threshold (EMU). When the topmost wide-enough text frame
+# on a slide sits at or below this value from the slide top, the empty
+# space ABOVE it is treated as the talking-header placeholder — even if
+# a label-shaped section title is the only thing visible. The user's
+# rule: "even if there is a gap large enough for a 2- to 3-liner, that
+# gap should be considered a placeholder for the talking header."
+# 0.5 inches comfortably fits a 2-3 line header at standard pt sizes.
+_HEADLINE_GAP_THRESHOLD_EMU = int(0.5 * 914400)
+
+
+def _topmost_wide_shape_top(slide) -> int | None:
+    """Return the `top` (EMU) of the topmost wide-enough text frame on
+    the slide (any length, any narrative-shape — pure layout query).
+
+    Used to decide whether the slide has empty space at the top that
+    qualifies as a talking-header placeholder. Returns None when the
+    slide has no text frames in the upper region.
+    """
+    slide_w_emu = (slide.part.package.presentation_part.presentation
+                   .slide_width if hasattr(slide.part.package, "presentation_part")
+                   else 9144000)
+    min_width_emu = int(slide_w_emu * 0.4)
+    topmost = None
+    for shape in slide.shapes:
+        if not shape.has_text_frame:
+            continue
+        text = (shape.text_frame.text or "").strip()
+        if not text:
+            continue  # empty frames don't block — they ARE the placeholder
+        top = shape.top or 0
+        width = shape.width or 0
+        if width < min_width_emu:
+            continue
+        if top >= _HEADLINE_TOP_LIMIT_EMU:
+            continue
+        if topmost is None or top < topmost:
+            topmost = top
+    return topmost
+
+
 def _ensure_headline_shape(slide, llm_arbiter=None):
     """Find the talking-header shape OR create one if missing.
 
@@ -669,6 +709,7 @@ def refresh_headlines(
     only_slides: Optional[list[int]] = None,
     model: str = "anthropic/claude-sonnet-4-6",
     dry_run: bool = False,
+    force: bool = False,
 ) -> list[HeadlineUpdate]:
     """Rewrite the talking header on EVERY slide that has one + at least
     one chart or table.
@@ -751,21 +792,40 @@ def refresh_headlines(
         old_headline = headline_shape.text_frame.text.strip()
 
         # 2b. If the existing talking-header text reads like a slide-section
-        #     title / banner ("Message Recall CREON", "Interaction Details
-        #     - All Products", etc.) — the deck author intentionally didn't
-        #     put a narrative claim in this slot, so don't overwrite it
-        #     with one. Only skips the EXISTING-text path; empty and
-        #     created shapes still get written.
+        #     title / banner, decide between rewriting the label, creating
+        #     a new shape in the empty space above, or skipping.
+        #
+        #     User's rule: the talking-header POSITION is the top of the
+        #     slide. Even if there's a gap large enough for 2-3 lines,
+        #     that gap IS the placeholder. So:
+        #       - Label at top > 0.5in (significant gap above)  → CREATE
+        #         new shape at top=0.2in. Don't overwrite the section
+        #         title; sit a fresh talking header in the gap above it.
+        #       - Label at top <= 0.5in (no gap; label IS in the talking-
+        #         header position) → SKIP. Author chose label here.
+        #     `force=True` overrides the no-gap skip and creates anyway
+        #     (will likely overlap the section title; analyst can tidy).
         LABEL_SCORE_THRESHOLD = 2.0
         if head_source == "existing" and old_headline:
             old_score = _score_narrative(old_headline)
             if old_score < LABEL_SCORE_THRESHOLD:
-                updates.append(HeadlineUpdate(
-                    s_idx, old_headline, "",
-                    f"existing header reads as slide label "
-                    f"(score={old_score:.1f}); not rewriting",
-                    "skipped_label"))
-                continue
+                topmost_top = _topmost_wide_shape_top(r_slide)
+                gap_above = (topmost_top is not None
+                             and topmost_top > _HEADLINE_GAP_THRESHOLD_EMU)
+                if gap_above or force:
+                    # Don't overwrite the label/section title; create a
+                    # fresh talking-header textbox in the empty space
+                    # above (or with --force, accept potential overlap).
+                    headline_shape = _create_talking_header_shape(r_slide)
+                    head_source = "created"
+                    old_headline = ""
+                else:
+                    updates.append(HeadlineUpdate(
+                        s_idx, old_headline, "",
+                        f"existing header reads as slide label "
+                        f"(score={old_score:.1f}, no gap above); not rewriting",
+                        "skipped_label"))
+                    continue
 
         # 3. Source summaries are optional — included only when the slide
         #    was connected so Claude can describe MOVEMENT. Non-connected
@@ -888,6 +948,15 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dry-run", action="store_true",
                         help="Don't call the LLM or write the deck.")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Bypass the label-skip guard. When the only in-zone shape on "
+             "a slide is label-shaped (e.g. 'Interaction Details — All "
+             "Products'), create a NEW talking-header textbox at the "
+             "default top-left position rather than skipping the slide. "
+             "Use this on test runs where you've deleted the talking "
+             "headers and want one regenerated for every slide.",
+    )
     args = parser.parse_args()
 
     deck_path = Path(args.deck)
@@ -906,6 +975,7 @@ if __name__ == "__main__":
         only_slides=args.slide,
         model=args.model,
         dry_run=args.dry_run,
+        force=args.force,
     )
 
     counts = Counter(u.status for u in updates)
