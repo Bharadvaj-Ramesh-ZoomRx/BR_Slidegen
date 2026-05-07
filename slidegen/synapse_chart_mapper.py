@@ -943,15 +943,25 @@ def pivot_records_to_chart_data(
             df = filtered
 
     # ── Latest-wave-only filter ──
-    # When `time_period_name` is in the data but NOT in ColumnFields (i.e.
-    # waves aren't a chart axis) AND multiple waves are present, the user
-    # intent is "show the latest snapshot," not "sum/mean across waves."
-    # Without this filter, an L-style label_table with dynamic_latest_n=2
-    # gets two waves' Mean values summed (148% instead of 74%).
-    # Sort by chronological wave key (NOT time_period_id — that gotcha).
+    # When `time_period_name` is in the data but is NOT a pivot axis at all
+    # (neither RowFields nor ColumnFields), the user intent is "show the
+    # latest snapshot," not "sum/mean across waves." Without this filter,
+    # an L-style label_table with dynamic_latest_n=2 would aggregate two
+    # waves' Mean values (148% instead of 74%).
+    #
+    # CRITICAL: must check BOTH RowFields and ColumnFields. If the spec
+    # has RowFields=['time_period_name'] (e.g. CREON slide 17 trended
+    # rep-effectiveness charts) the user wants every wave as a row of
+    # the chart's category axis. Stripping to the latest wave here
+    # collapses dynamic_latest_n=6 to 1 row in the chart — exactly the
+    # bug observed on slide 17 where Nov-Apr should appear and only
+    # the latest wave was rendering.
     if (
         "time_period_name" in df.columns
         and "time_period_name" not in (col_fields or [])
+        and "time_period_name" not in (raw_col_fields or [])
+        and "time_period_name" not in (row_fields or [])
+        and "time_period_name" not in (raw_row_fields or [])
         and df["time_period_name"].nunique() > 1
     ):
         unique_waves = list(df["time_period_name"].astype(str).unique())
