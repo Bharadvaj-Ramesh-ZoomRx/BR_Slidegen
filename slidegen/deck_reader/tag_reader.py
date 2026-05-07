@@ -44,7 +44,9 @@ from slidegen.slide_spec.schema import (
 # Tag names — UPPERCASE in real PPTX files (Galen-PowerPoint Connector convention).
 # Comparison is case-insensitive throughout tag_reader to handle mixed-case edge cases.
 TAG_REPORT_CONFIG_HASH = "REPORTCONFIGHASH"
+TAG_REPORT_CONFIG_HASH_BACKUP = "REPORTCONFIGHASH_BACKUP"
 TAG_PIVOT_CONFIG_HASH = "DATAFRAMECONFIGHASH"
+TAG_PIVOT_CONFIG_HASH_BACKUP = "DATAFRAMECONFIGHASH_BACKUP"
 TAG_MAPPING_CONFIG = "MAPPINGCONFIG"
 TAG_REFRESH_ERROR = "REFRESHERRORMSG"
 TAG_LAST_REFRESH = "LASTREFRESHTIME"
@@ -69,6 +71,13 @@ class TagReaderSummary:
     report_configs_resolved: int = 0
     pivot_configs_resolved: int = 0
     mapping_configs_resolved: int = 0
+    # Fallback path: per-shape *_BACKUP tag JSON used when the deck-wide
+    # customXml store has no entry for the hash. Connector's migration sometimes
+    # writes the per-shape tag fully but skips the customXml store entry —
+    # without this fallback those shapes look "non-connected" even though
+    # their tag is intact.
+    report_configs_from_backup: int = 0
+    pivot_configs_from_backup: int = 0
     per_slide: dict = field(default_factory=dict)  # slide_index -> {tagged, untagged}
 
 
@@ -425,6 +434,28 @@ def _extract_headline_from_slide(slide) -> str:
     # Pick by: largest font first, then longest text, then lower position
     candidates.sort(key=lambda c: (-c[0], -c[1], c[2]))
     return candidates[0][3]
+
+
+def _resolve_config_from_backup(tags: dict, backup_tag_name: str) -> Optional[dict]:
+    """Parse the per-shape *_BACKUP tag JSON. Used as a fallback when the
+    deck-wide customXml store has no entry for the hash.
+
+    Connector writes the full ReportConfig / PivotConfig as inline JSON in
+    REPORTCONFIGHASH_BACKUP / DATAFRAMECONFIGHASH_BACKUP on every connected
+    shape. The customXml store is canonical when present (one copy per hash,
+    deduplicated across the deck), but cross-deck PowerPoint paste +
+    incremental migration can leave hashes referenced on shapes without a
+    matching customXml entry. Falling back to the per-shape backup keeps
+    those shapes treated as connected — which is what the user sees in
+    PowerPoint anyway.
+    """
+    raw = tags.get(backup_tag_name)
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 def _report_config_to_lineage(report_config: dict, tags: dict) -> DataLineage:
@@ -823,21 +854,34 @@ def read_tagged_shapes(
             slide_tagged += 1
             summary.tagged_shapes += 1
 
-            # Resolve ReportConfig from Custom XML Part
+            # Resolve ReportConfig from Custom XML Part — fall back to the
+            # per-shape REPORTCONFIGHASH_BACKUP JSON if the customXml store
+            # has no entry for this hash (Connector migration sometimes
+            # populates the per-shape tag but not the deck-wide store).
             report_config = None
             if has_report_hash:
                 r_hash = tags[TAG_REPORT_CONFIG_HASH]
                 report_config = report_configs.get(r_hash)
                 if report_config:
                     summary.report_configs_resolved += 1
+                else:
+                    report_config = _resolve_config_from_backup(
+                        tags, TAG_REPORT_CONFIG_HASH_BACKUP)
+                    if report_config:
+                        summary.report_configs_from_backup += 1
 
-            # Resolve PivotConfig
+            # Resolve PivotConfig — same fallback to DATAFRAMECONFIGHASH_BACKUP.
             pivot_config = None
             if has_pivot_hash:
                 p_hash = tags[TAG_PIVOT_CONFIG_HASH]
                 pivot_config = pivot_configs.get(p_hash)
                 if pivot_config:
                     summary.pivot_configs_resolved += 1
+                else:
+                    pivot_config = _resolve_config_from_backup(
+                        tags, TAG_PIVOT_CONFIG_HASH_BACKUP)
+                    if pivot_config:
+                        summary.pivot_configs_from_backup += 1
 
             # Parse MappingConfig
             mapping_config = None
@@ -969,8 +1013,12 @@ def print_summary(summary: TagReaderSummary) -> None:
     print(f"  Tagged shapes (Tier 1):    {summary.tagged_shapes}")
     print(f"  Untagged shapes (Tier 2):  {summary.untagged_shapes}")
     print(f"  Custom XML Parts found:    {summary.custom_xml_parts_found}")
-    print(f"  ReportConfigs resolved:    {summary.report_configs_resolved}")
-    print(f"  PivotConfigs resolved:     {summary.pivot_configs_resolved}")
+    print(f"  ReportConfigs resolved:    {summary.report_configs_resolved}"
+          + (f"  (+{summary.report_configs_from_backup} via per-shape backup)"
+             if summary.report_configs_from_backup else ""))
+    print(f"  PivotConfigs resolved:     {summary.pivot_configs_resolved}"
+          + (f"  (+{summary.pivot_configs_from_backup} via per-shape backup)"
+             if summary.pivot_configs_from_backup else ""))
     print(f"  MappingConfigs resolved:   {summary.mapping_configs_resolved}")
     print(f"\n  Per-slide breakdown:")
     for idx, counts in sorted(summary.per_slide.items()):
@@ -1336,13 +1384,20 @@ def generate_config_specs(
             slide_tagged += 1
             summary.tagged_shapes += 1
 
-            # Resolve configs from Custom XML
+            # Resolve configs from Custom XML — fall back to per-shape
+            # *_BACKUP tag JSON when the customXml store has no entry.
+            # See `_resolve_config_from_backup` for the full reasoning.
             report_config = None
             if has_report_hash:
                 r_hash = tags[TAG_REPORT_CONFIG_HASH]
                 report_config = report_configs.get(r_hash)
                 if report_config:
                     summary.report_configs_resolved += 1
+                else:
+                    report_config = _resolve_config_from_backup(
+                        tags, TAG_REPORT_CONFIG_HASH_BACKUP)
+                    if report_config:
+                        summary.report_configs_from_backup += 1
 
             pivot_config = None
             if has_pivot_hash:
@@ -1350,6 +1405,11 @@ def generate_config_specs(
                 pivot_config = pivot_configs.get(p_hash)
                 if pivot_config:
                     summary.pivot_configs_resolved += 1
+                else:
+                    pivot_config = _resolve_config_from_backup(
+                        tags, TAG_PIVOT_CONFIG_HASH_BACKUP)
+                    if pivot_config:
+                        summary.pivot_configs_from_backup += 1
 
             mapping_config = None
             if has_mapping:
